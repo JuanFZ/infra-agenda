@@ -38,18 +38,28 @@ class ClickUpClient:
             "Content-Type": "application/json"
         }
 
-    def fetch_tasks(self, page=0):
+    def fetch_tasks(self):
         if not self.token or not self.team_id:
             return []
-        url = f"{self.base_url}/team/{self.team_id}/task?include_closed=true&page={page}"
-        try:
-            res = requests.get(url, headers=self.get_headers(), timeout=15)
-            res.raise_for_status()
-            data = res.json()
-            return data.get("tasks", [])
-        except Exception as e:
-            print(f"[ClickUpClient] Error fetching tasks: {e}")
-            return []
+        all_tasks = []
+        page = 0
+        while True:
+            url = f"{self.base_url}/team/{self.team_id}/task?include_closed=true&subtasks=true&page={page}"
+            try:
+                res = requests.get(url, headers=self.get_headers(), timeout=15)
+                res.raise_for_status()
+                data = res.json()
+                tasks = data.get("tasks", [])
+                if not tasks:
+                    break
+                all_tasks.extend(tasks)
+                if len(tasks) < 100:
+                    break
+                page += 1
+            except Exception as e:
+                print(f"[ClickUpClient] Error fetching tasks page {page}: {e}")
+                break
+        return all_tasks
 
     def normalize_task(self, raw: dict) -> dict:
         task_id = raw.get("id")

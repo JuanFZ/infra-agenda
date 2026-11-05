@@ -93,13 +93,12 @@ def sync_clickup(db: Session):
             count += 1
 
         # Eliminar tareas que hayan sido borradas en ClickUp
-        if active_ids:
-            purged = db.query(Item).filter(
-                Item.source == "ClickUp",
-                ~Item.external_id.in_(active_ids)
-            ).all()
-            for p in purged:
-                db.delete(p)
+        purged = db.query(Item).filter(
+            Item.source == "ClickUp",
+            ~Item.external_id.in_(active_ids)
+        ).all()
+        for p in purged:
+            db.delete(p)
 
         db.commit()
         log = SyncLog(source="ClickUp", status="OK", records_synced=count, message=f"Sincronizadas {count} tareas con éxito.")
