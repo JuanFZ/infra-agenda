@@ -78,7 +78,44 @@ class GLPIClient:
         res.raise_for_status()
         return res.json()
 
-    def normalize_ticket(self, raw_ticket: dict) -> dict:
+    def fetch_users_map(self) -> dict:
+        """Obtiene el diccionario {user_id: 'Nombre Técnico'} de GLPI."""
+        try:
+            url = f"{self.base_url}/User?range=0-200"
+            headers = self.get_session_headers()
+            res = requests.get(url, headers=headers, timeout=10)
+            if res.status_code == 200:
+                mapping = {}
+                for u in res.json():
+                    uid = u.get("id")
+                    first = u.get("firstname", "")
+                    real = u.get("realname", "")
+                    full = f"{first} {real}".strip()
+                    mapping[uid] = full or u.get("name") or f"Usuario #{uid}"
+                return mapping
+        except Exception as e:
+            print(f"[GLPI] Error consultando catálogo de usuarios: {e}")
+        return {}
+
+    def fetch_ticket_assignees_map(self, users_map: dict) -> dict:
+        """Obtiene el mapa {tickets_id: 'Nombre Técnico'} desde la relación Ticket_User (type=2: asignado)."""
+        try:
+            url = f"{self.base_url}/Ticket_User?range=0-500"
+            headers = self.get_session_headers()
+            res = requests.get(url, headers=headers, timeout=10)
+            if res.status_code == 200:
+                mapping = {}
+                for tu in res.json():
+                    if tu.get("type") == 2:  # 2 = Técnico asignado
+                        tid = str(tu.get("tickets_id"))
+                        uid = tu.get("users_id")
+                        mapping[tid] = users_map.get(uid, f"Usuario #{uid}")
+                return mapping
+        except Exception as e:
+            print(f"[GLPI] Error consultando asignaciones Ticket_User: {e}")
+        return {}
+
+    def normalize_ticket(self, raw_ticket: dict, assignees_map: dict = None) -> dict:
         ticket_id = str(raw_ticket.get("id"))
         raw_status = int(raw_ticket.get("status", 1))
         status_unif, status_orig = STATUS_MAP.get(raw_status, ("pendiente", f"Estado {raw_status}"))
@@ -108,6 +145,10 @@ class GLPIClient:
         base_host = self.base_url.replace("/apirest.php", "")
         ticket_url = f"{base_host}/front/ticket.form.php?id={ticket_id}"
 
+        assignee = "Sin asignar"
+        if assignees_map and ticket_id in assignees_map:
+            assignee = assignees_map[ticket_id]
+
         return {
             "source": "GLPI",
             "external_id": ticket_id,
@@ -116,7 +157,7 @@ class GLPIClient:
             "category": "Soporte TI / Infraestructura",
             "client_name": f"Entidad #{raw_ticket.get('entities_id', 1)}",
             "client_type": "Interno",
-            "assignee_name": "Técnico GLPI",
+            "assignee_name": assignee,
             "priority": prio_unif,
             "status": status_unif,
             "status_origin": status_orig,

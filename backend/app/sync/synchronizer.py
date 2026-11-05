@@ -9,10 +9,12 @@ from ..notifications.telegram_notifier import check_and_notify_alerts
 def sync_glpi(db: Session):
     client = GLPIClient()
     try:
+        users_map = client.fetch_users_map()
+        assignees_map = client.fetch_ticket_assignees_map(users_map)
         raw_tickets = client.fetch_tickets()
         count = 0
         for raw in raw_tickets:
-            norm = client.normalize_ticket(raw)
+            norm = client.normalize_ticket(raw, assignees_map)
             # Buscar si ya existe
             item = db.query(Item).filter(
                 Item.source == "GLPI",
