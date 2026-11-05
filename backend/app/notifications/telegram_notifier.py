@@ -87,3 +87,4 @@ def check_and_notify_alerts(db: Session):
             db.add(log)
             db.commit()
             print(f"[Telegram Notifier] Alerta '{sem}' enviada para item #{item.external_id} ({item.source})")
+
