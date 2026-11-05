@@ -1,4 +1,4 @@
-# Propuesta Estratégica: Evolución de la Mesa de Control de Infraestructura y BD
+# Propuesta Estratégica: Evolución de la Agenda de Infra y BD
 
 **Destinatario:** Coordinación de Infraestructura y Base de Datos  
 **Autor:** Equipo de Desarrollo e Integración de Infraestructura  
@@ -17,7 +17,7 @@ flowchart LR
     CU["ClickUp (Proyectos y Tareas)"] -->|API v2 Oficial| SYNC
     SYNC --> DB[("Base de Datos Unificada (Tabla Items)")]
     DB --> API["Backend FastAPI"]
-    API --> WEB["Mesa de Control Web (Nginx - Modo TV y Kanban)"]
+    API --> WEB["Agenda de Infra Web (Nginx - Modo TV y Kanban)"]
 ```
 
 ### Principales Hitos Entregados:
@@ -108,3 +108,4 @@ flowchart TD
 La infraestructura montada en la Fase 1 es sólida, modular y está completamente contenerizada en Docker. Las mejoras propuestas no requieren cambiar la arquitectura base, sino simplemente activar módulos adicionales sobre el backend que ya está funcionando.
 
 Se recomienda priorizar de inmediato **M1 (Horario Hábil)** y **M2 (Alertas en Telegram/Teams)** por su impacto directo en la satisfacción de los clientes internos y externos.
+
