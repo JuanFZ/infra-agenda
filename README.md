@@ -1,4 +1,4 @@
-# Mesa de Control · Infraestructura y Base de Datos
+# Agenda de Infra · Infraestructura y Base de Datos
 
 Sistema centralizado de seguimiento y gestión operativa en tiempo real que consolida los requerimientos y tickets de **GLPI** y las tareas de **ClickUp** en un único tablero de control unificado.
 

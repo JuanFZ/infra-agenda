@@ -13,7 +13,7 @@ from .sync.synchronizer import sync_all
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Mesa de Control - Infraestructura y BD",
+    title="Agenda de Infra - Infraestructura y BD",
     description="API de consolidación y sincronización en tiempo real de GLPI y ClickUp",
     version="1.0.0"
 )
