@@ -196,6 +196,21 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
 const API_URL = window.location.port === '8000' ? 'http://localhost:8000/api' : '/api';
 let ALL_ITEMS = [];
 
+function formatDate(dateStr, includeTime = false) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  if (!includeTime) {
+    return `${day}-${month}-${year}`;
+  }
+  const hours = String(d.getHours()).padStart(2, '0');
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  return `${day}-${month}-${year} ${hours}:${mins}`;
+}
+
 async function loadData() {
   try {
     // 1. Cargar KPIs
@@ -203,7 +218,7 @@ async function loadData() {
     const kpis = await resKpi.json();
     renderKPIs(kpis);
     document.getElementById('apiStatus').textContent = 'API Conectada';
-    document.getElementById('syncTime').textContent = kpis.last_sync ? `Última sync: ${new Date(kpis.last_sync).toLocaleTimeString()}` : 'Sync: OK';
+    document.getElementById('syncTime').textContent = kpis.last_sync ? `Última sync: ${formatDate(kpis.last_sync, true)}` : 'Sync: OK';
 
     // 2. Cargar Items
     const resItems = await fetch(`${API_URL}/items`);
@@ -265,7 +280,7 @@ function renderAll() {
         <td><span class="prio prio-${it.priority}">${it.priority}</span></td>
         <td>${it.status_origin || it.status}</td>
         <td><b>${it.sla_percent}%</b></td>
-        <td class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.due_at ? new Date(it.due_at).toLocaleDateString() : '—'}</td>
+        <td class="${it.is_overdue ? 'txt-red' : 'muted'}">${formatDate(it.due_at)}</td>
       </tr>
     `).join('');
   }
@@ -281,7 +296,7 @@ function renderAll() {
       <td>${it.source} #${it.external_id}</td>
       <td>${it.title}</td>
       <td>${it.priority}</td>
-      <td style="color:var(--red)">${it.sla_percent}% consumido</td>
+      <td style="color:var(--red)">${it.sla_percent}% consumido (Vence: ${formatDate(it.due_at)})</td>
     </tr>
   `).join('') || '<tr><td colspan="5" class="muted" style="text-align:center">🎉 Ningún asunto atrasado</td></tr>';
 }
@@ -306,7 +321,7 @@ function renderKanban(list) {
               <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
             </div>
             <div class="title">${it.title}</div>
-            <div class="muted" style="font-size:11px">${it.client_name} · SLA: ${it.sla_percent}%</div>
+            <div class="muted" style="font-size:11px">${it.client_name} · SLA: ${it.sla_percent}%${it.due_at ? ' · Vence: ' + formatDate(it.due_at) : ''}</div>
           </div>
         `).join('') || '<div class="muted" style="font-size:12px;text-align:center;padding:20px">Vacío</div>'}
       </div>
@@ -326,8 +341,8 @@ function openModal(id) {
       <dt>Estado:</dt><dd>${it.status_origin || it.status}</dd>
       <dt>Prioridad:</dt><dd><span class="prio prio-${it.priority}">${it.priority}</span></dd>
       <dt>Cliente / Entidad:</dt><dd>${it.client_name}</dd>
-      <dt>Creado el:</dt><dd>${it.created_at ? new Date(it.created_at).toLocaleString() : '—'}</dd>
-      <dt>Vencimiento SLA:</dt><dd>${it.due_at ? new Date(it.due_at).toLocaleString() : '—'}</dd>
+      <dt>Creado el:</dt><dd>${formatDate(it.created_at, true)}</dd>
+      <dt>Vencimiento SLA:</dt><dd>${formatDate(it.due_at, true)}</dd>
       <dt>SLA consumido:</dt><dd><b>${it.sla_percent}%</b> (${it.semaphore.toUpperCase()})</dd>
     </dl>
     <div class="actions">
