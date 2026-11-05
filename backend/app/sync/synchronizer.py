@@ -46,13 +46,12 @@ def sync_glpi(db: Session):
             count += 1
         
         # Si un ticket fue eliminado por completo de GLPI (no devuelto por la API), eliminarlo de la BD
-        if active_ids:
-            purged = db.query(Item).filter(
-                Item.source == "GLPI",
-                ~Item.external_id.in_(active_ids)
-            ).all()
-            for p in purged:
-                db.delete(p)
+        purged = db.query(Item).filter(
+            Item.source == "GLPI",
+            ~Item.external_id.in_(active_ids)
+        ).all()
+        for p in purged:
+            db.delete(p)
 
         db.commit()
         log = SyncLog(source="GLPI", status="OK", records_synced=count, message=f"Sincronizados {count} tickets con éxito.")

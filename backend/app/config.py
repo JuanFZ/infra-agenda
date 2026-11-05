@@ -13,6 +13,7 @@ GLPI_APP_TOKEN = os.getenv("GLPI_APP_TOKEN", "")
 
 CLICKUP_TOKEN = os.getenv("CLICKUP_TOKEN", "")
 CLICKUP_TEAM_ID = os.getenv("CLICKUP_TEAM_ID", "")
+CLICKUP_SPACE_ID = os.getenv("CLICKUP_SPACE_ID", "55559035")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./dashboard.db")
 SYNC_INTERVAL_MINUTES = int(os.getenv("SYNC_INTERVAL_MINUTES", "1"))

@@ -1,6 +1,6 @@
 import datetime
 import requests
-from ..config import CLICKUP_TOKEN, CLICKUP_TEAM_ID
+from ..config import CLICKUP_TOKEN, CLICKUP_TEAM_ID, CLICKUP_SPACE_ID
 
 STATUS_MAP_CLICKUP = {
     "to do": "pendiente",
@@ -43,8 +43,9 @@ class ClickUpClient:
             return []
         all_tasks = []
         page = 0
+        space_param = f"&space_ids%5B%5D={CLICKUP_SPACE_ID}" if CLICKUP_SPACE_ID else ""
         while True:
-            url = f"{self.base_url}/team/{self.team_id}/task?include_closed=true&subtasks=true&page={page}"
+            url = f"{self.base_url}/team/{self.team_id}/task?include_closed=true&subtasks=true{space_param}&page={page}"
             try:
                 res = requests.get(url, headers=self.get_headers(), timeout=15)
                 res.raise_for_status()
