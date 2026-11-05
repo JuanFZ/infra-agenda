@@ -16,3 +16,7 @@ CLICKUP_TEAM_ID = os.getenv("CLICKUP_TEAM_ID", "")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./dashboard.db")
 SYNC_INTERVAL_MINUTES = int(os.getenv("SYNC_INTERVAL_MINUTES", "1"))
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+

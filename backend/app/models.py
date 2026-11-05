@@ -62,3 +62,13 @@ class SyncLog(Base):
     message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+
+class AlertLog(Base):
+    __tablename__ = "alert_logs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    item_id = Column(Integer, index=True)
+    semaphore = Column(String(20)) # 'amarillo', 'rojo'
+    sent_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+

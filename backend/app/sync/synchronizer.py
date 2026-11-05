@@ -4,6 +4,7 @@ from ..database import SessionLocal
 from ..models import Item, SyncLog
 from .glpi_client import GLPIClient
 from .clickup_client import ClickUpClient
+from ..notifications.telegram_notifier import check_and_notify_alerts
 
 def sync_glpi(db: Session):
     client = GLPIClient()
@@ -81,6 +82,8 @@ def sync_all():
         res_glpi = sync_glpi(db)
         res_cu = sync_clickup(db)
         print(f"[Sync Completado] GLPI: {res_glpi.get('status')} ({res_glpi.get('count', 0)}), ClickUp: {res_cu.get('status')} ({res_cu.get('count', 0)})")
+        # Revisar y enviar alertas automáticas a Telegram
+        check_and_notify_alerts(db)
     finally:
         db.close()
 
