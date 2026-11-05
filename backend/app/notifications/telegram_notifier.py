@@ -1,3 +1,4 @@
+import datetime
 import urllib.request
 import json
 from sqlalchemy.orm import Session
@@ -67,6 +68,7 @@ def resolve_assignee_mention(db: Session, assignee_name: str, is_critical: bool 
 def check_and_notify_alerts(db: Session):
     """
     Revisa los tickets activos y envía notificaciones a Telegram:
+    - 🆕 Nuevo requerimiento asignado (creado en las últimas 4 horas)
     - 🟡 SLA entre 75% y 99% (Alerta Preventiva)
     - 🔴 SLA >= 100% o atrasado (Alerta Crítica / Fuera de SLA)
     Usa la tabla AlertLog para garantizar que cada ticket se alerte solo UNA vez por nivel.
@@ -74,13 +76,42 @@ def check_and_notify_alerts(db: Session):
     if not config.TELEGRAM_BOT_TOKEN or not config.TELEGRAM_CHAT_ID:
         return
 
+    now = datetime.datetime.utcnow()
     open_items = db.query(Item).filter(Item.status != "cerrado").all()
     for item in open_items:
+        # 1. Alerta de NUEVO requerimiento asignado (si fue creado en las últimas 4 horas)
+        if item.created_at and (now - item.created_at).total_seconds() < 14400:
+            new_alerted = db.query(AlertLog).filter(
+                AlertLog.item_id == item.id,
+                AlertLog.semaphore == "nuevo"
+            ).first()
+
+            if not new_alerted:
+                assignee_str = resolve_assignee_mention(db, item.assignee_name, is_critical=False)
+                due_str = item.due_at.strftime("%d-%m-%Y %H:%M") if item.due_at else "No especificada"
+                ticket_url = item.url or "http://200.74.215.44:7070/"
+                msg_nuevo = (
+                    f"🆕 *NUEVO REQUERIMIENTO ASIGNADO ({item.source.upper()})*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📋 *{item.source} #{item.external_id}:* {item.title}\n"
+                    f"🏢 *Cliente / Espacio:* {item.client_name}\n"
+                    f"👤 *Responsable:* {assignee_str}\n"
+                    f"⚡ *Prioridad:* {item.priority}\n"
+                    f"⏰ *Vence:* {due_str}\n"
+                    f"🔗 [Abrir en {item.source}]({ticket_url})"
+                )
+                ok = send_telegram_message(msg_nuevo)
+                if ok:
+                    log_nuevo = AlertLog(item_id=item.id, semaphore="nuevo")
+                    db.add(log_nuevo)
+                    db.commit()
+                    print(f"[Telegram Notifier] Alerta 'nuevo' enviada para #{item.external_id} ({item.source})")
+
+        # 2. Alertas de SLA Preventiva y Crítica
         sem = item.semaphore
         if sem not in ("amarillo", "rojo"):
             continue
 
-        # Verificar si ya enviamos alerta para este nivel de semáforo
         already_alerted = db.query(AlertLog).filter(
             AlertLog.item_id == item.id,
             AlertLog.semaphore == sem
