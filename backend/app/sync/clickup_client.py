@@ -79,7 +79,8 @@ class ClickUpClient:
 
         # Responsables
         assignees = raw.get("assignees", [])
-        assignee_names = ", ".join([a.get("username", "") for a in assignees]) or "Sin asignar"
+        names = [a.get("username") or a.get("email") for a in assignees if a.get("username") or a.get("email")]
+        assignee_names = ", ".join(names) or "Sin asignar"
 
         return {
             "source": "ClickUp",

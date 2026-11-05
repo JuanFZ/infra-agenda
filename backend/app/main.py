@@ -13,10 +13,10 @@ from .sync.synchronizer import sync_all
 Base.metadata.create_all(bind=engine)
 
 DEFAULT_USERS = [
-    {"full_name": "Adonis Lozada", "username": "alozada", "telegram_username": "@adonislozada", "role": "coordinador"},
-    {"full_name": "Juan Fernández", "username": "jfernandez", "telegram_username": "@Juuan8", "role": "especialista"},
-    {"full_name": "Yoxaide Jiménez", "username": "yjimenez", "telegram_username": "@Yjimenezg", "role": "especialista"},
-    {"full_name": "Luis Acosta", "username": "lacosta", "telegram_username": "@lapsy0", "role": "especialista"},
+    {"full_name": "Adonis Lozada", "username": "a.lozada", "email": "a.lozada@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
+    {"full_name": "Juan Fernández", "username": "j.fernandez", "email": "j.fernandez@sycom.com.ve", "telegram_username": "@Juuan8", "role": "especialista"},
+    {"full_name": "Yoxaide Jiménez", "username": "y.jimenez", "email": "y.jimenez@sycom.com.ve", "telegram_username": "@Yjimenezg", "role": "especialista"},
+    {"full_name": "Luis Acosta", "username": "l.acosta", "email": "l.acosta@sycom.com.ve", "telegram_username": "@lapsy0", "role": "especialista"},
 ]
 
 def init_users():
@@ -30,6 +30,7 @@ def init_users():
                 exists.telegram_username = u["telegram_username"]
                 exists.role = u["role"]
                 exists.username = u["username"]
+                exists.email = u["email"]
         db.commit()
     finally:
         db.close()

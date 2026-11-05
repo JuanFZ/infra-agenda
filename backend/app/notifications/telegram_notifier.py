@@ -49,7 +49,8 @@ def resolve_assignee_mention(db: Session, assignee_name: str, is_critical: bool 
         assignee_lower = assignee_name.lower()
 
         if (first_name in assignee_lower or last_name in assignee_lower or 
-            (u.username and u.username.lower() in assignee_lower)):
+            (u.username and u.username.lower() in assignee_lower) or
+            (u.email and u.email.lower() in assignee_lower)):
             tag = u.telegram_username if u.telegram_username else u.full_name
             matched_tags.append(f"{u.full_name} ({tag})")
 
