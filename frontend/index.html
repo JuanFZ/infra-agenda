@@ -41,9 +41,11 @@ header .sub{color:var(--muted);font-size:12px}
 .filters input{min-width:240px;flex:1}
 .filters label{color:var(--muted);font-size:12px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
-.kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;cursor:pointer;transition:border-color .15s}
-.kpi:hover{border-color:var(--c,var(--accent))}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;cursor:pointer;transition:all .18s ease;user-select:none}
+.kpi:hover{border-color:var(--c,var(--accent));transform:translateY(-2px);background:var(--panel2)}
 .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c,var(--accent))}
+.kpi.selected{border-color:var(--c,var(--accent)) !important;background:var(--panel2);box-shadow:0 0 14px rgba(79,140,255,.25);transform:translateY(-2px)}
+.kpi.selected::after{content:"✓ Filtrando";position:absolute;top:10px;right:10px;font-size:10px;font-weight:700;color:var(--c,var(--accent));background:rgba(255,255,255,.08);padding:2px 7px;border-radius:4px}
 .kpi .lbl{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
 .kpi .val{font-size:28px;font-weight:700;margin-top:4px}
 .kpi .hint{font-size:11px;color:var(--muted);margin-top:2px}
@@ -124,6 +126,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
       </select>
     </label>
     <input type="text" id="fSearch" placeholder="🔍 Buscar por asunto o ID...">
+    <button class="btn" id="btnResetFilters" onclick="resetAllFilters()" style="display:none;font-size:12px;padding:7px 12px;color:var(--red);border-color:rgba(255,93,93,.3)">✕ Limpiar filtros</button>
   </div>
 
   <!-- KPIs -->
@@ -195,6 +198,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
 // Usar ruta relativa para que funcione automáticamente en localhost o a través de la IP/dominio
 const API_URL = window.location.port === '8000' ? 'http://localhost:8000/api' : '/api';
 let ALL_ITEMS = [];
+let ACTIVE_KPI_FILTER = null;
 
 function formatDate(dateStr, includeTime = false) {
   if (!dateStr) return '—';
@@ -232,15 +236,15 @@ async function loadData() {
 
 function renderKPIs(k) {
   const cards = [
-    { lbl: 'Pendientes', val: k.pendientes, hint: 'Por iniciar', c: 'var(--accent)' },
-    { lbl: 'En Curso', val: k.en_curso, hint: 'En atención', c: 'var(--cyan)' },
-    { lbl: 'En Espera', val: k.en_espera, hint: 'Cliente / Proveedor', c: 'var(--purple)' },
-    { lbl: 'Atrasados', val: k.atrasados, hint: 'SLA vencido', c: 'var(--red)' },
-    { lbl: 'Cumplimiento SLA', val: `${k.cumplimiento_sla}%`, hint: 'Meta: 90%', c: k.cumplimiento_sla >= 90 ? 'var(--green)' : 'var(--yellow)' },
-    { lbl: 'Total Registrados', val: k.total_registrados, hint: 'En base de datos', c: 'var(--accent)' }
+    { key: 'pendiente', lbl: 'Pendientes', val: k.pendientes, hint: 'Por iniciar', c: 'var(--accent)' },
+    { key: 'curso', lbl: 'En Curso', val: k.en_curso, hint: 'En atención', c: 'var(--cyan)' },
+    { key: 'espera', lbl: 'En Espera', val: k.en_espera, hint: 'Cliente / Proveedor', c: 'var(--purple)' },
+    { key: 'atrasados', lbl: 'Atrasados', val: k.atrasados, hint: 'SLA vencido', c: 'var(--red)' },
+    { key: 'cumplimiento', lbl: 'Cumplimiento SLA', val: `${k.cumplimiento_sla}%`, hint: 'Meta: 90%', c: k.cumplimiento_sla >= 90 ? 'var(--green)' : 'var(--yellow)' },
+    { key: 'total', lbl: 'Total Registrados', val: k.total_registrados, hint: 'En base de datos', c: 'var(--accent)' }
   ];
   document.getElementById('kpisContainer').innerHTML = cards.map(c => `
-    <div class="kpi" style="--c:${c.c}">
+    <div class="kpi ${ACTIVE_KPI_FILTER === c.key ? 'selected' : ''}" style="--c:${c.c}" data-kpi="${c.key}" onclick="toggleKpiFilter('${c.key}')" title="Clic para filtrar por ${c.lbl}">
       <div class="lbl">${c.lbl}</div>
       <div class="val">${c.val}</div>
       <div class="hint">${c.hint}</div>
@@ -249,15 +253,59 @@ function renderKPIs(k) {
   document.getElementById('navOver').textContent = k.atrasados;
 }
 
+function toggleKpiFilter(key) {
+  if (key === 'total') {
+    ACTIVE_KPI_FILTER = null;
+  } else if (ACTIVE_KPI_FILTER === key) {
+    ACTIVE_KPI_FILTER = null;
+  } else {
+    ACTIVE_KPI_FILTER = key;
+  }
+
+  // Si no está en resumen ni kanban, cambiar a resumen para ver el resultado
+  const activeNav = document.querySelector('.nav.active')?.dataset?.view;
+  if (activeNav && activeNav !== 'resumen' && activeNav !== 'kanban') {
+    document.querySelector('.nav[data-view="resumen"]')?.click();
+  }
+
+  document.querySelectorAll('.kpi').forEach(el => {
+    el.classList.toggle('selected', el.getAttribute('data-kpi') === ACTIVE_KPI_FILTER);
+  });
+
+  renderAll();
+}
+
+function resetAllFilters() {
+  document.getElementById('fSrc').value = '';
+  document.getElementById('fPrio').value = '';
+  document.getElementById('fSearch').value = '';
+  ACTIVE_KPI_FILTER = null;
+  document.querySelectorAll('.kpi').forEach(el => el.classList.remove('selected'));
+  renderAll();
+}
+
 function filterItems() {
   const src = document.getElementById('fSrc').value;
   const prio = document.getElementById('fPrio').value;
   const q = document.getElementById('fSearch').value.toLowerCase().trim();
 
+  // Mostrar u ocultar botón de limpiar filtros
+  const hasFilter = src || prio || q || ACTIVE_KPI_FILTER;
+  const btnReset = document.getElementById('btnResetFilters');
+  if (btnReset) btnReset.style.display = hasFilter ? 'inline-block' : 'none';
+
   return ALL_ITEMS.filter(it => {
+    // Filtro por cuadro KPI activo
+    if (ACTIVE_KPI_FILTER === 'pendiente' && it.status !== 'pendiente') return false;
+    if (ACTIVE_KPI_FILTER === 'curso' && it.status !== 'curso') return false;
+    if (ACTIVE_KPI_FILTER === 'espera' && it.status !== 'espera') return false;
+    if (ACTIVE_KPI_FILTER === 'atrasados' && !(it.is_overdue || it.semaphore === 'rojo')) return false;
+    if (ACTIVE_KPI_FILTER === 'cumplimiento' && (it.is_overdue || it.semaphore === 'rojo')) return false;
+
+    // Filtros de barra superior
     if (src && it.source !== src) return false;
     if (prio && it.priority !== prio) return false;
-    if (q && !(it.title.toLowerCase().includes(q) || String(it.external_id).includes(q))) return false;
+    if (q && !(it.title.toLowerCase().includes(q) || String(it.external_id).includes(q) || (it.client_name && it.client_name.toLowerCase().includes(q)))) return false;
     return true;
   });
 }
