@@ -2,7 +2,7 @@ import urllib.request
 import json
 from sqlalchemy.orm import Session
 from .. import config
-from ..models import Item, AlertLog
+from ..models import Item, AlertLog, User
 
 def send_telegram_message(text: str) -> bool:
     token = config.TELEGRAM_BOT_TOKEN
@@ -27,6 +27,40 @@ def send_telegram_message(text: str) -> bool:
     except Exception as e:
         print(f"[Telegram Notifier] Error enviando mensaje: {e}")
         return False
+
+
+def resolve_assignee_mention(db: Session, assignee_name: str, is_critical: bool = False) -> str:
+    """
+    Resuelve el nombre del responsable y le agrega su mención en Telegram (@usuario).
+    Si el ticket no tiene responsable asignado, menciona al Coordinador (@adonislozada).
+    """
+    coord = db.query(User).filter(User.role == "coordinador").first()
+    coord_tag = coord.telegram_username if coord and coord.telegram_username else "@adonislozada"
+
+    if not assignee_name or assignee_name.strip() in ("Sin asignar", "Sin Asignar", "Técnico GLPI"):
+        return f"⚠️ *Sin asignar* (Atención Coordinador: {coord_tag})"
+
+    users = db.query(User).filter(User.is_active == 1).all()
+    matched_tags = []
+
+    for u in users:
+        first_name = u.full_name.split()[0].lower()
+        last_name = u.full_name.split()[-1].lower()
+        assignee_lower = assignee_name.lower()
+
+        if (first_name in assignee_lower or last_name in assignee_lower or 
+            (u.username and u.username.lower() in assignee_lower)):
+            tag = u.telegram_username if u.telegram_username else u.full_name
+            matched_tags.append(f"{u.full_name} ({tag})")
+
+    if matched_tags:
+        res = ", ".join(matched_tags)
+        # Si es crítico (rojo), también notificamos al coordinador
+        if is_critical and coord_tag not in res:
+            res += f" · 📢 CC: {coord_tag}"
+        return res
+
+    return f"{assignee_name}" + (f" · 📢 CC: {coord_tag}" if is_critical else "")
 
 
 def check_and_notify_alerts(db: Session):
@@ -54,17 +88,18 @@ def check_and_notify_alerts(db: Session):
         if already_alerted:
             continue
 
-        # Formatear fecha de vencimiento
+        is_critical = (sem == "rojo")
+        assignee_str = resolve_assignee_mention(db, item.assignee_name, is_critical=is_critical)
         due_str = item.due_at.strftime("%d-%m-%Y %H:%M") if item.due_at else "No especificada"
         ticket_url = item.url or "http://200.74.215.44:7070/"
 
         if sem == "amarillo":
             msg = (
                 f"🟡 *ALERTA PREVENTIVA · SLA al {item.sla_percent}%*\n"
-                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"📋 *{item.source} #{item.external_id}:* {item.title}\n"
                 f"🏢 *Cliente / Entidad:* {item.client_name}\n"
-                f"👤 *Asignado a:* {item.assignee_name}\n"
+                f"👤 *Responsable:* {assignee_str}\n"
                 f"⚡ *Prioridad:* {item.priority}\n"
                 f"⏰ *Vence:* {due_str}\n"
                 f"🔗 [Abrir en {item.source}]({ticket_url})"
@@ -72,10 +107,10 @@ def check_and_notify_alerts(db: Session):
         else: # rojo
             msg = (
                 f"🚨 *¡ATENCIÓN! TICKET FUERA DE SLA ({item.sla_percent}%)*\n"
-                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"📋 *{item.source} #{item.external_id}:* {item.title}\n"
                 f"🏢 *Cliente / Entidad:* {item.client_name}\n"
-                f"👤 *Asignado a:* {item.assignee_name}\n"
+                f"👤 *Responsable:* {assignee_str}\n"
                 f"⚡ *Prioridad:* {item.priority}\n"
                 f"⏰ *Venció:* {due_str}\n"
                 f"🔗 [Abrir en {item.source}]({ticket_url})"
@@ -87,4 +122,5 @@ def check_and_notify_alerts(db: Session):
             db.add(log)
             db.commit()
             print(f"[Telegram Notifier] Alerta '{sem}' enviada para item #{item.external_id} ({item.source})")
+
 

@@ -4,13 +4,35 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from .database import engine, Base, get_db
-from .models import Item, SyncLog
+from .database import engine, Base, get_db, SessionLocal
+from .models import Item, SyncLog, AlertLog, User
 from .config import SYNC_INTERVAL_MINUTES
 from .sync.synchronizer import sync_all
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
+
+DEFAULT_USERS = [
+    {"full_name": "Adonis Lozada", "username": "alozada", "telegram_username": "@adonislozada", "role": "coordinador"},
+    {"full_name": "Juan Fernández", "username": "jfernandez", "telegram_username": "@Juuan8", "role": "especialista"},
+    {"full_name": "Yoxaide Jiménez", "username": "yjimenez", "telegram_username": "@Yjimenezg", "role": "especialista"},
+    {"full_name": "Luis Acosta", "username": "lacosta", "telegram_username": "@lapsy0", "role": "especialista"},
+]
+
+def init_users():
+    db = SessionLocal()
+    try:
+        for u in DEFAULT_USERS:
+            exists = db.query(User).filter(User.full_name == u["full_name"]).first()
+            if not exists:
+                db.add(User(**u))
+            else:
+                exists.telegram_username = u["telegram_username"]
+                exists.role = u["role"]
+                exists.username = u["username"]
+        db.commit()
+    finally:
+        db.close()
 
 app = FastAPI(
     title="Agenda de Infra - Infraestructura y BD",
@@ -32,6 +54,8 @@ scheduler = BackgroundScheduler()
 
 @app.on_event("startup")
 def on_startup():
+    # Inicializar usuarios del equipo
+    init_users()
     # Sincronización inicial al arrancar
     sync_all()
     # Programar sincronización periódica
@@ -159,6 +183,17 @@ def get_team_workload(db: Session = Depends(get_db)):
         if item.is_overdue:
             workload[resp]["atrasados"] += 1
     return list(workload.values())
+
+@app.get("/api/users")
+def get_users(db: Session = Depends(get_db)):
+    users = db.query(User).filter(User.is_active == 1).all()
+    return [{
+        "id": u.id,
+        "full_name": u.full_name,
+        "username": u.username,
+        "telegram_username": u.telegram_username,
+        "role": u.role
+    } for u in users]
 
 @app.get("/api/clients")
 def get_clients_summary(db: Session = Depends(get_db)):

@@ -72,3 +72,15 @@ class AlertLog(Base):
     sent_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    full_name = Column(String(150), unique=True, index=True)
+    username = Column(String(100), nullable=True) # jfernandez, yjimenez, etc.
+    telegram_username = Column(String(100), nullable=True) # @Juuan8, etc.
+    role = Column(String(50), default="especialista") # 'coordinador' o 'especialista'
+    is_active = Column(Integer, default=1)
+
+
+

@@ -141,6 +141,16 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
         <option value="Baja">Baja</option>
       </select>
     </label>
+    <label>Responsable:
+      <select id="fResp">
+        <option value="">Todo el equipo</option>
+        <option value="Juan">👤 Juan Fernández</option>
+        <option value="Yoxaide">👤 Yoxaide Jiménez</option>
+        <option value="Luis">👤 Luis Acosta</option>
+        <option value="Adonis">👤 Adonis Lozada</option>
+        <option value="Sin asignar">⚠️ Sin asignar</option>
+      </select>
+    </label>
     <input type="text" id="fSearch" placeholder="🔍 Buscar por asunto o ID...">
     <button class="btn" id="btnResetFilters" onclick="resetAllFilters()" style="display:none;font-size:12px;padding:7px 12px;color:var(--red);border-color:rgba(255,93,93,.3)">✕ Limpiar filtros</button>
   </div>
@@ -161,6 +171,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
             <th>ID</th>
             <th>Asunto</th>
             <th>Cliente</th>
+            <th>Responsable</th>
             <th>Prioridad</th>
             <th>Estado</th>
             <th>SLA Consumido</th>
@@ -294,6 +305,7 @@ function toggleKpiFilter(key) {
 function resetAllFilters() {
   document.getElementById('fSrc').value = '';
   document.getElementById('fPrio').value = '';
+  document.getElementById('fResp').value = '';
   document.getElementById('fSearch').value = '';
   ACTIVE_KPI_FILTER = null;
   document.querySelectorAll('.kpi').forEach(el => el.classList.remove('selected'));
@@ -303,10 +315,11 @@ function resetAllFilters() {
 function filterItems() {
   const src = document.getElementById('fSrc').value;
   const prio = document.getElementById('fPrio').value;
+  const resp = document.getElementById('fResp').value.toLowerCase();
   const q = document.getElementById('fSearch').value.toLowerCase().trim();
 
   // Mostrar u ocultar botón de limpiar filtros
-  const hasFilter = src || prio || q || ACTIVE_KPI_FILTER;
+  const hasFilter = src || prio || resp || q || ACTIVE_KPI_FILTER;
   const btnReset = document.getElementById('btnResetFilters');
   if (btnReset) btnReset.style.display = hasFilter ? 'inline-block' : 'none';
 
@@ -321,7 +334,15 @@ function filterItems() {
     // Filtros de barra superior
     if (src && it.source !== src) return false;
     if (prio && it.priority !== prio) return false;
-    if (q && !(it.title.toLowerCase().includes(q) || String(it.external_id).includes(q) || (it.client_name && it.client_name.toLowerCase().includes(q)))) return false;
+    if (resp) {
+      const itResp = (it.assignee_name || '').toLowerCase();
+      if (resp === 'sin asignar') {
+        if (itResp && !itResp.includes('sin asignar') && !itResp.includes('técnico glpi')) return false;
+      } else {
+        if (!itResp.includes(resp)) return false;
+      }
+    }
+    if (q && !(it.title.toLowerCase().includes(q) || String(it.external_id).includes(q) || (it.client_name && it.client_name.toLowerCase().includes(q)) || (it.assignee_name && it.assignee_name.toLowerCase().includes(q)))) return false;
     return true;
   });
 }
@@ -333,7 +354,7 @@ function renderAll() {
   // 1. Tabla Resumen
   const tbody = document.querySelector('#tblItems tbody');
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center" class="muted">Sin tickets que coincidan.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center" class="muted">Sin tickets que coincidan.</td></tr>';
   } else {
     tbody.innerHTML = list.map(it => `
       <tr class="click" onclick="openModal(${it.id})">
@@ -341,6 +362,7 @@ function renderAll() {
         <td><span class="badge src-${it.source}">${it.source}</span> #${it.external_id}</td>
         <td><b>${it.title}</b></td>
         <td>${it.client_name}</td>
+        <td><span class="muted">${it.assignee_name || 'Sin asignar'}</span></td>
         <td><span class="prio prio-${it.priority}">${it.priority}</span></td>
         <td>${it.status_origin || it.status}</td>
         <td><b>${it.sla_percent}%</b></td>
@@ -403,6 +425,7 @@ function openModal(id) {
     <h2>${it.title}</h2>
     <dl>
       <dt>Estado:</dt><dd>${it.status_origin || it.status}</dd>
+      <dt>Responsable:</dt><dd><b>${it.assignee_name || 'Sin asignar'}</b></dd>
       <dt>Prioridad:</dt><dd><span class="prio prio-${it.priority}">${it.priority}</span></dd>
       <dt>Cliente / Entidad:</dt><dd>${it.client_name}</dd>
       <dt>Creado el:</dt><dd>${formatDate(it.created_at, true)}</dd>
@@ -461,6 +484,7 @@ document.querySelectorAll('.nav').forEach(n => {
 // Filtros
 document.getElementById('fSrc').onchange = renderAll;
 document.getElementById('fPrio').onchange = renderAll;
+document.getElementById('fResp').onchange = renderAll;
 document.getElementById('fSearch').oninput = renderAll;
 document.getElementById('btnTheme').onclick = () => document.body.classList.toggle('light');
 document.getElementById('modalBg').onclick = (e) => {
