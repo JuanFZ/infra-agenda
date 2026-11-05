@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mesa de Control · Infraestructura y BD (En Vivo)</title>
+<style>
+:root{
+  --bg:#0f1419; --panel:#171e26; --panel2:#1e2731; --border:#2a3541; --text:#e6edf3; --muted:#8b98a5;
+  --accent:#4f8cff; --green:#2ecc71; --yellow:#f5b83d; --red:#ff5d5d; --purple:#a78bfa; --cyan:#22c3d6;
+  --glpi:#f39c12; --clickup:#7b68ee;
+}
+body.light{ --bg:#f3f5f8; --panel:#ffffff; --panel2:#f2f5f8; --border:#dfe4ea; --text:#1d2733; --muted:#5f6b78; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;display:flex;min-height:100vh}
+aside{width:230px;background:var(--panel);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;flex-shrink:0}
+.brand{font-weight:700;font-size:16px;margin-bottom:18px;display:flex;align-items:center;gap:10px}
+.brand .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--purple));display:grid;place-items:center;font-size:18px}
+.brand small{display:block;font-weight:400;color:var(--muted);font-size:11px}
+.nav{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--muted);cursor:pointer;user-select:none}
+.nav:hover{background:var(--panel2);color:var(--text)}
+.nav.active{background:rgba(79,140,255,.15);color:var(--accent);font-weight:600}
+.nav .count{margin-left:auto;background:var(--red);color:#fff;border-radius:10px;font-size:11px;padding:1px 7px}
+.side-foot{margin-top:auto;font-size:11px;color:var(--muted);line-height:1.7}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+main{flex:1;padding:20px 26px;min-width:0}
+header{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+header h1{font-size:20px}
+header .sub{color:var(--muted);font-size:12px}
+.spacer{flex:1}
+.clock{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
+.btn{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;background:var(--panel);border:1px solid var(--border);padding:10px 12px;border-radius:10px;align-items:center}
+.filters select,.filters input{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-size:13px}
+.filters input{min-width:240px;flex:1}
+.filters label{color:var(--muted);font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.kpi:hover{border-color:var(--c,var(--accent))}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c,var(--accent))}
+.kpi .lbl{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.kpi .val{font-size:28px;font-weight:700;margin-top:4px}
+.kpi .hint{font-size:11px;color:var(--muted);margin-top:2px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
+.card h3{font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;color:var(--muted);font-weight:500;font-size:12px;padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
+.badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600}
+.src-GLPI{background:rgba(243,156,18,.18);color:var(--glpi)}
+.src-ClickUp{background:rgba(123,104,238,.2);color:var(--clickup)}
+.sem{display:inline-block;width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.sem.verde{background:var(--green)} .sem.amarillo{background:var(--yellow)} .sem.rojo{background:var(--red);box-shadow:0 0 8px var(--red)}
+.prio{font-size:11px;font-weight:600}
+.prio-Crítica{color:var(--red)} .prio-Alta{color:var(--yellow)} .prio-Media{color:var(--cyan)} .prio-Baja{color:var(--muted)}
+.view{display:none} .view.active{display:block}
+.kanban-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:1100px){.kanban-grid{grid-template-columns:1fr}}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;min-height:300px}
+.col h4{font-size:13px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.tcard{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:10px;margin-bottom:10px;cursor:pointer}
+.tcard.verde{border-left-color:var(--green)} .tcard.amarillo{border-left-color:var(--yellow)} .tcard.rojo{border-left-color:var(--red)}
+.tcard .top{display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:6px}
+.tcard .title{font-size:13px;font-weight:600;margin-bottom:6px}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;place-items:center}
+.modal-bg.show{display:grid}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;max-width:540px;width:90%;padding:22px}
+.modal dl{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;margin:16px 0;font-size:13px}
+.modal dt{color:var(--muted)}
+.modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="brand">
+    <div class="logo">⚡</div>
+    <div>Mesa de Control<small>Infraestructura & BD</small></div>
+  </div>
+  <div class="nav active" data-view="resumen">📊 Resumen</div>
+  <div class="nav" data-view="kanban">📌 Tablero Kanban</div>
+  <div class="nav" data-view="atrasados">⚠️ Atrasados <span class="count" id="navOver">0</span></div>
+  <div class="nav" data-view="clientes">👥 Clientes</div>
+  <div class="side-foot">
+    <div><span class="dot"></span><span id="apiStatus">Conectando API...</span></div>
+    <div id="syncTime" style="margin-top:4px">Última sync: —</div>
+  </div>
+</aside>
+
+<main>
+  <header>
+    <div>
+      <h1 id="viewTitle">Resumen general</h1>
+      <div class="sub">Consolidación en vivo: GLPI + ClickUp</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="clock" id="clock">--:--:--</div>
+    <button class="btn" id="btnSync" onclick="forceSync()">🔄 Sincronizar Ahora</button>
+    <button class="btn" id="btnTheme">🌓 Tema</button>
+  </header>
+
+  <div class="filters">
+    <label>Origen:
+      <select id="fSrc">
+        <option value="">Todos</option>
+        <option value="GLPI">GLPI</option>
+        <option value="ClickUp">ClickUp</option>
+      </select>
+    </label>
+    <label>Prioridad:
+      <select id="fPrio">
+        <option value="">Todas</option>
+        <option value="Crítica">Crítica</option>
+        <option value="Alta">Alta</option>
+        <option value="Media">Media</option>
+        <option value="Baja">Baja</option>
+      </select>
+    </label>
+    <input type="text" id="fSearch" placeholder="🔍 Buscar por asunto o ID...">
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpis" id="kpisContainer">
+    <!-- Se llena dinámicamente desde /api/kpis -->
+  </div>
+
+  <!-- Vistas -->
+  <div class="view active" id="v-resumen">
+    <div class="card">
+      <h3>Todos los Asuntos Recientes (<span id="totalItemsCount">0</span>)</h3>
+      <table id="tblItems">
+        <thead>
+          <tr>
+            <th></th>
+            <th>ID</th>
+            <th>Asunto</th>
+            <th>Cliente</th>
+            <th>Prioridad</th>
+            <th>Estado</th>
+            <th>SLA Consumido</th>
+            <th>Vencimiento</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="8" style="text-align:center;padding:20px" class="muted">Cargando tickets en vivo...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="view" id="v-kanban">
+    <div class="kanban-grid" id="kanbanGrid">
+      <!-- Columnas Kanban -->
+    </div>
+  </div>
+
+  <div class="view" id="v-atrasados">
+    <div class="card">
+      <h3 style="color:var(--red)">Asuntos Fuera de SLA</h3>
+      <table id="tblOverdue">
+        <thead>
+          <tr><th></th><th>ID</th><th>Asunto</th><th>Prioridad</th><th>SLA</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="view" id="v-clientes">
+    <div class="card">
+      <h3>Estado por Cliente / Entidad</h3>
+      <table id="tblClients">
+        <thead>
+          <tr><th>Cliente</th><th>Abiertos</th><th>Atrasados</th><th>Cerrados</th><th>Cumplimiento SLA</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- Modal Detalle -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script>
+const API_URL = 'http://localhost:8000/api';
+let ALL_ITEMS = [];
+
+async function loadData() {
+  try {
+    // 1. Cargar KPIs
+    const resKpi = await fetch(`${API_URL}/kpis`);
+    const kpis = await resKpi.json();
+    renderKPIs(kpis);
+    document.getElementById('apiStatus').textContent = 'API Conectada';
+    document.getElementById('syncTime').textContent = kpis.last_sync ? `Última sync: ${new Date(kpis.last_sync).toLocaleTimeString()}` : 'Sync: OK';
+
+    // 2. Cargar Items
+    const resItems = await fetch(`${API_URL}/items`);
+    ALL_ITEMS = await resItems.json();
+    renderAll();
+  } catch (err) {
+    document.getElementById('apiStatus').textContent = 'API Desconectada';
+    console.error('Error conectando a FastAPI:', err);
+  }
+}
+
+function renderKPIs(k) {
+  const cards = [
+    { lbl: 'Pendientes', val: k.pendientes, hint: 'Por iniciar', c: 'var(--accent)' },
+    { lbl: 'En Curso', val: k.en_curso, hint: 'En atención', c: 'var(--cyan)' },
+    { lbl: 'En Espera', val: k.en_espera, hint: 'Cliente / Proveedor', c: 'var(--purple)' },
+    { lbl: 'Atrasados', val: k.atrasados, hint: 'SLA vencido', c: 'var(--red)' },
+    { lbl: 'Cumplimiento SLA', val: `${k.cumplimiento_sla}%`, hint: 'Meta: 90%', c: k.cumplimiento_sla >= 90 ? 'var(--green)' : 'var(--yellow)' },
+    { lbl: 'Total Registrados', val: k.total_registrados, hint: 'En base de datos', c: 'var(--accent)' }
+  ];
+  document.getElementById('kpisContainer').innerHTML = cards.map(c => `
+    <div class="kpi" style="--c:${c.c}">
+      <div class="lbl">${c.lbl}</div>
+      <div class="val">${c.val}</div>
+      <div class="hint">${c.hint}</div>
+    </div>
+  `).join('');
+  document.getElementById('navOver').textContent = k.atrasados;
+}
+
+function filterItems() {
+  const src = document.getElementById('fSrc').value;
+  const prio = document.getElementById('fPrio').value;
+  const q = document.getElementById('fSearch').value.toLowerCase().trim();
+
+  return ALL_ITEMS.filter(it => {
+    if (src && it.source !== src) return false;
+    if (prio && it.priority !== prio) return false;
+    if (q && !(it.title.toLowerCase().includes(q) || String(it.external_id).includes(q))) return false;
+    return true;
+  });
+}
+
+function renderAll() {
+  const list = filterItems();
+  document.getElementById('totalItemsCount').textContent = list.length;
+
+  // 1. Tabla Resumen
+  const tbody = document.querySelector('#tblItems tbody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center" class="muted">Sin tickets que coincidan.</td></tr>';
+  } else {
+    tbody.innerHTML = list.map(it => `
+      <tr class="click" onclick="openModal(${it.id})">
+        <td><span class="sem ${it.semaphore}"></span></td>
+        <td><span class="badge src-${it.source}">${it.source}</span> #${it.external_id}</td>
+        <td><b>${it.title}</b></td>
+        <td>${it.client_name}</td>
+        <td><span class="prio prio-${it.priority}">${it.priority}</span></td>
+        <td>${it.status_origin || it.status}</td>
+        <td><b>${it.sla_percent}%</b></td>
+        <td class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.due_at ? new Date(it.due_at).toLocaleDateString() : '—'}</td>
+      </tr>
+    `).join('');
+  }
+
+  // 2. Kanban
+  renderKanban(list);
+
+  // 3. Atrasados
+  const over = list.filter(i => i.is_overdue || i.semaphore === 'rojo');
+  document.querySelector('#tblOverdue tbody').innerHTML = over.map(it => `
+    <tr class="click" onclick="openModal(${it.id})">
+      <td><span class="sem rojo"></span></td>
+      <td>${it.source} #${it.external_id}</td>
+      <td>${it.title}</td>
+      <td>${it.priority}</td>
+      <td style="color:var(--red)">${it.sla_percent}% consumido</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" class="muted" style="text-align:center">🎉 Ningún asunto atrasado</td></tr>';
+}
+
+function renderKanban(list) {
+  const cols = [
+    { k: 'pendiente', title: '📥 Pendientes' },
+    { k: 'curso', title: '⚙️ En curso' },
+    { k: 'espera', title: '⏸️ En espera' },
+    { k: 'cerrado', title: '✅ Cerrados' }
+  ];
+
+  document.getElementById('kanbanGrid').innerHTML = cols.map(c => {
+    const colItems = list.filter(i => i.status === c.k);
+    return `
+      <div class="col">
+        <h4>${c.title} <span class="muted" style="margin-left:auto">${colItems.length}</span></h4>
+        ${colItems.map(it => `
+          <div class="tcard ${it.semaphore}" onclick="openModal(${it.id})">
+            <div class="top">
+              <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
+              <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
+            </div>
+            <div class="title">${it.title}</div>
+            <div class="muted" style="font-size:11px">${it.client_name} · SLA: ${it.sla_percent}%</div>
+          </div>
+        `).join('') || '<div class="muted" style="font-size:12px;text-align:center;padding:20px">Vacío</div>'}
+      </div>
+    `;
+  }).join('');
+}
+
+function openModal(id) {
+  const it = ALL_ITEMS.find(i => i.id === id);
+  if (!it) return;
+  document.getElementById('modalContent').innerHTML = `
+    <div style="margin-bottom:10px">
+      <span class="badge src-${it.source}">${it.source}</span> #${it.external_id} · <span class="sem ${it.semaphore}"></span>
+    </div>
+    <h2>${it.title}</h2>
+    <dl>
+      <dt>Estado:</dt><dd>${it.status_origin || it.status}</dd>
+      <dt>Prioridad:</dt><dd><span class="prio prio-${it.priority}">${it.priority}</span></dd>
+      <dt>Cliente / Entidad:</dt><dd>${it.client_name}</dd>
+      <dt>Creado el:</dt><dd>${it.created_at ? new Date(it.created_at).toLocaleString() : '—'}</dd>
+      <dt>Vencimiento SLA:</dt><dd>${it.due_at ? new Date(it.due_at).toLocaleString() : '—'}</dd>
+      <dt>SLA consumido:</dt><dd><b>${it.sla_percent}%</b> (${it.semaphore.toUpperCase()})</dd>
+    </dl>
+    <div class="actions">
+      <button class="btn" onclick="document.getElementById('modalBg').classList.remove('show')">Cerrar</button>
+      <a href="${it.url}" target="_blank" class="btn primary" style="text-decoration:none">Abrir en ${it.source} ↗</a>
+    </div>
+  `;
+  document.getElementById('modalBg').classList.add('show');
+}
+
+async function forceSync() {
+  const btn = document.getElementById('btnSync');
+  btn.textContent = '⏳ Sincronizando...';
+  try {
+    await fetch(`${API_URL}/sync`, { method: 'POST' });
+    await loadData();
+    btn.textContent = '✅ Sincronizado';
+    setTimeout(() => btn.textContent = '🔄 Sincronizar Ahora', 2000);
+  } catch (e) {
+    btn.textContent = '❌ Error Sync';
+  }
+}
+
+// Navegación de vistas
+document.querySelectorAll('.nav').forEach(n => {
+  n.onclick = () => {
+    document.querySelectorAll('.nav').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
+    n.classList.add('active');
+    const viewName = n.dataset.view;
+    document.getElementById(`v-${viewName}`).classList.add('active');
+    document.getElementById('viewTitle').textContent = n.textContent.trim();
+  };
+});
+
+// Filtros
+document.getElementById('fSrc').onchange = renderAll;
+document.getElementById('fPrio').onchange = renderAll;
+document.getElementById('fSearch').oninput = renderAll;
+document.getElementById('btnTheme').onclick = () => document.body.classList.toggle('light');
+document.getElementById('modalBg').onclick = (e) => {
+  if (e.target.id === 'modalBg') document.getElementById('modalBg').classList.remove('show');
+};
+
+// Reloj
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}, 1000);
+
+// Carga inicial y refresco cada 30 segundos
+loadData();
+setInterval(loadData, 30000);
+</script>
+
+</body>
+</html>
+

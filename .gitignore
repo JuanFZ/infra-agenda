@@ -1,0 +1,28 @@
+# Entorno y Secretos (NUNCA subir a GitHub)
+.env
+*.env
+backend/.env
+
+# Base de datos local
+*.db
+*.sqlite3
+dashboard.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Docker volumes locales
+dashboard_data/
+
+# IDE y Sistema Operativo
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

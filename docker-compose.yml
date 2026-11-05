@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # Backend API & Sincronizador (GLPI + ClickUp)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dashboard_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      # Persistencia de la base de datos
+      - dashboard_data:/app/
+    networks:
+      - dashboard_net
+
+  # Frontend Web Dashboard (Servido con Nginx)
+  frontend:
+    image: nginx:alpine
+    container_name: dashboard_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    networks:
+      - dashboard_net
+
+volumes:
+  dashboard_data:
+
+networks:
+  dashboard_net:
+    driver: bridge
