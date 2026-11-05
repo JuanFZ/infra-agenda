@@ -13,6 +13,7 @@ services:
     env_file:
       - ./backend/.env
     volumes:
+      - ./backend/app:/app/app
       - dashboard_data:/app/
     networks:
       - dashboard_net
