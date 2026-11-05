@@ -13,12 +13,28 @@ def sync_glpi(db: Session):
         assignees_map = client.fetch_ticket_assignees_map(users_map)
         raw_tickets = client.fetch_tickets()
         count = 0
+        active_ids = set()
+
         for raw in raw_tickets:
+            # En GLPI, si un ticket está en papelera (is_deleted = 1), se descarta y elimina de la BD
+            if raw.get("is_deleted") == 1 or raw.get("is_deleted") is True:
+                del_id = str(raw.get("id"))
+                existing_del = db.query(Item).filter(
+                    Item.source == "GLPI",
+                    Item.external_id == del_id
+                ).first()
+                if existing_del:
+                    db.delete(existing_del)
+                continue
+
             norm = client.normalize_ticket(raw, assignees_map)
+            ext_id = norm["external_id"]
+            active_ids.add(ext_id)
+
             # Buscar si ya existe
             item = db.query(Item).filter(
                 Item.source == "GLPI",
-                Item.external_id == norm["external_id"]
+                Item.external_id == ext_id
             ).first()
 
             if item:
@@ -29,6 +45,15 @@ def sync_glpi(db: Session):
                 db.add(item)
             count += 1
         
+        # Si un ticket fue eliminado por completo de GLPI (no devuelto por la API), eliminarlo de la BD
+        if active_ids:
+            purged = db.query(Item).filter(
+                Item.source == "GLPI",
+                ~Item.external_id.in_(active_ids)
+            ).all()
+            for p in purged:
+                db.delete(p)
+
         db.commit()
         log = SyncLog(source="GLPI", status="OK", records_synced=count, message=f"Sincronizados {count} tickets con éxito.")
         db.add(log)
@@ -48,11 +73,15 @@ def sync_clickup(db: Session):
     try:
         raw_tasks = client.fetch_tasks()
         count = 0
+        active_ids = set()
         for raw in raw_tasks:
             norm = client.normalize_task(raw)
+            ext_id = norm["external_id"]
+            active_ids.add(ext_id)
+
             item = db.query(Item).filter(
                 Item.source == "ClickUp",
-                Item.external_id == norm["external_id"]
+                Item.external_id == ext_id
             ).first()
 
             if item:
@@ -62,6 +91,15 @@ def sync_clickup(db: Session):
                 item = Item(**norm)
                 db.add(item)
             count += 1
+
+        # Eliminar tareas que hayan sido borradas en ClickUp
+        if active_ids:
+            purged = db.query(Item).filter(
+                Item.source == "ClickUp",
+                ~Item.external_id.in_(active_ids)
+            ).all()
+            for p in purged:
+                db.delete(p)
 
         db.commit()
         log = SyncLog(source="ClickUp", status="OK", records_synced=count, message=f"Sincronizadas {count} tareas con éxito.")
