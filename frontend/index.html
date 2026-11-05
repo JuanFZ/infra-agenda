@@ -189,7 +189,8 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
 </div>
 
 <script>
-const API_URL = 'http://localhost:8000/api';
+// Usar ruta relativa para que funcione automáticamente en localhost o a través de la IP/dominio
+const API_URL = window.location.port === '8000' ? 'http://localhost:8000/api' : '/api';
 let ALL_ITEMS = [];
 
 async function loadData() {

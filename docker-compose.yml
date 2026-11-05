@@ -1,7 +1,7 @@
-version: '3.8'
-
 services:
+  # ----------------------------------------------------
   # Backend API & Sincronizador (GLPI + ClickUp)
+  # ----------------------------------------------------
   backend:
     build:
       context: ./backend
@@ -13,12 +13,13 @@ services:
     env_file:
       - ./backend/.env
     volumes:
-      # Persistencia de la base de datos
       - dashboard_data:/app/
     networks:
       - dashboard_net
 
-  # Frontend Web Dashboard (Servido con Nginx)
+  # ----------------------------------------------------
+  # Frontend Web Dashboard (Servido con Nginx + Proxy a la API)
+  # ----------------------------------------------------
   frontend:
     image: nginx:alpine
     container_name: dashboard_frontend
@@ -27,6 +28,7 @@ services:
       - "80:80"
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - backend
     networks:
