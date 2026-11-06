@@ -1,13 +1,14 @@
 import datetime
 from fastapi import FastAPI, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import or_, and_
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from .database import engine, Base, get_db, SessionLocal
 from .models import Item, SyncLog, AlertLog, User
 from .config import SYNC_INTERVAL_MINUTES
-from .sync.synchronizer import sync_all
+from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
@@ -65,6 +66,12 @@ scheduler = BackgroundScheduler()
 def on_startup():
     # Inicializar usuarios del equipo
     init_users()
+    # Purgar cerrados anteriores al día de ayer
+    db = SessionLocal()
+    try:
+        purge_old_closed_items(db)
+    finally:
+        db.close()
     # Sincronización inicial al arrancar
     sync_all()
     # Programar sincronización periódica
@@ -105,8 +112,28 @@ def get_items(
         query = query.filter(Item.assignee_name.ilike(f"%{resp}%"))
     if prio:
         query = query.filter(Item.priority == prio)
-    if status:
+    
+    # Política de cerrados: solo mostrar activos o cerrados desde el día de ayer en adelante
+    yesterday_start = get_yesterday_start()
+    if not status:
+        query = query.filter(
+            or_(
+                Item.status != "cerrado",
+                Item.closed_at >= yesterday_start,
+                and_(Item.closed_at == None, Item.updated_at >= yesterday_start)
+            )
+        )
+    elif status == "cerrado":
+        query = query.filter(
+            Item.status == "cerrado",
+            or_(
+                Item.closed_at >= yesterday_start,
+                and_(Item.closed_at == None, Item.updated_at >= yesterday_start)
+            )
+        )
+    else:
         query = query.filter(Item.status == status)
+
     if q:
         query = query.filter(Item.title.ilike(f"%{q}%"))
 
@@ -140,7 +167,14 @@ def get_items(
 
 @app.get("/api/kpis")
 def get_kpis(db: Session = Depends(get_db)):
-    all_items = db.query(Item).all()
+    yesterday_start = get_yesterday_start()
+    all_items = db.query(Item).filter(
+        or_(
+            Item.status != "cerrado",
+            Item.closed_at >= yesterday_start,
+            and_(Item.closed_at == None, Item.updated_at >= yesterday_start)
+        )
+    ).all()
     now = datetime.datetime.utcnow()
     today_start = datetime.datetime(now.year, now.month, now.day, 0, 0, 0)
     today_end = datetime.datetime(now.year, now.month, now.day, 23, 59, 59)
@@ -206,7 +240,14 @@ def get_users(db: Session = Depends(get_db)):
 
 @app.get("/api/clients")
 def get_clients_summary(db: Session = Depends(get_db)):
-    items = db.query(Item).all()
+    yesterday_start = get_yesterday_start()
+    items = db.query(Item).filter(
+        or_(
+            Item.status != "cerrado",
+            Item.closed_at >= yesterday_start,
+            and_(Item.closed_at == None, Item.updated_at >= yesterday_start)
+        )
+    ).all()
     clients = {}
     for item in items:
         c_name = item.client_name or "Sin cliente"
