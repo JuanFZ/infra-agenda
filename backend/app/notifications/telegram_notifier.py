@@ -5,20 +5,27 @@ from sqlalchemy.orm import Session
 from .. import config
 from ..models import Item, AlertLog, User
 
-def send_telegram_message(text: str) -> bool:
+def send_telegram_message(text: str, parse_mode: str | None = None) -> bool:
     token = config.TELEGRAM_BOT_TOKEN
     chat_id = config.TELEGRAM_CHAT_ID
 
     if not token or not chat_id:
         return False
 
+    if not parse_mode:
+        if "<b" in text or "<i" in text or "<a " in text or "<code" in text or "</" in text:
+            parse_mode = "HTML"
+        else:
+            parse_mode = "Markdown"
+
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": text,
-        "parse_mode": "Markdown",
         "disable_web_page_preview": True
     }
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
 
     try:
         data = json.dumps(payload).encode("utf-8")
@@ -26,8 +33,17 @@ def send_telegram_message(text: str) -> bool:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.status == 200
     except Exception as e:
-        print(f"[Telegram Notifier] Error enviando mensaje: {e}")
-        return False
+        print(f"[Telegram Notifier] Error enviando mensaje ({parse_mode}): {e}")
+        # Si falló por formato, reintentar sin parse_mode para asegurar que el mensaje llegue
+        try:
+            payload.pop("parse_mode", None)
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.status == 200
+        except Exception as retry_err:
+            print(f"[Telegram Notifier] Falló reintento plano: {retry_err}")
+            return False
 
 
 def resolve_assignee_mention(db: Session, assignee_name: str, is_critical: bool = False) -> str:

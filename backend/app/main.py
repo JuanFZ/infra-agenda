@@ -407,20 +407,23 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
 
     # Disparar alerta inmediata a Telegram
     try:
+        import html
         from .notifications.telegram_notifier import send_telegram_message
-        mentions = ", ".join(f"{m['name']} ({m['telegram']})" for m in matched_list)
+        mentions = ", ".join(f"{html.escape(m['name'])} ({m['telegram']})" for m in matched_list)
         plural_label = "Responsables" if len(matched_list) > 1 else "Responsable"
         icon = "👥" if len(matched_list) > 1 else "👤"
         now_str = datetime.datetime.now().strftime('%d-%m-%Y %I:%M %p')
+        safe_title = html.escape(item.title or "")
+        safe_source = html.escape(item.source or "")
         msg = (
             f"{icon} <b>Asignación en vivo</b>\n\n"
-            f"📌 <b>Asunto:</b> {item.title}\n"
-            f"🏷 <b>Origen:</b> {item.source} #{item.external_id}\n"
+            f"📌 <b>Asunto:</b> {safe_title}\n"
+            f"🏷 <b>Origen:</b> {safe_source} #{item.external_id}\n"
             f"🎯 <b>{plural_label}:</b> {mentions}\n"
             f"🕒 <b>Incorporado a la actividad:</b> {now_str}\n"
             f"⚡ <i>Asignado desde la Agenda de Infra</i>"
         )
-        send_telegram_message(msg)
+        send_telegram_message(msg, parse_mode="HTML")
     except Exception as e:
         print(f"[Telegram Assign Alert Error] {e}")
 
@@ -487,6 +490,7 @@ def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Dep
 
     # Disparar alerta en Telegram
     try:
+        import html
         from .notifications.telegram_notifier import send_telegram_message
         status_labels = {
             "pendiente": "Pendiente",
@@ -494,15 +498,19 @@ def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Dep
             "espera": "En Espera",
             "cerrado": "Cerrado / Resuelto"
         }
+        safe_title = html.escape(item.title or "")
+        safe_source = html.escape(item.source or "")
+        safe_status_orig = html.escape(item.status_origin or "")
+        safe_assignee = html.escape(item.assignee_name or "Sin asignar")
         msg = (
             f"📋 <b>Cambio de estado en Tablero Kanban</b>\n\n"
-            f"📌 <b>Asunto:</b> {item.title}\n"
-            f"🏷 <b>Origen:</b> {item.source} #{item.external_id}\n"
-            f"📊 <b>Nuevo estado:</b> {status_labels.get(new_st, new_st)} ({item.status_origin})\n"
-            f"👤 <b>Responsable:</b> {item.assignee_name}\n"
+            f"📌 <b>Asunto:</b> {safe_title}\n"
+            f"🏷 <b>Origen:</b> {safe_source} #{item.external_id}\n"
+            f"📊 <b>Nuevo estado:</b> {status_labels.get(new_st, new_st)} ({safe_status_orig})\n"
+            f"👤 <b>Responsable:</b> {safe_assignee}\n"
             f"⚡ <i>Actualizado arrastrando desde el Kanban</i>"
         )
-        send_telegram_message(msg)
+        send_telegram_message(msg, parse_mode="HTML")
     except Exception as e:
         print(f"[Telegram Status Alert Error] {e}")
 
