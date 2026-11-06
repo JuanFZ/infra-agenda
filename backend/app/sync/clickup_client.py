@@ -222,4 +222,16 @@ class ClickUpClient:
                 print(f"[ClickUpClient Response] {e.response.text}")
             return None
 
+    def delete_task(self, task_id: str) -> bool:
+        """
+        Elimina formalmente la tarea en ClickUp mediante su API v2.
+        """
+        try:
+            url = f"{self.base_url}/task/{task_id}"
+            res = requests.delete(url, headers=self.get_headers(), timeout=12)
+            return res.status_code in [200, 204]
+        except Exception as e:
+            print(f"[ClickUpClient] Error eliminando tarea {task_id}: {e}")
+            return False
+
 

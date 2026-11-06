@@ -700,4 +700,47 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db)):
     }
 
 
+@app.delete("/api/items/{item_id}")
+def delete_item(item_id: int, db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Actividad no encontrada")
+
+    source = item.source
+    ext_id = item.external_id
+    title = item.title
+
+    # Intentar eliminar de la plataforma de origen
+    if source == "ClickUp":
+        client = ClickUpClient()
+        client.delete_task(ext_id)
+    elif source == "GLPI":
+        client = GLPIClient()
+        client.delete_ticket(ext_id)
+
+    # Eliminar de la base de datos operativa
+    db.delete(item)
+    db.commit()
+
+    # Notificar a Telegram
+    try:
+        import html
+        from .notifications.telegram_notifier import send_telegram_message
+        msg = (
+            f"🗑 <b>Actividad Eliminada</b>\n\n"
+            f"📌 <b>Asunto:</b> {html.escape(title)}\n"
+            f"🏷 <b>Origen:</b> {html.escape(source)} #{ext_id}\n"
+            f"⚡ <i>Eliminada desde la Agenda de Infraestructura</i>"
+        )
+        send_telegram_message(msg, parse_mode="HTML")
+    except Exception as e:
+        print(f"[Telegram Delete Alert Error] {e}")
+
+    return {
+        "status": "OK",
+        "message": f"Actividad {source} #{ext_id} eliminada con éxito",
+        "deleted_id": item_id
+    }
+
+
 

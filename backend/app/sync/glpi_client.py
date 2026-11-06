@@ -296,5 +296,21 @@ class GLPIClient:
                 print(f"[GLPIClient Response] {e.response.text}")
             return None
 
+    def delete_ticket(self, ticket_id: str) -> bool:
+        """
+        Elimina o purga el ticket en GLPI mediante su API REST.
+        """
+        try:
+            headers = self.get_session_headers()
+            tid = int(ticket_id)
+            res = requests.delete(f"{self.base_url}/Ticket/{tid}?force_purge=true", headers=headers, timeout=12)
+            if res.status_code in [200, 201, 204]:
+                return True
+            res2 = requests.delete(f"{self.base_url}/Ticket/{tid}", headers=headers, timeout=12)
+            return res2.status_code in [200, 201, 204]
+        except Exception as e:
+            print(f"[GLPIClient] Error eliminando ticket {ticket_id}: {e}")
+            return False
+
 
 
