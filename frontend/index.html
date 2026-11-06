@@ -2243,13 +2243,14 @@
     }
 
     function renderKPIs(k) {
+      const isFiltered = !!(document.getElementById('fSrc').value || document.getElementById('fPrio').value || document.getElementById('fResp').value || document.getElementById('fSearch').value);
       const cards = [
-        { key: 'pendiente', lbl: 'Pendientes', val: k.pendientes, hint: 'Por iniciar', c: 'var(--accent)' },
-        { key: 'curso', lbl: 'En Curso', val: k.en_curso, hint: 'En atención', c: 'var(--cyan)' },
-        { key: 'espera', lbl: 'En Espera', val: k.en_espera, hint: 'Cliente / Proveedor', c: 'var(--purple)' },
-        { key: 'atrasados', lbl: 'Atrasados', val: k.atrasados, hint: 'SLA vencido', c: 'var(--red)' },
+        { key: 'pendiente', lbl: 'Pendientes', val: k.pendientes, hint: isFiltered ? 'Filtrados' : 'Por iniciar', c: 'var(--accent)' },
+        { key: 'curso', lbl: 'En Curso', val: k.en_curso, hint: isFiltered ? 'Filtrados' : 'En atención', c: 'var(--cyan)' },
+        { key: 'espera', lbl: 'En Espera', val: k.en_espera, hint: isFiltered ? 'Filtrados' : 'Cliente / Proveedor', c: 'var(--purple)' },
+        { key: 'atrasados', lbl: 'Atrasados', val: k.atrasados, hint: isFiltered ? 'Con SLA vencido' : 'SLA vencido', c: 'var(--red)' },
         { key: 'cumplimiento', lbl: 'Cumplimiento SLA', val: `${k.cumplimiento_sla}%`, hint: 'Meta: 90%', c: k.cumplimiento_sla >= 90 ? 'var(--green)' : 'var(--yellow)' },
-        { key: 'total', lbl: 'Total Registrados', val: k.total_registrados, hint: 'En base de datos', c: 'var(--accent)' }
+        { key: 'total', lbl: isFiltered ? 'Total Filtrado' : 'Total Registrados', val: k.total_registrados, hint: isFiltered ? 'Coincidentes' : 'En base de datos', c: 'var(--accent)' }
       ];
       document.getElementById('kpisContainer').innerHTML = cards.map(c => `
     <div class="kpi ${ACTIVE_KPI_FILTER === c.key ? 'selected' : ''}" style="--c:${c.c}" data-kpi="${c.key}" onclick="toggleKpiFilter('${c.key}')" title="Clic para filtrar por ${c.lbl}">
