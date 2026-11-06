@@ -51,6 +51,65 @@ class Item(Base):
         else:
             return "rojo"
 
+    @property
+    def elapsed_seconds(self) -> float:
+        if not self.created_at:
+            return 0.0
+        ref = self.closed_at if self.status == "cerrado" and self.closed_at else datetime.datetime.utcnow()
+        return max(0.0, (ref - self.created_at).total_seconds())
+
+    @property
+    def duration_human(self) -> str:
+        secs = int(self.elapsed_seconds)
+        if secs < 60:
+            return "< 1m"
+        mins = secs // 60
+        hours = mins // 60
+        days = hours // 24
+        if days > 0:
+            rem_hours = hours % 24
+            return f"{days}d {rem_hours}h"
+        if hours > 0:
+            rem_mins = mins % 60
+            return f"{hours}h {rem_mins}m"
+        return f"{mins}m"
+
+    @property
+    def time_sla_label(self) -> str:
+        dur = self.duration_human
+        if self.status == "cerrado":
+            return f"Duró {dur}"
+        elif self.status == "pendiente":
+            return f"Sin atender: {dur}"
+        elif self.status == "curso":
+            return f"En atención: {dur}"
+        elif self.status == "espera":
+            return f"En espera: {dur}"
+        return f"Transcurrido: {dur}"
+
+    @property
+    def sla_remaining_human(self) -> str:
+        if not self.due_at:
+            return ""
+        now = datetime.datetime.utcnow()
+        ref = self.closed_at if self.status == "cerrado" and self.closed_at else now
+        diff = (self.due_at - ref).total_seconds()
+        abs_secs = int(abs(diff))
+        mins = abs_secs // 60
+        hours = mins // 60
+        days = hours // 24
+        if days > 0:
+            time_str = f"{days}d {hours % 24}h"
+        elif hours > 0:
+            time_str = f"{hours}h {mins % 60}m"
+        else:
+            time_str = f"{mins}m"
+
+        if diff >= 0:
+            return f"Restan {time_str}"
+        else:
+            return f"+{time_str} excedido"
+
 
 class SyncLog(Base):
     __tablename__ = "sync_logs"

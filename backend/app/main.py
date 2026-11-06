@@ -161,7 +161,10 @@ def get_items(
             "synced_at": item.synced_at.isoformat() if item.synced_at else None,
             "is_overdue": item.is_overdue,
             "sla_percent": item.sla_percent,
-            "semaphore": item.semaphore
+            "semaphore": item.semaphore,
+            "duration_human": item.duration_human,
+            "time_sla_label": item.time_sla_label,
+            "sla_remaining_human": item.sla_remaining_human
         })
     return results
 

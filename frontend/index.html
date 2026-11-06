@@ -721,7 +721,7 @@ body.light .modal{
               <th>Responsable</th>
               <th>Prioridad</th>
               <th>Estado</th>
-              <th>SLA Consumido</th>
+              <th>Tiempo / SLA</th>
               <th>Vencimiento</th>
             </tr>
           </thead>
@@ -828,6 +828,45 @@ function formatDate(dateStr, includeTime = false) {
   const hours = String(d.getHours()).padStart(2, '0');
   const mins = String(d.getMinutes()).padStart(2, '0');
   return `${day}-${month}-${year} ${hours}:${mins}`;
+}
+
+function getItemTimeLabel(it) {
+  if (it.time_sla_label) return it.time_sla_label;
+  if (!it.created_at) return (it.status === 'cerrado' ? 'Cerrado' : 'Activo');
+  const created = new Date(it.created_at).getTime();
+  const ref = (it.status === 'cerrado' && it.closed_at) ? new Date(it.closed_at).getTime() : Date.now();
+  const diffSec = Math.max(0, Math.floor((ref - created) / 1000));
+  const mins = Math.floor(diffSec / 60);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+  let dur = '';
+  if (days > 0) dur = `${days}d ${hours % 24}h`;
+  else if (hours > 0) dur = `${hours}h ${mins % 60}m`;
+  else if (mins > 0) dur = `${mins}m`;
+  else dur = '< 1m';
+
+  if (it.status === 'cerrado') return `Duró ${dur}`;
+  if (it.status === 'pendiente') return `Sin atender: ${dur}`;
+  if (it.status === 'curso') return `En atención: ${dur}`;
+  if (it.status === 'espera') return `En espera: ${dur}`;
+  return `Transcurrido: ${dur}`;
+}
+
+function getItemSlaRemaining(it) {
+  if (it.sla_remaining_human) return it.sla_remaining_human;
+  if (!it.due_at) return '';
+  const due = new Date(it.due_at).getTime();
+  const ref = (it.status === 'cerrado' && it.closed_at) ? new Date(it.closed_at).getTime() : Date.now();
+  const diffSec = Math.floor((due - ref) / 1000);
+  const absSec = Math.abs(diffSec);
+  const mins = Math.floor(absSec / 60);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+  let str = '';
+  if (days > 0) str = `${days}d ${hours % 24}h`;
+  else if (hours > 0) str = `${hours}h ${mins % 60}m`;
+  else str = `${mins}m`;
+  return diffSec >= 0 ? `Restan ${str}` : `+${str} excedido`;
 }
 
 async function loadData() {
@@ -947,7 +986,10 @@ function renderAll() {
         <td><span class="muted">${it.assignee_name || 'Sin asignar'}</span></td>
         <td><span class="prio prio-${it.priority}">${it.priority}</span></td>
         <td>${it.status_origin || it.status}</td>
-        <td><b>${it.sla_percent}%</b></td>
+        <td>
+          <div style="font-weight:600;font-size:12px;color:var(--text)">${getItemTimeLabel(it)}</div>
+          <div class="muted" style="font-size:11px">${it.sla_percent}% consumido${getItemSlaRemaining(it) ? ' · ' + getItemSlaRemaining(it) : ''}</div>
+        </td>
         <td class="${it.is_overdue ? 'txt-red' : 'muted'}">${formatDate(it.due_at)}</td>
       </tr>
     `).join('');
@@ -964,7 +1006,10 @@ function renderAll() {
       <td>${it.source} #${it.external_id}</td>
       <td>${it.title}</td>
       <td>${it.priority}</td>
-      <td style="color:var(--red)">${it.sla_percent}% consumido (Vence: ${formatDate(it.due_at)})</td>
+      <td style="color:var(--red)">
+        <div style="font-weight:600;font-size:12px">${getItemTimeLabel(it)}</div>
+        <div style="font-size:11px">${it.sla_percent}% consumido (${getItemSlaRemaining(it) || ('Vence: ' + formatDate(it.due_at))})</div>
+      </td>
     </tr>
   `).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">Sin asuntos fuera de SLA.</td></tr>';
 
@@ -1032,7 +1077,11 @@ function renderKanban(list) {
               <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
             </div>
             <div class="title">${it.title}</div>
-            <div class="muted" style="font-size:11px">${it.client_name} · SLA: ${it.sla_percent}%${it.due_at ? ' · Vence: ' + formatDate(it.due_at) : ''}</div>
+            <div class="muted" style="font-size:11px">${it.client_name}</div>
+            <div style="font-size:11px;font-weight:600;color:var(--accent);margin-top:3px;display:flex;justify-content:space-between;align-items:center">
+              <span>${getItemTimeLabel(it)}</span>
+              <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA</span>
+            </div>
           </div>
         `).join('') || '<div class="muted" style="font-size:12px;text-align:center;padding:20px">Vacío</div>'}
       </div>
@@ -1054,8 +1103,9 @@ function openModal(id) {
       <dt>Prioridad:</dt><dd><span class="prio prio-${it.priority}">${it.priority}</span></dd>
       <dt>Cliente / Entidad:</dt><dd>${it.client_name}</dd>
       <dt>Creado el:</dt><dd>${formatDate(it.created_at, true)}</dd>
+      <dt>Tiempo registrado:</dt><dd><b>${getItemTimeLabel(it)}</b></dd>
       <dt>Vencimiento SLA:</dt><dd>${formatDate(it.due_at, true)}</dd>
-      <dt>SLA consumido:</dt><dd><b>${it.sla_percent}%</b> (${it.semaphore.toUpperCase()})</dd>
+      <dt>SLA / Plazo:</dt><dd><b>${it.sla_percent}%</b> consumido (${it.semaphore.toUpperCase()}) ${getItemSlaRemaining(it) ? '· <b>' + getItemSlaRemaining(it) + '</b>' : ''}</dd>
     </dl>
     <div class="actions">
       <button class="btn" onclick="document.getElementById('modalBg').classList.remove('show')">Cerrar</button>
@@ -1299,8 +1349,8 @@ function renderTvSlide() {
             <div style="font-size:15px;font-weight:700">${it.title}</div>
             <div class="muted" style="font-size:12px">Cliente: ${it.client_name} · Responsable: <b>${it.assignee_name || 'Sin asignar'}</b></div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;font-size:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px">
-              <span>SLA: <b>${it.sla_percent}%</b></span>
-              <span class="${it.is_overdue ? 'txt-red' : 'muted'}">Vence: ${formatDate(it.due_at)}</span>
+              <span style="font-weight:600;color:var(--accent)">${getItemTimeLabel(it)}</span>
+              <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? '· ' + getItemSlaRemaining(it) : ''}</span>
             </div>
           </div>
         `).join('') || '<div class="muted" style="padding:40px;text-align:center">No hay tickets activos en este momento.</div>'}
@@ -1334,7 +1384,7 @@ function renderTvSlide() {
               <div style="font-size:15px;font-weight:700">${it.title}</div>
               <div class="muted" style="font-size:12px">Cliente: ${it.client_name}</div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:10px">
-                <span style="font-size:12px">Vence: <b>${formatDate(it.due_at)}</b></span>
+                <span style="font-size:12px;font-weight:600;color:#f39c12">${getItemTimeLabel(it)}</span>
                 <a href="${it.url}" target="_blank" class="tv-action-btn">
                   <span>Tomar en ${it.source}</span>
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -1392,8 +1442,8 @@ function renderTvSlide() {
               <div style="font-size:15px;font-weight:700">${it.title}</div>
               <div class="muted" style="font-size:12px">Cliente: ${it.client_name} · Estado: <b>${it.status_origin || it.status}</b></div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;font-size:12px">
-                <span>SLA: <b>${it.sla_percent}%</b></span>
-                <span class="${it.is_overdue ? 'txt-red' : 'muted'}">Vence: ${formatDate(it.due_at)}</span>
+                <span style="font-weight:600;color:var(--accent)">${getItemTimeLabel(it)}</span>
+                <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? '· ' + getItemSlaRemaining(it) : ''}</span>
                 <a href="${it.url}" target="_blank" class="tv-action-btn" style="padding:4px 8px;font-size:11px">
                   <span>Abrir</span>
                   <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>

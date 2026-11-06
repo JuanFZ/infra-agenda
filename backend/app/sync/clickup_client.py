@@ -64,10 +64,12 @@ class ClickUpClient:
 
     def normalize_task(self, raw: dict) -> dict:
         task_id = raw.get("id")
-        raw_status = (raw.get("status", {}).get("status") or "").lower()
+        status_obj = raw.get("status") or {}
+        raw_status = (status_obj.get("status") or "").lower() if isinstance(status_obj, dict) else str(status_obj).lower()
         status_unif = STATUS_MAP_CLICKUP.get(raw_status, "pendiente")
 
-        raw_prio = (raw.get("priority", {}).get("priority") or "").lower()
+        prio_obj = raw.get("priority") or {}
+        raw_prio = (prio_obj.get("priority") or "").lower() if isinstance(prio_obj, dict) else str(prio_obj).lower()
         prio_unif = PRIORITY_MAP_CLICKUP.get(raw_prio, "Media")
 
         # Fechas en milisegundos
