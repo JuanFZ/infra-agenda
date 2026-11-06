@@ -1,6 +1,7 @@
 import datetime
-from fastapi import FastAPI, Depends, Query
+from fastapi import FastAPI, Depends, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -9,9 +10,45 @@ from .database import engine, Base, get_db, SessionLocal
 from .models import Item, SyncLog, AlertLog, User
 from .config import SYNC_INTERVAL_MINUTES
 from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
+from .sync.glpi_client import GLPIClient
+from .sync.clickup_client import ClickUpClient
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
+
+SPECIALISTS_MAP = {
+    "adonis": {
+        "key": "adonis",
+        "name": "Adonis Lozada",
+        "glpi_id": 8,
+        "clickup_id": 49560462,
+        "telegram": "@adonislozada"
+    },
+    "juan": {
+        "key": "juan",
+        "name": "Juan Fernández",
+        "glpi_id": 10,
+        "clickup_id": None,
+        "telegram": "@Juuan8"
+    },
+    "yoxaide": {
+        "key": "yoxaide",
+        "name": "Yoxaide Jiménez",
+        "glpi_id": 11,
+        "clickup_id": 49560461,
+        "telegram": "@Yjimenezg"
+    },
+    "luis": {
+        "key": "luis",
+        "name": "Luis Acosta",
+        "glpi_id": 9,
+        "clickup_id": None,
+        "telegram": "@lapsy0"
+    }
+}
+
+class AssignRequest(BaseModel):
+    specialist_key: str
 
 DEFAULT_USERS = [
     {"full_name": "Adonis Lozada", "username": "a.lozada", "email": "a.lozada@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
@@ -276,4 +313,76 @@ def get_clients_summary(db: Session = Depends(get_db)):
                 clients[c_name]["dentro_sla"] += 1
 
     return list(clients.values())
+
+@app.post("/api/items/{item_id}/assign")
+def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+
+    spec_key = req.specialist_key.lower().strip()
+    matched = None
+    for k, v in SPECIALISTS_MAP.items():
+        if k == spec_key or k in spec_key or v["name"].lower() in spec_key:
+            matched = v
+            break
+
+    if not matched:
+        raise HTTPException(status_code=400, detail=f"Especialista '{req.specialist_key}' no reconocido.")
+
+    success = False
+    source = item.source
+    ext_id = item.external_id
+
+    if source == "GLPI":
+        client = GLPIClient()
+        success = client.assign_ticket(ext_id, matched["glpi_id"])
+    elif source == "ClickUp":
+        client = ClickUpClient()
+        if matched["clickup_id"]:
+            success = client.assign_task(ext_id, matched["clickup_id"])
+        else:
+            success = True
+
+    if not success:
+        raise HTTPException(status_code=500, detail=f"No se pudo sincronizar la asignación en {source}")
+
+    # Actualizar estado y responsable en la base de datos operativa
+    item.assignee_name = matched["name"]
+    if item.status == "pendiente":
+        item.status = "curso"
+        item.status_origin = "in progress" if source == "ClickUp" else "En curso (asignado)"
+    item.updated_at = datetime.datetime.utcnow()
+    item.synced_at = datetime.datetime.utcnow()
+    db.commit()
+    db.refresh(item)
+
+    # Disparar alerta inmediata a Telegram
+    try:
+        from .notifications.telegram_notifier import send_telegram_message
+        msg = (
+            f"👤 <b>Asignación en vivo</b>\n\n"
+            f"📌 <b>Asunto:</b> {item.title}\n"
+            f"🏷 <b>Origen:</b> {item.source} #{item.external_id}\n"
+            f"🎯 <b>Responsable:</b> {matched['name']} ({matched['telegram']})\n"
+            f"⚡ <i>Asignado desde la Agenda de Infra</i>"
+        )
+        send_telegram_message(msg)
+    except Exception as e:
+        print(f"[Telegram Assign Alert Error] {e}")
+
+    return {
+        "status": "OK",
+        "message": f"Asignado exitosamente a {matched['name']}",
+        "item": {
+            "id": item.id,
+            "external_id": item.external_id,
+            "source": item.source,
+            "title": item.title,
+            "assignee_name": item.assignee_name,
+            "status": item.status,
+            "status_origin": item.status_origin
+        }
+    }
+
 
