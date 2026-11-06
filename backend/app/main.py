@@ -48,7 +48,8 @@ SPECIALISTS_MAP = {
 }
 
 class AssignRequest(BaseModel):
-    specialist_key: str
+    specialist_key: str | None = None
+    specialist_keys: list[str] | None = None
 
 DEFAULT_USERS = [
     {"full_name": "Adonis Lozada", "username": "a.lozada", "email": "a.lozada@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
@@ -320,15 +321,30 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
     if not item:
         raise HTTPException(status_code=404, detail="Item no encontrado")
 
-    spec_key = req.specialist_key.lower().strip()
-    matched = None
-    for k, v in SPECIALISTS_MAP.items():
-        if k == spec_key or k in spec_key or v["name"].lower() in spec_key:
-            matched = v
-            break
+    # Obtener lista de especialistas solicitados
+    keys = []
+    if req.specialist_keys:
+        keys = [k.strip().lower() for k in req.specialist_keys if k and k.strip()]
+    elif req.specialist_key:
+        keys = [req.specialist_key.strip().lower()]
 
-    if not matched:
-        raise HTTPException(status_code=400, detail=f"Especialista '{req.specialist_key}' no reconocido.")
+    if not keys:
+        raise HTTPException(status_code=400, detail="Debe indicar al menos un especialista.")
+
+    matched_list = []
+    seen = set()
+    for spec_key in keys:
+        matched = None
+        for k, v in SPECIALISTS_MAP.items():
+            if k == spec_key or k in spec_key or v["name"].lower() in spec_key:
+                matched = v
+                break
+        if matched and matched["key"] not in seen:
+            seen.add(matched["key"])
+            matched_list.append(matched)
+
+    if not matched_list:
+        raise HTTPException(status_code=400, detail="Ninguno de los especialistas indicados fue reconocido.")
 
     success = False
     source = item.source
@@ -336,11 +352,13 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
 
     if source == "GLPI":
         client = GLPIClient()
-        success = client.assign_ticket(ext_id, matched["glpi_id"])
+        glpi_ids = [m["glpi_id"] for m in matched_list if m.get("glpi_id")]
+        success = client.assign_ticket(ext_id, glpi_ids)
     elif source == "ClickUp":
         client = ClickUpClient()
-        if matched["clickup_id"]:
-            success = client.assign_task(ext_id, matched["clickup_id"])
+        clickup_ids = [m["clickup_id"] for m in matched_list if m.get("clickup_id")]
+        if clickup_ids:
+            success = client.assign_task(ext_id, clickup_ids)
         else:
             success = True
 
@@ -348,7 +366,8 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
         raise HTTPException(status_code=500, detail=f"No se pudo sincronizar la asignación en {source}")
 
     # Actualizar estado y responsable en la base de datos operativa
-    item.assignee_name = matched["name"]
+    combined_names = ", ".join(m["name"] for m in matched_list)
+    item.assignee_name = combined_names
     if item.status == "pendiente":
         item.status = "curso"
         item.status_origin = "in progress" if source == "ClickUp" else "En curso (asignado)"
@@ -360,11 +379,14 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
     # Disparar alerta inmediata a Telegram
     try:
         from .notifications.telegram_notifier import send_telegram_message
+        mentions = ", ".join(f"{m['name']} ({m['telegram']})" for m in matched_list)
+        plural_label = "Responsables" if len(matched_list) > 1 else "Responsable"
+        icon = "👥" if len(matched_list) > 1 else "👤"
         msg = (
-            f"👤 <b>Asignación en vivo</b>\n\n"
+            f"{icon} <b>Asignación en vivo</b>\n\n"
             f"📌 <b>Asunto:</b> {item.title}\n"
             f"🏷 <b>Origen:</b> {item.source} #{item.external_id}\n"
-            f"🎯 <b>Responsable:</b> {matched['name']} ({matched['telegram']})\n"
+            f"🎯 <b>{plural_label}:</b> {mentions}\n"
             f"⚡ <i>Asignado desde la Agenda de Infra</i>"
         )
         send_telegram_message(msg)
@@ -373,7 +395,7 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
 
     return {
         "status": "OK",
-        "message": f"Asignado exitosamente a {matched['name']}",
+        "message": f"Asignado exitosamente a {combined_names}",
         "item": {
             "id": item.id,
             "external_id": item.external_id,

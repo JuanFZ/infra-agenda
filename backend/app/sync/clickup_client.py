@@ -120,13 +120,18 @@ class ClickUpClient:
             "synced_at": datetime.datetime.utcnow()
         }
 
-    def assign_task(self, task_id: str, user_id: int) -> bool:
+    def assign_task(self, task_id: str, user_ids: list[int] | int) -> bool:
         """
-        Asigna o reasigna un especialista a la tarea en ClickUp.
+        Asigna o reasigna uno o varios especialistas a la tarea en ClickUp.
         """
         try:
             url = f"{self.base_url}/task/{task_id}"
-            # Consultar asignados actuales para reemplazarlos limpiamente
+            if isinstance(user_ids, (int, str)):
+                uids = [int(user_ids)]
+            else:
+                uids = [int(u) for u in user_ids if u]
+
+            # Consultar asignados actuales para remover únicamente los que no estén en la nueva lista
             res_get = requests.get(url, headers=self.get_headers(), timeout=10)
             current_ids = []
             if res_get.status_code == 200:
@@ -134,13 +139,13 @@ class ClickUpClient:
             
             payload = {
                 "assignees": {
-                    "add": [int(user_id)],
-                    "rem": [cid for cid in current_ids if cid != int(user_id)]
+                    "add": uids,
+                    "rem": [cid for cid in current_ids if cid not in uids]
                 }
             }
             res = requests.put(url, headers=self.get_headers(), json=payload, timeout=10)
             return res.status_code == 200
         except Exception as e:
-            print(f"[ClickUpClient] Error asignando tarea {task_id} a usuario {user_id}: {e}")
+            print(f"[ClickUpClient] Error asignando tarea {task_id} a usuarios {user_ids}: {e}")
             return False
 

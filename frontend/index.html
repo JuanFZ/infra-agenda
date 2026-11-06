@@ -544,6 +544,33 @@ body.light .modal{
 .modal dl{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;margin:16px 0;font-size:13px}
 .modal dt{color:var(--muted)}
 .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+.spec-chk-label{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:7px 10px;
+  font-size:12px;
+  cursor:pointer;
+  transition:all .15s ease;
+  user-select:none;
+}
+.spec-chk-label:hover{
+  background:rgba(79,140,255,.12);
+  border-color:rgba(79,140,255,.35);
+}
+.spec-chk-label input[type="checkbox"]{
+  accent-color:#4f8cff;
+  width:14px;
+  height:14px;
+  cursor:pointer;
+}
+body.light .spec-chk-label{
+  background:rgba(255,255,255,.75);
+  border-color:rgba(0,0,0,.08);
+}
 
 /* MODO TV Glassmorphism Transparente */
 .tv-overlay {
@@ -1228,6 +1255,12 @@ function renderKanban(list) {
 function openModal(id) {
   const it = ALL_ITEMS.find(i => i.id === id);
   if (!it) return;
+  const curName = (it.assignee_name || '').toLowerCase();
+  const isAdonis = curName.includes('adonis');
+  const isJuan = curName.includes('juan');
+  const isYoxaide = curName.includes('yoxaide');
+  const isLuis = curName.includes('luis');
+
   document.getElementById('modalContent').innerHTML = `
     <div style="margin-bottom:10px">
       <span class="badge src-${it.source}">${it.source}</span> #${it.external_id} · <span class="sem ${it.semaphore}"></span>
@@ -1235,22 +1268,35 @@ function openModal(id) {
     <h2 style="font-size:18px;line-height:1.3;margin-bottom:8px">${it.title}</h2>
     <dl>
       <dt>Estado:</dt><dd>${it.status_origin || it.status}</dd>
-      <dt>Responsable:</dt>
+      <dt>Responsable(s):</dt>
       <dd>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <b id="modalAssigneeText">${it.assignee_name || 'Sin asignar'}</b>
-          <div style="display:inline-flex;align-items:center;gap:6px;margin-left:auto">
-            <select id="modalAssignSelect" style="background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:12px;outline:none;cursor:pointer">
-              <option value="" style="background:#141c2b;color:#fff">Asignar a...</option>
-              <option value="adonis" style="background:#141c2b;color:#fff">Adonis Lozada</option>
-              <option value="juan" style="background:#141c2b;color:#fff">Juan Fernández</option>
-              <option value="yoxaide" style="background:#141c2b;color:#fff">Yoxaide Jiménez</option>
-              <option value="luis" style="background:#141c2b;color:#fff">Luis Acosta</option>
-            </select>
-            <button class="btn primary" id="btnModalAssign" onclick="assignItemFromModal(${it.id})" style="padding:4px 10px;font-size:11px">
-              <span>Asignar</span>
-            </button>
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+            <b id="modalAssigneeText" style="color:var(--text);font-size:13px">${it.assignee_name || 'Sin asignar'}</b>
+            <span style="font-size:11px;color:var(--muted)">Selecciona 1 o más</span>
           </div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px">
+            <label class="spec-chk-label">
+              <input type="checkbox" name="modal_spec_chk" value="adonis" ${isAdonis ? 'checked' : ''}>
+              <span>Adonis Lozada</span>
+            </label>
+            <label class="spec-chk-label">
+              <input type="checkbox" name="modal_spec_chk" value="juan" ${isJuan ? 'checked' : ''}>
+              <span>Juan Fernández</span>
+            </label>
+            <label class="spec-chk-label">
+              <input type="checkbox" name="modal_spec_chk" value="yoxaide" ${isYoxaide ? 'checked' : ''}>
+              <span>Yoxaide Jiménez</span>
+            </label>
+            <label class="spec-chk-label">
+              <input type="checkbox" name="modal_spec_chk" value="luis" ${isLuis ? 'checked' : ''}>
+              <span>Luis Acosta</span>
+            </label>
+          </div>
+          <button class="btn primary" id="btnModalAssign" onclick="assignItemFromModal(${it.id})" style="width:100%;justify-content:center;padding:6px 12px;font-size:12px">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+            <span>Guardar Asignación</span>
+          </button>
         </div>
       </dd>
       <dt>Prioridad:</dt><dd><span class="prio prio-${it.priority}">${it.priority}</span></dd>
@@ -1271,13 +1317,14 @@ function openModal(id) {
   document.getElementById('modalBg').classList.add('show');
 }
 
-async function assignItem(itemId, specialistKey) {
-  if (!specialistKey) return false;
+async function assignItem(itemId, specialistKeys) {
+  const keys = Array.isArray(specialistKeys) ? specialistKeys : [specialistKeys];
+  if (!keys.length) return false;
   try {
     const res = await fetch(`${API_URL}/items/${itemId}/assign`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ specialist_key: specialistKey })
+      body: JSON.stringify({ specialist_keys: keys })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -1294,16 +1341,17 @@ async function assignItem(itemId, specialistKey) {
 }
 
 async function assignItemFromModal(itemId) {
-  const sel = document.getElementById('modalAssignSelect');
-  const btn = document.getElementById('btnModalAssign');
-  if (!sel || !sel.value) {
-    alert('Por favor selecciona un especialista de la lista.');
+  const chks = document.querySelectorAll('input[name="modal_spec_chk"]:checked');
+  const selectedKeys = Array.from(chks).map(c => c.value);
+  if (!selectedKeys.length) {
+    alert('Por favor selecciona al menos un especialista de la lista.');
     return;
   }
+  const btn = document.getElementById('btnModalAssign');
   const oldText = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<span>Asignando...</span>';
-  const ok = await assignItem(itemId, sel.value);
+  btn.innerHTML = '<span>Guardando...</span>';
+  const ok = await assignItem(itemId, selectedKeys);
   if (ok) {
     openModal(itemId);
   } else {
@@ -1597,7 +1645,7 @@ function renderTvSlide() {
               <div class="muted" style="font-size:12px">Cliente: ${it.client_name}</div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;gap:8px;flex-wrap:wrap">
                 <span style="font-size:12px;font-weight:600;color:#f39c12">${getItemTimeLabel(it)}</span>
-                <div style="display:inline-flex;align-items:center;gap:8px">
+                <div style="display:inline-flex;align-items:center;gap:6px">
                   <select onchange="assignItemDirect(${it.id}, this.value)" style="background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:7px;padding:5px 8px;font-size:12px;cursor:pointer;outline:none">
                     <option value="" style="background:#141c2b;color:#fff">Tomar como...</option>
                     <option value="adonis" style="background:#141c2b;color:#fff">Adonis Lozada</option>
@@ -1605,6 +1653,9 @@ function renderTvSlide() {
                     <option value="yoxaide" style="background:#141c2b;color:#fff">Yoxaide Jiménez</option>
                     <option value="luis" style="background:#141c2b;color:#fff">Luis Acosta</option>
                   </select>
+                  <button type="button" onclick="openModal(${it.id})" class="tv-action-btn" style="cursor:pointer;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)" title="Asignar múltiples especialistas">
+                    <span>+ Varios</span>
+                  </button>
                   <a href="${it.url}" target="_blank" class="tv-action-btn" title="Abrir en plataforma nativa">
                     <span>Abrir</span>
                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>

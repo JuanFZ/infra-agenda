@@ -168,17 +168,21 @@ class GLPIClient:
             "synced_at": datetime.datetime.utcnow()
         }
 
-    def assign_ticket(self, ticket_id: str, user_id: int) -> bool:
+    def assign_ticket(self, ticket_id: str, user_ids: list[int] | int) -> bool:
         """
-        Asigna o reasigna un técnico (user_id) al ticket en GLPI.
-        1. Consulta Ticket_User para ver si ya tiene técnico asignado (type=2).
-        2. Si ya tiene técnico asignado, elimina la relación anterior.
-        3. Registra la nueva relación type=2.
+        Asigna o reasigna uno o varios técnicos (user_ids) al ticket en GLPI.
+        1. Consulta Ticket_User para ver si ya tiene técnicos asignados (type=2).
+        2. Elimina las relaciones técnicas anteriores para evitar duplicados.
+        3. Registra cada nuevo técnico en Ticket_User con type=2.
         4. Si el ticket estaba en 'Nuevo' (status=1), lo pasa a 'En curso (asignado)' (status=2).
         """
         try:
             headers = self.get_session_headers()
             tid = int(ticket_id)
+            if isinstance(user_ids, (int, str)):
+                uids = [int(user_ids)]
+            else:
+                uids = [int(u) for u in user_ids if u]
             
             # 1. Buscar y remover técnicos asignados previos
             res_tu = requests.get(f"{self.base_url}/Ticket/{tid}/Ticket_User", headers=headers, timeout=10)
@@ -188,22 +192,26 @@ class GLPIClient:
                         old_rel_id = tu.get("id")
                         requests.delete(f"{self.base_url}/Ticket/{tid}/Ticket_User/{old_rel_id}?force_purge=true", headers=headers, timeout=10)
             
-            # 2. Registrar la nueva relación técnico asignado
-            payload = {
-                "input": {
-                    "tickets_id": tid,
-                    "users_id": int(user_id),
-                    "type": 2
+            # 2. Registrar las nuevas relaciones de técnicos asignados
+            success = True
+            for uid in uids:
+                payload = {
+                    "input": {
+                        "tickets_id": tid,
+                        "users_id": uid,
+                        "type": 2
+                    }
                 }
-            }
-            res_add = requests.post(f"{self.base_url}/Ticket/{tid}/Ticket_User", headers=headers, json=payload, timeout=10)
+                res_add = requests.post(f"{self.base_url}/Ticket/{tid}/Ticket_User", headers=headers, json=payload, timeout=10)
+                if res_add.status_code not in [200, 201]:
+                    success = False
             
             # 3. Pasar a estado 'En curso' si estaba en 'Nuevo'
             requests.put(f"{self.base_url}/Ticket/{tid}", headers=headers, json={"input": {"id": tid, "status": 2}}, timeout=10)
             
-            return res_add.status_code in [200, 201]
+            return success
         except Exception as e:
-            print(f"[GLPIClient] Error asignando ticket {ticket_id} a usuario {user_id}: {e}")
+            print(f"[GLPIClient] Error asignando ticket {ticket_id} a usuarios {user_ids}: {e}")
             return False
 
 
