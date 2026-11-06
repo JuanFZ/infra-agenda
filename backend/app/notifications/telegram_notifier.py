@@ -79,8 +79,9 @@ def check_and_notify_alerts(db: Session):
     now = datetime.datetime.utcnow()
     open_items = db.query(Item).filter(Item.status != "cerrado").all()
     for item in open_items:
-        # 1. Alerta de NUEVO requerimiento asignado (si fue creado en las últimas 24 horas)
-        if item.created_at and (now - item.created_at).total_seconds() < 86400:
+        # 1. Alerta de NUEVO requerimiento asignado (si fue creado en los últimos 20 minutos para no saturar)
+        diff_sec = (now - item.created_at).total_seconds() if item.created_at else 999999
+        if -600 < diff_sec < 1200:
             new_alerted = db.query(AlertLog).filter(
                 AlertLog.item_id == item.id,
                 AlertLog.semaphore == "nuevo"

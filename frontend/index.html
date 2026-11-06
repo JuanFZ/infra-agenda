@@ -31,7 +31,7 @@ aside.collapsed .btn-toggle-side{margin:8px auto 0 auto}
 .nav{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--muted);cursor:pointer;user-select:none;position:relative;transition:all .15s}
 .nav:hover{background:var(--panel2);color:var(--text)}
 .nav.active{background:rgba(79,140,255,.15);color:var(--accent);font-weight:600}
-.nav .icon{font-size:16px;flex-shrink:0}
+.nav-svg{flex-shrink:0;display:inline-block}
 .nav .label{white-space:nowrap}
 aside.collapsed .nav{justify-content:center;padding:10px 0}
 aside.collapsed .nav .label{display:none}
@@ -75,14 +75,14 @@ header .sub{color:var(--muted);font-size:12px}
 .kpi:hover{border-color:var(--c,var(--accent));transform:translateY(-2px);background:var(--panel2)}
 .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c,var(--accent))}
 .kpi.selected{border-color:var(--c,var(--accent)) !important;background:var(--panel2);box-shadow:0 0 14px rgba(79,140,255,.25);transform:translateY(-2px)}
-.kpi.selected::after{content:"✓ Filtrando";position:absolute;top:10px;right:10px;font-size:10px;font-weight:700;color:var(--c,var(--accent));background:rgba(255,255,255,.08);padding:2px 7px;border-radius:4px}
+.kpi.selected::after{content:"Filtrando";position:absolute;top:10px;right:10px;font-size:10px;font-weight:700;color:var(--c,var(--accent));background:rgba(255,255,255,.08);padding:2px 7px;border-radius:4px}
 .kpi .lbl{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
 .kpi .val{font-size:28px;font-weight:700;margin-top:4px}
 .kpi .hint{font-size:11px;color:var(--muted);margin-top:2px}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
 .card h3{font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 
-/* Tablas responsivas con desplazamiento suave */
+/* Tablas responsivas */
 .table-responsive{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:6px;margin-bottom:4px}
 table{width:100%;border-collapse:collapse;min-width:680px}
 #tblClients{min-width:520px}
@@ -137,11 +137,12 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
 .tv-controls { display: flex; align-items: center; gap: 8px; }
 .tv-timer {
   background: #1c2430; border: 1px solid #303c4c; padding: 5px 12px; border-radius: 20px;
-  font-size: 13px; font-weight: 600; color: #4f8cff;
+  font-size: 13px; font-weight: 600; color: #4f8cff; display: inline-flex; align-items: center; gap: 4px;
 }
 .tv-btn {
   background: #1e2731; border: 1px solid #303c4c; color: #e6edf3; padding: 7px 12px;
   border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s;
+  display: inline-flex; align-items: center; gap: 6px;
 }
 .tv-btn:hover { background: #2a3746; border-color: #4f8cff; }
 .tv-btn.danger { background: rgba(255,93,93,.15); border-color: rgba(255,93,93,.4); color: #ff5d5d; }
@@ -173,7 +174,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
 .tv-stat-box { background: #151c24; border: 1px solid #263443; border-radius: 10px; padding: 14px 18px; }
 .tv-stat-box .num { font-size: 28px; font-weight: 700; margin-top: 4px; }
 
-/* MEDIA QUERIES GENERALES PARA SMARTPHONES, TABLETS Y DISPOSITIVOS SMART */
+/* MEDIA QUERIES PARA DISPOSITIVOS MÓVILES */
 @media(max-width: 768px) {
   body {
     flex-direction: column;
@@ -251,7 +252,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
     padding: 12px;
   }
 
-  /* Modo TV en móvil / smart */
+  /* Modo TV en móvil */
   .tv-overlay {
     padding: 12px 14px;
   }
@@ -356,12 +357,27 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
   <div class="brand">
     <img src="sycom.png" alt="Sycom" class="logo-sycom">
     <div class="brand-text">Agenda de Infra<small>Infraestructura & BD</small></div>
-    <button class="btn-toggle-side" id="btnToggleSidebar" title="Contraer / Expandir menú" onclick="toggleSidebar()">◀</button>
+    <button class="btn-toggle-side" id="btnToggleSidebar" title="Contraer / Expandir menú" onclick="toggleSidebar()">
+      <svg id="arrowSidebar" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
   </div>
-  <div class="nav active" data-view="resumen" title="Resumen"><span class="icon">📊</span><span class="label">Resumen</span></div>
-  <div class="nav" data-view="kanban" title="Tablero Kanban"><span class="icon">📌</span><span class="label">Tablero Kanban</span></div>
-  <div class="nav" data-view="atrasados" title="Atrasados"><span class="icon">⚠️</span><span class="label">Atrasados</span> <span class="count" id="navOver">0</span></div>
-  <div class="nav" data-view="clientes" title="Clientes"><span class="icon">👥</span><span class="label">Clientes</span></div>
+  <div class="nav active" data-view="resumen" title="Resumen">
+    <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+    <span class="label">Resumen</span>
+  </div>
+  <div class="nav" data-view="kanban" title="Tablero Kanban">
+    <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+    <span class="label">Tablero Kanban</span>
+  </div>
+  <div class="nav" data-view="atrasados" title="Atrasados">
+    <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <span class="label">Atrasados</span>
+    <span class="count" id="navOver">0</span>
+  </div>
+  <div class="nav" data-view="clientes" title="Clientes">
+    <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span class="label">Clientes</span>
+  </div>
   <div class="side-foot">
     <div><span class="dot"></span><span class="foot-text" id="apiStatus">Conectando API...</span></div>
     <div id="syncTime" class="foot-text" style="margin-top:4px">Última sync: —</div>
@@ -374,7 +390,9 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
 <main>
   <header>
     <div style="display:flex;align-items:center;gap:10px">
-      <button class="btn" id="btnHeaderToggle" onclick="toggleSidebar()" title="Abrir / Cerrar menú" style="padding:8px 11px">☰</button>
+      <button class="btn" id="btnHeaderToggle" onclick="toggleSidebar()" title="Abrir / Cerrar menú" style="padding:8px 11px">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
       <div>
         <h1 id="viewTitle">Resumen general</h1>
         <div class="sub">Consolidación en vivo: GLPI + ClickUp</div>
@@ -383,9 +401,18 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
     <div class="spacer"></div>
     <div class="clock" id="clock">--:--:--</div>
     <div class="header-actions">
-      <button class="btn" id="btnSync" onclick="forceSync()">🔄 <span class="btn-text">Sincronizar</span></button>
-      <button class="btn" id="btnTheme">🌓 <span class="btn-text">Tema</span></button>
-      <button class="btn primary" id="btnTvMode" onclick="toggleTvMode()" title="Presentación continua para pantalla grande y reuniones">📺 Modo TV</button>
+      <button class="btn" id="btnSync" onclick="forceSync()">
+        <svg id="syncIcon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"/></svg>
+        <span class="btn-text">Sincronizar</span>
+      </button>
+      <button class="btn" id="btnTheme">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        <span class="btn-text">Tema</span>
+      </button>
+      <button class="btn primary" id="btnTvMode" onclick="toggleTvMode()" title="Presentación continua para pantalla grande y reuniones">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
+        <span>Modo TV</span>
+      </button>
     </div>
   </header>
 
@@ -409,22 +436,22 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
     <label>Responsable:
       <select id="fResp">
         <option value="">Todo el equipo</option>
-        <option value="Bravo">👤 Richard Bravo</option>
-        <option value="Adonis">👤 Adonis Lozada</option>
-        <option value="Juan">👤 Juan Fernández</option>
-        <option value="Yoxaide">👤 Yoxaide Jiménez</option>
-        <option value="Luis">👤 Luis Acosta</option>
-        <option value="Sin asignar">⚠️ Sin asignar</option>
+        <option value="Adonis">Adonis Lozada</option>
+        <option value="Juan">Juan Fernández</option>
+        <option value="Yoxaide">Yoxaide Jiménez</option>
+        <option value="Luis">Luis Acosta</option>
+        <option value="Sin asignar">Sin asignar</option>
       </select>
     </label>
-    <input type="text" id="fSearch" placeholder="🔍 Buscar por asunto o ID...">
-    <button class="btn" id="btnResetFilters" onclick="resetAllFilters()" style="display:none;font-size:12px;padding:7px 12px;color:var(--red);border-color:rgba(255,93,93,.3)">✕ Limpiar filtros</button>
+    <input type="text" id="fSearch" placeholder="Buscar por asunto o ID...">
+    <button class="btn" id="btnResetFilters" onclick="resetAllFilters()" style="display:none;font-size:12px;padding:7px 12px;color:var(--red);border-color:rgba(255,93,93,.3)">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <span>Limpiar filtros</span>
+    </button>
   </div>
 
   <!-- KPIs -->
-  <div class="kpis" id="kpisContainer">
-    <!-- Se llena dinámicamente desde /api/kpis -->
-  </div>
+  <div class="kpis" id="kpisContainer"></div>
 
   <!-- Vistas -->
   <div class="view active" id="v-resumen">
@@ -454,9 +481,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
   </div>
 
   <div class="view" id="v-kanban">
-    <div class="kanban-grid" id="kanbanGrid">
-      <!-- Columnas Kanban -->
-    </div>
+    <div class="kanban-grid" id="kanbanGrid"></div>
   </div>
 
   <div class="view" id="v-atrasados">
@@ -499,7 +524,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
     <div class="tv-brand">
       <img src="sycom.png" alt="Sycom" class="tv-logo">
       <div>
-        <div class="tv-title" id="tvSlideTitle">📺 Cargando Modo TV...</div>
+        <div class="tv-title" id="tvSlideTitle">Cargando Modo TV...</div>
         <div class="tv-sub" id="tvSlideSub">Agenda de Infra · Sala de Operaciones</div>
       </div>
     </div>
@@ -507,20 +532,32 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
       <div class="tv-progress-bar" id="tvProgressBar"></div>
     </div>
     <div class="tv-controls">
-      <span class="tv-timer" id="tvTimerBadge">⏱️ 18s</span>
-      <button class="tv-btn" onclick="tvPrevSlide()" title="Diapositiva Anterior (←)">⏮</button>
-      <button class="tv-btn" id="tvPlayPauseBtn" onclick="tvTogglePause()" title="Pausar / Reanudar (Espacio)">⏸ Pausa</button>
-      <button class="tv-btn" onclick="tvNextSlide()" title="Siguiente Diapositiva (→)">⏭</button>
-      <button class="tv-btn danger" onclick="toggleTvMode()" title="Salir del Modo TV (Esc)">✕ Salir</button>
+      <span class="tv-timer" id="tvTimerBadge">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span id="tvTimerSec">18s</span>
+      </span>
+      <button class="tv-btn" onclick="tvPrevSlide()" title="Diapositiva Anterior (←)">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      <button class="tv-btn" id="tvPlayPauseBtn" onclick="tvTogglePause()" title="Pausar / Reanudar (Espacio)">
+        <span id="tvPlayPauseIcon">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        </span>
+        <span id="tvPlayPauseText">Pausa</span>
+      </button>
+      <button class="tv-btn" onclick="tvNextSlide()" title="Siguiente Diapositiva (→)">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      <button class="tv-btn danger" onclick="toggleTvMode()" title="Salir del Modo TV (Esc)">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <span>Salir</span>
+      </button>
     </div>
   </div>
-  <div class="tv-body" id="tvBody">
-    <!-- Se llena dinámicamente según el slide -->
-  </div>
+  <div class="tv-body" id="tvBody"></div>
 </div>
 
 <script>
-// Usar ruta relativa para que funcione automáticamente en localhost o a través de la IP/dominio
 const API_URL = window.location.port === '8000' ? 'http://localhost:8000/api' : '/api';
 let ALL_ITEMS = [];
 let ACTIVE_KPI_FILTER = null;
@@ -542,14 +579,12 @@ function formatDate(dateStr, includeTime = false) {
 
 async function loadData() {
   try {
-    // 1. Cargar KPIs
     const resKpi = await fetch(`${API_URL}/kpis`);
     const kpis = await resKpi.json();
     renderKPIs(kpis);
     document.getElementById('apiStatus').textContent = 'API Conectada';
     document.getElementById('syncTime').textContent = kpis.last_sync ? `Última sync: ${formatDate(kpis.last_sync, true)}` : 'Sync: OK';
 
-    // 2. Cargar Items
     const resItems = await fetch(`${API_URL}/items`);
     ALL_ITEMS = await resItems.json();
     renderAll();
@@ -587,7 +622,6 @@ function toggleKpiFilter(key) {
     ACTIVE_KPI_FILTER = key;
   }
 
-  // Si no está en resumen ni kanban, cambiar a resumen para ver el resultado
   const activeNav = document.querySelector('.nav.active')?.dataset?.view;
   if (activeNav && activeNav !== 'resumen' && activeNav !== 'kanban') {
     document.querySelector('.nav[data-view="resumen"]')?.click();
@@ -616,20 +650,17 @@ function filterItems() {
   const resp = document.getElementById('fResp').value.toLowerCase();
   const q = document.getElementById('fSearch').value.toLowerCase().trim();
 
-  // Mostrar u ocultar botón de limpiar filtros
   const hasFilter = src || prio || resp || q || ACTIVE_KPI_FILTER;
   const btnReset = document.getElementById('btnResetFilters');
-  if (btnReset) btnReset.style.display = hasFilter ? 'inline-block' : 'none';
+  if (btnReset) btnReset.style.display = hasFilter ? 'inline-flex' : 'none';
 
   return ALL_ITEMS.filter(it => {
-    // Filtro por cuadro KPI activo
     if (ACTIVE_KPI_FILTER === 'pendiente' && it.status !== 'pendiente') return false;
     if (ACTIVE_KPI_FILTER === 'curso' && it.status !== 'curso') return false;
     if (ACTIVE_KPI_FILTER === 'espera' && it.status !== 'espera') return false;
     if (ACTIVE_KPI_FILTER === 'atrasados' && !(it.is_overdue || it.semaphore === 'rojo')) return false;
     if (ACTIVE_KPI_FILTER === 'cumplimiento' && (it.is_overdue || it.semaphore === 'rojo')) return false;
 
-    // Filtros de barra superior
     if (src && it.source !== src) return false;
     if (prio && it.priority !== prio) return false;
     if (resp) {
@@ -682,7 +713,7 @@ function renderAll() {
       <td>${it.priority}</td>
       <td style="color:var(--red)">${it.sla_percent}% consumido (Vence: ${formatDate(it.due_at)})</td>
     </tr>
-  `).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">🎉 Ningún asunto atrasado</td></tr>';
+  `).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">Sin asuntos fuera de SLA.</td></tr>';
 
   // 4. Clientes
   renderClients(list);
@@ -730,10 +761,10 @@ function renderClients(list) {
 
 function renderKanban(list) {
   const cols = [
-    { k: 'pendiente', title: '📥 Pendientes' },
-    { k: 'curso', title: '⚙️ En curso' },
-    { k: 'espera', title: '⏸️ En espera' },
-    { k: 'cerrado', title: '✅ Cerrados' }
+    { k: 'pendiente', title: 'Pendientes' },
+    { k: 'curso', title: 'En curso' },
+    { k: 'espera', title: 'En espera' },
+    { k: 'cerrado', title: 'Cerrados' }
   ];
 
   document.getElementById('kanbanGrid').innerHTML = cols.map(c => {
@@ -775,7 +806,10 @@ function openModal(id) {
     </dl>
     <div class="actions">
       <button class="btn" onclick="document.getElementById('modalBg').classList.remove('show')">Cerrar</button>
-      <a href="${it.url}" target="_blank" class="btn primary" style="text-decoration:none">Abrir en ${it.source} ↗</a>
+      <a href="${it.url}" target="_blank" class="btn primary" style="text-decoration:none">
+        <span>Abrir en ${it.source}</span>
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      </a>
     </div>
   `;
   document.getElementById('modalBg').classList.add('show');
@@ -783,14 +817,16 @@ function openModal(id) {
 
 async function forceSync() {
   const btn = document.getElementById('btnSync');
-  btn.textContent = '⏳ Sincronizando...';
+  btn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"/></svg> <span class="btn-text">Sincronizando...</span>`;
   try {
     await fetch(`${API_URL}/sync`, { method: 'POST' });
     await loadData();
-    btn.textContent = '✅ Sincronizado';
-    setTimeout(() => btn.innerHTML = '🔄 <span class="btn-text">Sincronizar</span>', 2000);
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> <span class="btn-text">Sincronizado</span>`;
+    setTimeout(() => {
+      btn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"/></svg> <span class="btn-text">Sincronizar</span>`;
+    }, 2000);
   } catch (e) {
-    btn.textContent = '❌ Error Sync';
+    btn.innerHTML = `<span class="btn-text">Error Sync</span>`;
   }
 }
 
@@ -805,8 +841,12 @@ function toggleSidebar() {
     if (backdrop) backdrop.classList.toggle('show', isOpen);
   } else {
     const isCollapsed = sb.classList.toggle('collapsed');
-    const btn = document.getElementById('btnToggleSidebar');
-    if (btn) btn.textContent = isCollapsed ? '▶' : '◀';
+    const arrow = document.getElementById('arrowSidebar');
+    if (arrow) {
+      arrow.innerHTML = isCollapsed 
+        ? '<polyline points="9 18 15 12 9 6"/>' 
+        : '<polyline points="15 18 9 12 15 6"/>';
+    }
     localStorage.setItem('sidebar_collapsed', isCollapsed ? '1' : '0');
   }
 }
@@ -820,8 +860,8 @@ function closeSidebarMobile() {
 
 if (localStorage.getItem('sidebar_collapsed') === '1' && window.innerWidth > 768) {
   document.getElementById('sidebar')?.classList.add('collapsed');
-  const btn = document.getElementById('btnToggleSidebar');
-  if (btn) btn.textContent = '▶';
+  const arrow = document.getElementById('arrowSidebar');
+  if (arrow) arrow.innerHTML = '<polyline points="9 18 15 12 9 6"/>';
 }
 
 // Navegación de vistas
@@ -867,7 +907,6 @@ const TV_SLIDE_DURATION = 18;
 let TV_IS_PAUSED = false;
 
 const TV_SPECIALISTS = [
-  { name: "Richard Bravo", tag: "Jefatura", key: "bravo" },
   { name: "Adonis Lozada", tag: "@adonislozada", key: "adonis", isCoord: true },
   { name: "Juan Fernández", tag: "@Juuan8", key: "juan" },
   { name: "Yoxaide Jiménez", tag: "@Yjimenezg", key: "yoxaide" },
@@ -876,14 +915,14 @@ const TV_SPECIALISTS = [
 
 function getTvSlides() {
   const slides = [
-    { type: 'resumen', title: '📊 Panorama General del Equipo', sub: 'Indicadores globales y casos prioritarios en curso' },
-    { type: 'unassigned', title: '⚠️ Asuntos Sin Asignar', sub: '¡Disponibles para asignación inmediata del equipo!' }
+    { type: 'resumen', title: 'Panorama General del Equipo', sub: 'Indicadores globales y casos prioritarios en curso' },
+    { type: 'unassigned', title: 'Asuntos Sin Asignar', sub: 'Disponibles para asignación inmediata del equipo' }
   ];
   TV_SPECIALISTS.forEach(spec => {
     slides.push({
       type: 'specialist',
       spec: spec,
-      title: `${spec.isCoord ? '👤 Coordinación' : (spec.key === 'bravo' ? '👤 Jefatura' : '👤 Especialista')}: ${spec.name}`,
+      title: `${spec.isCoord ? 'Coordinación' : 'Especialista'}: ${spec.name}`,
       sub: `Tareas y tickets asignados (${spec.tag})`
     });
   });
@@ -927,9 +966,9 @@ function startTvTimer() {
 }
 
 function updateTvTimerUI() {
-  const badge = document.getElementById('tvTimerBadge');
+  const sec = document.getElementById('tvTimerSec');
   const bar = document.getElementById('tvProgressBar');
-  if (badge) badge.textContent = `⏱️ ${TV_TIME_LEFT}s`;
+  if (sec) sec.textContent = `${TV_TIME_LEFT}s`;
   if (bar) {
     const pct = Math.max(0, (TV_TIME_LEFT / TV_SLIDE_DURATION) * 100);
     bar.style.width = `${pct}%`;
@@ -938,8 +977,14 @@ function updateTvTimerUI() {
 
 function tvTogglePause() {
   TV_IS_PAUSED = !TV_IS_PAUSED;
-  const btn = document.getElementById('tvPlayPauseBtn');
-  if (btn) btn.textContent = TV_IS_PAUSED ? '▶ Reanudar' : '⏸ Pausa';
+  const icon = document.getElementById('tvPlayPauseIcon');
+  const text = document.getElementById('tvPlayPauseText');
+  if (icon) {
+    icon.innerHTML = TV_IS_PAUSED 
+      ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>' 
+      : '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+  }
+  if (text) text.textContent = TV_IS_PAUSED ? 'Reanudar' : 'Pausa';
 }
 
 function tvNextSlide() {
@@ -990,7 +1035,7 @@ function renderTvSlide() {
           <div class="num" style="color:var(--yellow)">${criticos}</div>
         </div>
       </div>
-      <h3 style="margin-bottom:12px;font-size:16px">🔥 Casos Prioritarios y Actividades en Atención</h3>
+      <h3 style="margin-bottom:12px;font-size:16px">Casos Prioritarios y Actividades en Atención</h3>
       <div class="tv-card-grid">
         ${active.slice(0, 6).map(it => `
           <div class="tv-item-card ${it.semaphore}">
@@ -999,7 +1044,7 @@ function renderTvSlide() {
               <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
             </div>
             <div style="font-size:15px;font-weight:700">${it.title}</div>
-            <div class="muted" style="font-size:12px">🏢 ${it.client_name} · 👤 <b>${it.assignee_name || 'Sin asignar'}</b></div>
+            <div class="muted" style="font-size:12px">Cliente: ${it.client_name} · Responsable: <b>${it.assignee_name || 'Sin asignar'}</b></div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;font-size:12px;border-top:1px solid #25303d;padding-top:8px">
               <span>SLA: <b>${it.sla_percent}%</b></span>
               <span class="${it.is_overdue ? 'txt-red' : 'muted'}">Vence: ${formatDate(it.due_at)}</span>
@@ -1014,15 +1059,15 @@ function renderTvSlide() {
     container.innerHTML = `
       <div class="tv-unassigned-banner">
         <div>
-          <b style="font-size:16px;color:#f39c12">📢 ${unassigned.length} Asunto(s) Disponibles para Tomar</b>
+          <b style="font-size:16px;color:#f39c12">${unassigned.length} Asunto(s) Disponibles para Tomar</b>
           <div style="font-size:12px;color:var(--muted);margin-top:2px">Cualquier especialista puede tomarlos en GLPI o ClickUp para comenzar a atenderlos.</div>
         </div>
         <span class="badge" style="background:#f39c12;color:#000;font-size:13px;padding:4px 10px">${unassigned.length} disponibles</span>
       </div>
       ${unassigned.length === 0 ? `
         <div style="background:#151c24;border:1px dashed #2ecc71;border-radius:12px;padding:50px;text-align:center">
-          <div style="font-size:40px;margin-bottom:10px">🎉</div>
-          <b style="font-size:18px;color:#2ecc71">¡Excelente trabajo de equipo!</b>
+          <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#2ecc71" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:10px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <div style="font-size:18px;color:#2ecc71;font-weight:700">¡Equipo al día!</div>
           <div class="muted" style="margin-top:6px;font-size:14px">No hay tickets ni tareas pendientes por asignar en este momento.</div>
         </div>
       ` : `
@@ -1034,10 +1079,13 @@ function renderTvSlide() {
                 <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
               </div>
               <div style="font-size:15px;font-weight:700">${it.title}</div>
-              <div class="muted" style="font-size:12px">🏢 Cliente: ${it.client_name}</div>
+              <div class="muted" style="font-size:12px">Cliente: ${it.client_name}</div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;border-top:1px solid #25303d;padding-top:10px">
                 <span style="font-size:12px">Vence: <b>${formatDate(it.due_at)}</b></span>
-                <a href="${it.url}" target="_blank" class="tv-action-btn">Tomar en ${it.source} ↗</a>
+                <a href="${it.url}" target="_blank" class="tv-action-btn">
+                  <span>Tomar en ${it.source}</span>
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>
               </div>
             </div>
           `).join('')}
@@ -1076,8 +1124,8 @@ function renderTvSlide() {
       </div>
       ${items.length === 0 ? `
         <div style="background:#151c24;border:1px dashed #303c4c;border-radius:12px;padding:40px;text-align:center">
-          <div style="font-size:32px;margin-bottom:8px">✨</div>
-          <b style="font-size:16px">${spec.name} tiene todas sus tareas al día.</b>
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <div style="font-size:16px;font-weight:600">${spec.name} tiene todas sus tareas al día.</div>
           <div class="muted" style="margin-top:4px;font-size:13px">Sin actividades pendientes actualmente.</div>
         </div>
       ` : `
@@ -1089,11 +1137,14 @@ function renderTvSlide() {
                 <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
               </div>
               <div style="font-size:15px;font-weight:700">${it.title}</div>
-              <div class="muted" style="font-size:12px">🏢 ${it.client_name} · Estado: <b>${it.status_origin || it.status}</b></div>
+              <div class="muted" style="font-size:12px">Cliente: ${it.client_name} · Estado: <b>${it.status_origin || it.status}</b></div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;border-top:1px solid #25303d;padding-top:10px;font-size:12px">
                 <span>SLA: <b>${it.sla_percent}%</b></span>
                 <span class="${it.is_overdue ? 'txt-red' : 'muted'}">Vence: ${formatDate(it.due_at)}</span>
-                <a href="${it.url}" target="_blank" class="tv-action-btn" style="padding:4px 8px;font-size:11px">Abrir ↗</a>
+                <a href="${it.url}" target="_blank" class="tv-action-btn" style="padding:4px 8px;font-size:11px">
+                  <span>Abrir</span>
+                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>
               </div>
             </div>
           `).join('')}
