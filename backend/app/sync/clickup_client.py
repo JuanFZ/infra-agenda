@@ -179,3 +179,47 @@ class ClickUpClient:
             print(f"[ClickUpClient] Error actualizando estado de tarea {task_id} a {new_status}: {e}")
             return False
 
+    def create_task(self, title: str, description: str = "", priority: str = "Media", due_at: datetime.datetime | None = None, user_ids: list[int] | None = None, list_id: str | None = None) -> dict | None:
+        """
+        Crea una tarea formal en ClickUp mediante su API v2.
+        """
+        if not list_id:
+            list_id = "1600250000002725"  # Lista Action Items en Espacio Infra & BD
+        
+        url = f"{self.base_url}/list/{list_id}/task"
+        prio_map = {
+            "Crítica": 1,
+            "Alta": 2,
+            "Media": 3,
+            "Baja": 4
+        }
+        clickup_prio = prio_map.get(priority, 3)
+        
+        payload = {
+            "name": title,
+            "description": description or "",
+            "priority": clickup_prio,
+            "status": "to do"
+        }
+        if user_ids:
+            payload["assignees"] = [int(u) for u in user_ids if u]
+            
+        if due_at:
+            payload["due_date"] = int(due_at.timestamp() * 1000)
+            payload["due_date_time"] = True
+            
+        try:
+            res = requests.post(url, headers=self.get_headers(), json=payload, timeout=12)
+            res.raise_for_status()
+            data = res.json()
+            task_id = data.get("id")
+            if task_id and not data.get("url"):
+                data["url"] = f"https://app.clickup.com/t/{task_id}"
+            return data
+        except Exception as e:
+            print(f"[ClickUpClient] Error creando tarea '{title}': {e}")
+            if hasattr(e, "response") and e.response is not None:
+                print(f"[ClickUpClient Response] {e.response.text}")
+            return None
+
+

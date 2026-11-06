@@ -241,4 +241,60 @@ class GLPIClient:
             print(f"[GLPIClient] Error actualizando estado de ticket {ticket_id} a {new_status}: {e}")
             return False
 
+    def create_ticket(self, title: str, description: str = "", priority: str = "Media", due_at: datetime.datetime | None = None, user_ids: list[int] | None = None) -> dict | None:
+        """
+        Crea un ticket en GLPI mediante la API REST.
+        """
+        prio_map = {
+            "Baja": 2,
+            "Media": 3,
+            "Alta": 4,
+            "Crítica": 5
+        }
+        glpi_prio = prio_map.get(priority, 3)
+        input_data = {
+            "name": title,
+            "content": description or title,
+            "priority": glpi_prio,
+            "urgency": glpi_prio,
+            "impact": glpi_prio,
+            "status": 1  # 1: Nuevo
+        }
+        if due_at:
+            input_data["time_to_resolve"] = due_at.strftime("%Y-%m-%d %H:%M:%S")
+
+        try:
+            headers = self.get_session_headers()
+            url = f"{self.base_url}/Ticket"
+            res = requests.post(url, headers=headers, json={"input": input_data}, timeout=12)
+            if res.status_code == 401:
+                self.init_session()
+                headers = self.get_session_headers()
+                res = requests.post(url, headers=headers, json={"input": input_data}, timeout=12)
+            
+            res.raise_for_status()
+            data = res.json()
+            new_id = data.get("id")
+            if not new_id:
+                return None
+            
+            # Asignar técnicos si se indicaron
+            if user_ids:
+                self.assign_ticket(str(new_id), user_ids)
+            
+            base_web = self.base_url.replace("/apirest.php", "")
+            ticket_url = f"{base_web}/front/ticket.form.php?id={new_id}"
+            
+            return {
+                "id": str(new_id),
+                "url": ticket_url,
+                "message": data.get("message")
+            }
+        except Exception as e:
+            print(f"[GLPIClient] Error creando ticket '{title}': {e}")
+            if hasattr(e, "response") and e.response is not None:
+                print(f"[GLPIClient Response] {e.response.text}")
+            return None
+
+
 

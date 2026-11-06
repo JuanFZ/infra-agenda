@@ -76,6 +76,14 @@ class AssignRequest(BaseModel):
 class StatusUpdateRequest(BaseModel):
     status: str
 
+class CreateItemRequest(BaseModel):
+    source: str
+    title: str
+    description: str | None = None
+    priority: str = "Media"
+    specialist_keys: list[str] | None = None
+    due_at: str | None = None
+
 DEFAULT_USERS = [
     {"full_name": "Adonis Lozada", "username": "a.lozada", "email": "a.lozada@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
     {"full_name": "Juan Fernández", "username": "j.fernandez", "email": "j.fernandez@sycom.com.ve", "telegram_username": "@Juuan8", "role": "especialista"},
@@ -537,5 +545,159 @@ def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Dep
             "updated_at": item.updated_at.isoformat() if item.updated_at else None
         }
     }
+
+@app.post("/api/items")
+def create_item(req: CreateItemRequest, db: Session = Depends(get_db)):
+    src = req.source.strip()
+    if src.lower() in ["clickup", "click_up"]:
+        source = "ClickUp"
+    elif src.lower() in ["glpi"]:
+        source = "GLPI"
+    else:
+        raise HTTPException(status_code=400, detail="Plataforma de destino no válida. Debe ser 'ClickUp' o 'GLPI'.")
+
+    title = req.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="El título o asunto de la actividad es obligatorio.")
+
+    priority = req.priority.strip().capitalize()
+    if priority not in ["Baja", "Media", "Alta", "Crítica"]:
+        priority = "Media"
+
+    # Procesar fecha límite (SLA)
+    now_utc = datetime.datetime.utcnow()
+    due_dt = None
+    if req.due_at:
+        try:
+            clean_due = req.due_at.replace("Z", "+00:00")
+            due_dt = datetime.datetime.fromisoformat(clean_due)
+            if due_dt.tzinfo is not None:
+                due_dt = due_dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        except Exception as e:
+            print(f"[CreateItem] Error parseando due_at '{req.due_at}': {e}")
+            due_dt = None
+
+    if not due_dt:
+        sla_hours = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(priority, 72)
+        due_dt = now_utc + datetime.timedelta(hours=sla_hours)
+
+    # Identificar especialistas solicitados
+    matched_list = []
+    seen = set()
+    if req.specialist_keys:
+        for spec_key in req.specialist_keys:
+            if not spec_key:
+                continue
+            k_clean = spec_key.strip().lower()
+            matched = None
+            for k, v in SPECIALISTS_MAP.items():
+                if k == k_clean or k in k_clean or v["name"].lower() in k_clean:
+                    matched = v
+                    break
+            if matched and matched["key"] not in seen:
+                seen.add(matched["key"])
+                matched_list.append(matched)
+
+    combined_names = ", ".join(m["name"] for m in matched_list) if matched_list else "Sin asignar"
+
+    # Crear en plataforma nativa
+    external_id = None
+    url = None
+    category = "Proyectos y Tareas" if source == "ClickUp" else "Tickets TI"
+    client_name = "Gestión Sycom" if source == "ClickUp" else "Interno Sycom"
+    status_origin = "to do" if source == "ClickUp" else "1 - Nuevo"
+
+    if source == "ClickUp":
+        client = ClickUpClient()
+        clickup_ids = [m["clickup_id"] for m in matched_list if m.get("clickup_id")]
+        task_data = client.create_task(
+            title=title,
+            description=req.description or "",
+            priority=priority,
+            due_at=due_dt,
+            user_ids=clickup_ids
+        )
+        if not task_data or not task_data.get("id"):
+            raise HTTPException(status_code=500, detail="Error creando la tarea en la API de ClickUp")
+        external_id = str(task_data["id"])
+        url = task_data.get("url") or f"https://app.clickup.com/t/{external_id}"
+    elif source == "GLPI":
+        client = GLPIClient()
+        glpi_ids = [m["glpi_id"] for m in matched_list if m.get("glpi_id")]
+        ticket_data = client.create_ticket(
+            title=title,
+            description=req.description or "",
+            priority=priority,
+            due_at=due_dt,
+            user_ids=glpi_ids
+        )
+        if not ticket_data or not ticket_data.get("id"):
+            raise HTTPException(status_code=500, detail="Error creando el ticket en la API de GLPI")
+        external_id = str(ticket_data["id"])
+        url = ticket_data.get("url")
+
+    # Guardar en base de datos local
+    item = Item(
+        source=source,
+        external_id=external_id,
+        url=url,
+        title=title,
+        category=category,
+        client_name=client_name,
+        client_type="Interno",
+        assignee_name=combined_names,
+        priority=priority,
+        status="pendiente",
+        status_origin=status_origin,
+        created_at=now_utc,
+        assigned_at=now_utc if matched_list else None,
+        due_at=due_dt,
+        updated_at=now_utc,
+        synced_at=now_utc
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    # Disparar notificación a Telegram
+    try:
+        import html
+        from .notifications.telegram_notifier import send_telegram_message
+        mentions = ", ".join(f"{html.escape(m['name'])} ({m['telegram']})" for m in matched_list) if matched_list else "⚠️ <b>Sin asignar</b> (Atención: @adonislozada)"
+        plural_label = "Responsables" if len(matched_list) > 1 else "Responsable"
+        due_str = due_dt.strftime('%d-%m-%Y %I:%M %p') if due_dt else "Sin límite"
+        safe_title = html.escape(title)
+        safe_source = html.escape(source)
+        safe_desc = f"\n📝 <b>Descripción:</b>\n{html.escape(req.description.strip())}\n" if req.description and req.description.strip() else ""
+        prio_icon = "🔥" if priority == "Crítica" else ("⚡" if priority == "Alta" else "📌")
+        msg = (
+            f"✨ <b>Nueva Actividad Creada</b>\n\n"
+            f"📌 <b>Asunto:</b> {safe_title}\n"
+            f"🏷 <b>Origen:</b> {safe_source} #{external_id}\n"
+            f"{prio_icon} <b>Prioridad:</b> {priority}\n"
+            f"🎯 <b>{plural_label}:</b> {mentions}\n"
+            f"⏳ <b>Límite SLA:</b> {due_str}\n"
+            f"{safe_desc}\n"
+            f"🔗 <a href='{url}'>Abrir en {safe_source}</a>"
+        )
+        send_telegram_message(msg, parse_mode="HTML")
+    except Exception as e:
+        print(f"[Telegram Create Notification Error] {e}")
+
+    return {
+        "status": "OK",
+        "message": "Actividad creada con éxito",
+        "item": {
+            "id": item.id,
+            "external_id": item.external_id,
+            "source": item.source,
+            "title": item.title,
+            "assignee_name": item.assignee_name,
+            "priority": item.priority,
+            "status": item.status,
+            "url": item.url
+        }
+    }
+
 
 
