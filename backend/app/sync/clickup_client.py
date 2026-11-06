@@ -149,3 +149,32 @@ class ClickUpClient:
             print(f"[ClickUpClient] Error asignando tarea {task_id} a usuarios {user_ids}: {e}")
             return False
 
+    def update_task_status(self, task_id: str, new_status: str) -> bool:
+        """
+        Actualiza el estado de la tarea en ClickUp.
+        new_status: 'pendiente', 'curso', 'espera', 'cerrado'
+        """
+        status_map = {
+            "pendiente": "to do",
+            "curso": "in progress",
+            "espera": "waiting",
+            "cerrado": "complete"
+        }
+        target = status_map.get(new_status, new_status)
+        try:
+            url = f"{self.base_url}/task/{task_id}"
+            res = requests.put(url, headers=self.get_headers(), json={"status": target}, timeout=10)
+            if res.status_code == 200:
+                return True
+            # Fallback en caso de que la lista use nombres estándar alternativos
+            if target == "to do":
+                res = requests.put(url, headers=self.get_headers(), json={"status": "open"}, timeout=10)
+            elif target == "complete":
+                res = requests.put(url, headers=self.get_headers(), json={"status": "closed"}, timeout=10)
+            elif target == "waiting":
+                res = requests.put(url, headers=self.get_headers(), json={"status": "in progress"}, timeout=10)
+            return res.status_code == 200
+        except Exception as e:
+            print(f"[ClickUpClient] Error actualizando estado de tarea {task_id} a {new_status}: {e}")
+            return False
+

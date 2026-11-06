@@ -73,6 +73,9 @@ class AssignRequest(BaseModel):
     specialist_key: str | None = None
     specialist_keys: list[str] | None = None
 
+class StatusUpdateRequest(BaseModel):
+    status: str
+
 DEFAULT_USERS = [
     {"full_name": "Adonis Lozada", "username": "a.lozada", "email": "a.lozada@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
     {"full_name": "Juan Fernández", "username": "j.fernandez", "email": "j.fernandez@sycom.com.ve", "telegram_username": "@Juuan8", "role": "especialista"},
@@ -433,6 +436,89 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
             "assigned_at": item.assigned_at.isoformat() if item.assigned_at else None,
             "status": item.status,
             "status_origin": item.status_origin
+        }
+    }
+
+@app.post("/api/items/{item_id}/status")
+def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+
+    new_st = req.status.lower().strip()
+    if new_st not in ["pendiente", "curso", "espera", "cerrado"]:
+        raise HTTPException(status_code=400, detail=f"Estado '{req.status}' no válido. Use: pendiente, curso, espera, cerrado")
+
+    source = item.source
+    ext_id = item.external_id
+    success = False
+
+    if source == "GLPI":
+        client = GLPIClient()
+        success = client.update_ticket_status(ext_id, new_st)
+    elif source == "ClickUp":
+        client = ClickUpClient()
+        success = client.update_task_status(ext_id, new_st)
+
+    if not success:
+        raise HTTPException(status_code=500, detail=f"No se pudo sincronizar el estado en {source}")
+
+    # Actualizar estado en la base de datos operativa
+    now_utc = datetime.datetime.utcnow()
+    item.status = new_st
+    item.updated_at = now_utc
+    item.synced_at = now_utc
+
+    if new_st == "cerrado":
+        item.closed_at = now_utc
+        item.status_origin = "5 - Resuelto" if source == "GLPI" else "complete"
+    elif new_st == "curso":
+        item.closed_at = None
+        item.status_origin = "2 - En curso (asignado)" if source == "GLPI" else "in progress"
+    elif new_st == "espera":
+        item.closed_at = None
+        item.status_origin = "4 - En espera" if source == "GLPI" else "waiting"
+    elif new_st == "pendiente":
+        item.closed_at = None
+        item.status_origin = "1 - Nuevo" if source == "GLPI" else "to do"
+
+    db.commit()
+    db.refresh(item)
+
+    # Disparar alerta en Telegram
+    try:
+        from .notifications.telegram_notifier import send_telegram_message
+        status_labels = {
+            "pendiente": "Pendiente",
+            "curso": "En Curso",
+            "espera": "En Espera",
+            "cerrado": "Cerrado / Resuelto"
+        }
+        msg = (
+            f"📋 <b>Cambio de estado en Tablero Kanban</b>\n\n"
+            f"📌 <b>Asunto:</b> {item.title}\n"
+            f"🏷 <b>Origen:</b> {item.source} #{item.external_id}\n"
+            f"📊 <b>Nuevo estado:</b> {status_labels.get(new_st, new_st)} ({item.status_origin})\n"
+            f"👤 <b>Responsable:</b> {item.assignee_name}\n"
+            f"⚡ <i>Actualizado arrastrando desde el Kanban</i>"
+        )
+        send_telegram_message(msg)
+    except Exception as e:
+        print(f"[Telegram Status Alert Error] {e}")
+
+    return {
+        "status": "OK",
+        "message": f"Estado cambiado a {new_st}",
+        "item": {
+            "id": item.id,
+            "external_id": item.external_id,
+            "source": item.source,
+            "title": item.title,
+            "assignee_name": item.assignee_name,
+            "status": item.status,
+            "status_origin": item.status_origin,
+            "closed_at": item.closed_at.isoformat() if item.closed_at else None,
+            "updated_at": item.updated_at.isoformat() if item.updated_at else None
         }
     }
 

@@ -471,15 +471,25 @@ body.light tr.click:hover td{
   border-radius:14px;
   padding:14px;
   min-height:300px;
+  transition:background .15s ease, border-color .15s ease;
+}
+.col.drag-over{
+  background:rgba(79, 140, 255, 0.10) !important;
+  border-color:rgba(79, 140, 255, 0.6) !important;
+  border-style:dashed !important;
 }
 body.light .col{
   background:rgba(255,255,255,.6);
   border-color:rgba(255,255,255,.85);
   box-shadow:0 4px 14px rgba(31,38,135,.05);
 }
+body.light .col.drag-over{
+  background:rgba(79, 140, 255, 0.15) !important;
+  border-color:rgba(79, 140, 255, 0.8) !important;
+}
 .col h4{font-size:13px;margin-bottom:12px;display:flex;align-items:center;gap:8px;font-weight:700}
 
-/* Tarjetas Kanban Transparentes con Borde Suave */
+/* Tarjetas Kanban Transparentes con Borde Suave y Drag & Drop */
 .tcard{
   background:rgba(255, 255, 255, 0.045);
   backdrop-filter:blur(12px);
@@ -488,6 +498,20 @@ body.light .col{
   border-left:2px solid rgba(79, 140, 255, 0.6);
   box-shadow:0 3px 12px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.10);
   border-radius:10px;
+  padding:12px;
+  margin-bottom:10px;
+  cursor:grab;
+  user-select:none;
+  transition:transform .18s ease, opacity .18s ease, box-shadow .18s ease;
+}
+.tcard:active{
+  cursor:grabbing;
+}
+.tcard.dragging{
+  opacity:0.35 !important;
+  transform:scale(0.96) !important;
+  box-shadow:0 8px 24px rgba(0,0,0,.4) !important;
+}
   padding:12px;
   margin-bottom:10px;
   cursor:pointer;
@@ -1289,6 +1313,81 @@ function renderClients(list) {
   }).join('');
 }
 
+let DRAGGED_ITEM_ID = null;
+let IS_DRAGGING = false;
+
+function handleDragStart(e, itemId) {
+  DRAGGED_ITEM_ID = itemId;
+  IS_DRAGGING = true;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(itemId));
+  const card = document.getElementById(`kcard-${itemId}`);
+  if (card) {
+    setTimeout(() => card.classList.add('dragging'), 0);
+  }
+}
+
+function handleDragEnd(e) {
+  if (DRAGGED_ITEM_ID) {
+    const card = document.getElementById(`kcard-${DRAGGED_ITEM_ID}`);
+    if (card) card.classList.remove('dragging');
+  }
+  document.querySelectorAll('.col.drag-over').forEach(el => el.classList.remove('drag-over'));
+  setTimeout(() => { IS_DRAGGING = false; }, 120);
+  DRAGGED_ITEM_ID = null;
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const col = e.currentTarget;
+  if (!col.classList.contains('drag-over')) {
+    col.classList.add('drag-over');
+  }
+}
+
+function handleDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+}
+
+async function handleDrop(e, targetStatus) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+
+  const itemId = DRAGGED_ITEM_ID || parseInt(e.dataTransfer.getData('text/plain'));
+  if (!itemId) return;
+
+  const item = ALL_ITEMS.find(i => i.id === itemId);
+  if (!item || item.status === targetStatus) return;
+
+  const oldStatus = item.status;
+  item.status = targetStatus;
+  renderKanban(ALL_ITEMS);
+
+  try {
+    const res = await fetch(`${API_URL}/items/${itemId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: targetStatus })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`Error al actualizar estado: ${data.detail || 'Ocurrió un error en el servidor'}`);
+      item.status = oldStatus;
+      renderKanban(ALL_ITEMS);
+      return;
+    }
+    await loadData();
+  } catch (err) {
+    console.error('Error actualizando estado desde Kanban:', err);
+    alert('Error de conexión al mover la tarjeta.');
+    item.status = oldStatus;
+    renderKanban(ALL_ITEMS);
+  }
+}
+
 function renderKanban(list) {
   const cols = [
     { k: 'pendiente', title: 'Pendientes' },
@@ -1300,10 +1399,10 @@ function renderKanban(list) {
   document.getElementById('kanbanGrid').innerHTML = cols.map(c => {
     const colItems = list.filter(i => i.status === c.k);
     return `
-      <div class="col">
+      <div class="col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
         <h4>${c.title} <span class="muted" style="margin-left:auto">${colItems.length}</span></h4>
         ${colItems.map(it => `
-          <div class="tcard ${it.semaphore}" onclick="openModal(${it.id})">
+          <div class="tcard ${it.semaphore}" id="kcard-${it.id}" draggable="true" ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)" onclick="if(!IS_DRAGGING) openModal(${it.id})">
             <div class="top">
               <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
               <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
@@ -1319,7 +1418,7 @@ function renderKanban(list) {
               <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA</span>
             </div>
           </div>
-        `).join('') || '<div class="muted" style="font-size:12px;text-align:center;padding:20px">Vacío</div>'}
+        `).join('') || '<div class="muted" style="font-size:12px;text-align:center;padding:24px;border:1px dashed rgba(255,255,255,.08);border-radius:8px;pointer-events:none">Arrastra actividades aquí</div>'}
       </div>
     `;
   }).join('');
@@ -1434,6 +1533,7 @@ document.addEventListener('click', (e) => {
 });
 
 function openModal(id) {
+  if (IS_DRAGGING) return;
   const it = ALL_ITEMS.find(i => i.id === id);
   if (!it) return;
 
@@ -1451,7 +1551,20 @@ function openModal(id) {
     </div>
     <h2 style="font-size:18px;line-height:1.3;margin-bottom:8px">${it.title}</h2>
     <dl>
-      <dt>Estado:</dt><dd>${it.status_origin || it.status}</dd>
+      <dt>Estado:</dt>
+      <dd>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <b>${it.status_origin || it.status}</b>
+          <div style="display:inline-flex;align-items:center;gap:6px;margin-left:auto">
+            <select onchange="changeStatusFromModal(${it.id}, this.value)" style="background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:11.5px;outline:none;cursor:pointer">
+              <option value="pendiente" ${it.status === 'pendiente' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: Pendiente</option>
+              <option value="curso" ${it.status === 'curso' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: En curso</option>
+              <option value="espera" ${it.status === 'espera' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: En espera</option>
+              <option value="cerrado" ${it.status === 'cerrado' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: Cerrado</option>
+            </select>
+          </div>
+        </div>
+      </dd>
       <dt>Responsable(s):</dt>
       <dd>
         <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px">
@@ -1557,6 +1670,34 @@ async function saveAssignmentFromModal(itemId) {
   } else {
     btn.disabled = false;
     btn.innerHTML = oldText;
+  }
+}
+
+async function changeStatusFromModal(itemId, newStatus) {
+  const item = ALL_ITEMS.find(i => i.id === itemId);
+  if (!item || item.status === newStatus) return;
+  const oldStatus = item.status;
+  item.status = newStatus;
+  try {
+    const res = await fetch(`${API_URL}/items/${itemId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`Error al cambiar estado: ${data.detail || 'Ocurrió un error en el servidor'}`);
+      item.status = oldStatus;
+      openModal(itemId);
+      return;
+    }
+    await loadData();
+    openModal(itemId);
+  } catch (err) {
+    console.error('Error in changeStatusFromModal:', err);
+    alert('Error de conexión al cambiar estado.');
+    item.status = oldStatus;
+    openModal(itemId);
   }
 }
 

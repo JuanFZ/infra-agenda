@@ -214,4 +214,31 @@ class GLPIClient:
             print(f"[GLPIClient] Error asignando ticket {ticket_id} a usuarios {user_ids}: {e}")
             return False
 
+    def update_ticket_status(self, ticket_id: str, new_status: str) -> bool:
+        """
+        Actualiza el estado del ticket en GLPI.
+        new_status: 'pendiente', 'curso', 'espera', 'cerrado'
+        GLPI status IDs:
+        1: Nuevo (pendiente)
+        2: En curso (asignado) (curso)
+        4: En espera (espera)
+        5: Resuelto (cerrado)
+        """
+        status_id_map = {
+            "pendiente": 1,
+            "curso": 2,
+            "espera": 4,
+            "cerrado": 5
+        }
+        target_id = status_id_map.get(new_status, 2)
+        try:
+            headers = self.get_session_headers()
+            tid = int(ticket_id)
+            payload = {"input": {"id": tid, "status": target_id}}
+            res = requests.put(f"{self.base_url}/Ticket/{tid}", headers=headers, json=payload, timeout=10)
+            return res.status_code in [200, 201]
+        except Exception as e:
+            print(f"[GLPIClient] Error actualizando estado de ticket {ticket_id} a {new_status}: {e}")
+            return False
+
 
