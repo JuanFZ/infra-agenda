@@ -49,11 +49,11 @@ def ensure_db_schema():
 ensure_db_schema()
 
 def verify_coordinator_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
-    """Valida que la solicitud provenga de un usuario con rol Coordinador."""
-    if not x_user_role or x_user_role.strip().lower() != "coordinador":
+    """Valida que la solicitud provenga de un usuario con rol Coordinador o Administrador."""
+    if not x_user_role or x_user_role.strip().lower() not in ("coordinador", "admin", "administrador"):
         raise HTTPException(
             status_code=403,
-            detail="Acceso restringido: Solo el rol Coordinador tiene permisos para crear, asignar, mover estados o eliminar actividades."
+            detail="Acceso restringido: Solo el rol Coordinador / Administrador tiene permisos para crear, asignar, mover estados o eliminar actividades."
         )
     return x_user_role
 
@@ -122,6 +122,7 @@ class ChangePasswordRequest(BaseModel):
 
 DEFAULT_USERS = [
     {"full_name": "Adonis Lozada", "username": "a.lozada", "email": "a.lozada@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
+    {"full_name": "Administrador", "username": "admin", "email": "admin@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
     {"full_name": "Juan Fernández", "username": "j.fernandez", "email": "j.fernandez@sycom.com.ve", "telegram_username": "@Juuan8", "role": "especialista"},
     {"full_name": "Yoxaide Jiménez", "username": "y.jimenez", "email": "y.jimenez@sycom.com.ve", "telegram_username": "@Yjimenezg", "role": "especialista"},
     {"full_name": "Luis Acosta", "username": "l.acosta", "email": "l.acosta@sycom.com.ve", "telegram_username": "@lapsy0", "role": "especialista"},
@@ -226,7 +227,7 @@ def get_items(
     # Control de visibilidad por perfil:
     # El usuario regular solo ve las asignadas a él y las que están sin asignar (NO las de los demás)
     role = (x_user_role.strip().lower()) if isinstance(x_user_role, str) else ""
-    if role and role != "coordinador" and isinstance(x_user_name, str) and x_user_name:
+    if role and role not in ("coordinador", "admin", "administrador") and isinstance(x_user_name, str) and x_user_name:
         clean_name = x_user_name.strip()
         first_name = clean_name.split()[0] if clean_name else ""
         query = query.filter(
@@ -595,8 +596,8 @@ def update_item_status(
         raise HTTPException(status_code=404, detail="Item no encontrado")
 
     role = (x_user_role.strip().lower()) if isinstance(x_user_role, str) else ""
-    if role == "coordinador":
-        pass  # Coordinador tiene autorización total sobre cualquier actividad
+    if role in ("coordinador", "admin", "administrador"):
+        pass  # Coordinador / Administrador tiene autorización total sobre cualquier actividad
     elif role == "especialista":
         # Especialista solo puede cambiar de estado sus propias actividades asignadas
         user_name_clean = (x_user_name.strip().lower()) if isinstance(x_user_name, str) else ""

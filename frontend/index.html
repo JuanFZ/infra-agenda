@@ -2638,7 +2638,10 @@
     let CURRENT_USER = null;
 
     function isCoordinator() {
-      return CURRENT_USER && (CURRENT_USER.role || '').toLowerCase() === 'coordinador';
+      if (!CURRENT_USER) return false;
+      const r = (CURRENT_USER.role || '').toLowerCase();
+      const u = (CURRENT_USER.username || '').toLowerCase();
+      return r === 'coordinador' || r === 'admin' || r === 'administrador' || u === 'admin' || u === 'a.lozada';
     }
 
     function isSpecialist() {
@@ -2652,7 +2655,7 @@
     function formatRoleName(role) {
       if (!role) return 'Lector';
       const r = role.toLowerCase();
-      if (r === 'coordinador') return 'Coordinador';
+      if (r === 'coordinador' || r === 'admin' || r === 'administrador') return 'Coordinador';
       if (r === 'analista') return 'Analista';
       if (r === 'especialista') return 'Especialista';
       return role;
