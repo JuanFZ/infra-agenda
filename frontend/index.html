@@ -1553,6 +1553,23 @@
       transform: scale(0.96) !important;
     }
 
+    @keyframes pulseHighlight {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.85); border-color: #10b981 !important; }
+      50% { box-shadow: 0 0 24px 6px rgba(16, 185, 129, 0.5); border-color: #34d399 !important; }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .highlight-new {
+      animation: pulseHighlight 2s ease infinite !important;
+      border-color: #10b981 !important;
+      position: relative;
+    }
+
+    .highlight-new-row {
+      background: rgba(16, 185, 129, 0.16) !important;
+      outline: 1px solid rgba(16, 185, 129, 0.45) !important;
+    }
+
     /* MEDIA QUERIES RESPONSIVAS */
     @media(max-width: 768px) {
       body {
@@ -1773,6 +1790,9 @@
 </head>
 
 <body>
+
+  <!-- Notificaciones Toast flotantes -->
+  <div id="toastContainer" style="position:fixed;top:24px;right:24px;z-index:999999;display:flex;flex-direction:column;gap:10px;pointer-events:none"></div>
 
   <aside id="sidebar">
     <div class="brand">
@@ -2098,6 +2118,58 @@
     const API_URL = window.location.port === '8000' ? 'http://localhost:8000/api' : '/api';
     let ALL_ITEMS = [];
     let ACTIVE_KPI_FILTER = null;
+    let HIGHLIGHT_ITEM_ID = null;
+
+    function showToast(title, message = '', type = 'success', duration = 4500) {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.style.cssText = `
+        min-width: 280px;
+        max-width: 440px;
+        background: rgba(16, 22, 34, 0.96);
+        border: 1px solid ${type === 'success' ? 'rgba(16,185,129,0.6)' : (type === 'error' ? 'rgba(255,93,93,0.6)' : 'rgba(79,140,255,0.6)')};
+        border-left: 5px solid ${type === 'success' ? '#10b981' : (type === 'error' ? '#ff5d5d' : '#4f8cff')};
+        color: #f0f6fc;
+        padding: 12px 16px;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        pointer-events: auto;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        transform: translateY(-10px);
+        opacity: 0;
+        transition: all .25s cubic-bezier(.16,1,.3,1);
+      `;
+      const iconSvg = type === 'success'
+        ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+        : (type === 'error'
+          ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#ff5d5d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+          : '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>');
+
+      toast.innerHTML = `
+        ${iconSvg}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:13.5px;line-height:1.3">${title}</div>
+          ${message ? `<div style="font-size:12px;color:rgba(240,246,252,.8);margin-top:3px;line-height:1.4">${message}</div>` : ''}
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" style="background:transparent;border:none;color:rgba(240,246,252,.5);cursor:pointer;padding:0;font-size:16px;line-height:1" title="Cerrar">&times;</button>
+      `;
+      container.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.style.transform = 'translateY(0)';
+        toast.style.opacity = '1';
+      });
+      setTimeout(() => {
+        toast.style.transform = 'translateY(-10px)';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 250);
+      }, duration);
+    }
 
     function formatDate(dateStr, includeTime = false) {
       if (!dateStr) return '—';
@@ -2263,7 +2335,7 @@
         tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px" class="muted">Sin tickets que coincidan con los filtros.</td></tr>';
       } else {
         tbody.innerHTML = list.map(it => `
-      <tr class="click" onclick="openModal(${it.id})">
+      <tr class="click ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new-row' : ''}" onclick="openModal(${it.id})">
         <td><span class="sem ${it.semaphore}"></span></td>
         <td><span class="badge src-${it.source}">${it.source}</span> #${it.external_id}</td>
         <td><b>${it.title}</b></td>
@@ -2444,6 +2516,8 @@
         }
         await loadData();
         if (TV_MODE_ACTIVE) renderTvSlide();
+        const stLabels = { pendiente: 'Pendientes', curso: 'En curso', espera: 'En espera', cerrado: 'Cerrados' };
+        showToast('Estado sincronizado', `${item.source} #${item.external_id} movido a ${stLabels[targetStatus] || targetStatus}.`, 'info', 3500);
       } catch (err) {
         console.error('Error actualizando estado desde Kanban:', err);
         alert('Error de conexión al mover la tarjeta.');
@@ -2467,7 +2541,7 @@
       <div class="col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
         <h4>${c.title} <span class="muted" style="margin-left:auto">${colItems.length}</span></h4>
         ${colItems.map(it => `
-          <div class="tcard ${it.semaphore}" id="kcard-${it.id}" draggable="true" ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)" onclick="if(!IS_DRAGGING) openModal(${it.id})">
+          <div class="tcard ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-${it.id}" draggable="true" ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)" onclick="if(!IS_DRAGGING) openModal(${it.id})">
             <div class="top">
               <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
               <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
@@ -2793,8 +2867,43 @@
           return;
         }
 
+        const createdItem = data.item;
         closeModal();
+
+        // 1. Limpiar filtros en vista principal para garantizar visibilidad inmediata
+        resetAllFilters();
+
+        // 2. Si estamos en Modo TV, saltar al slide de Tablero Kanban
+        if (TV_MODE_ACTIVE) {
+          const slides = getTvSlides();
+          const kanbanIdx = slides.findIndex(s => s.type === 'kanban');
+          if (kanbanIdx !== -1) {
+            TV_CURRENT_SLIDE = kanbanIdx;
+          }
+        }
+
+        // 3. Resaltar visualmente la actividad recién creada
+        if (createdItem && createdItem.id) {
+          HIGHLIGHT_ITEM_ID = createdItem.id;
+          setTimeout(() => {
+            HIGHLIGHT_ITEM_ID = null;
+            if (TV_MODE_ACTIVE) renderTvSlide();
+            else renderAll();
+          }, 7000);
+        }
+
+        // 4. Recargar datos de la API
         await loadData();
+
+        if (TV_MODE_ACTIVE) {
+          renderTvSlide();
+          startTvTimer();
+        }
+
+        // 5. Notificación Toast elegante
+        const itemTitle = createdItem ? createdItem.title : title;
+        const itemSrc = createdItem ? `${createdItem.source} #${createdItem.external_id}` : source;
+        showToast('¡Actividad creada con éxito!', `${itemSrc}: "${itemTitle}" agregada a Pendientes y sincronizada.`, 'success', 5000);
       } catch (err) {
         console.error('Error creando actividad:', err);
         alert('Error de conexión al conectar con el servidor.');
@@ -3051,6 +3160,7 @@
           return false;
         }
         await loadData();
+        showToast('Asignación guardada', 'Especialista(s) asignados y notificados por Telegram.', 'success', 3500);
         return true;
       } catch (err) {
         console.error('Error in assignItem:', err);
@@ -3097,6 +3207,8 @@
         }
         await loadData();
         openModal(itemId);
+        const stLabels = { pendiente: 'Pendiente', curso: 'En curso', espera: 'En espera', cerrado: 'Cerrado' };
+        showToast('Estado sincronizado', `${item.source} #${item.external_id} cambiado a ${stLabels[newStatus] || newStatus}.`, 'info', 3500);
       } catch (err) {
         console.error('Error in changeStatusFromModal:', err);
         alert('Error de conexión al cambiar estado.');
@@ -3349,7 +3461,7 @@
       <h3 style="margin-bottom:12px;font-size:16px">Casos Prioritarios y Actividades en Atención</h3>
       <div class="tv-card-grid">
         ${active.slice(0, 6).map(it => `
-          <div class="tv-item-card ${it.semaphore}">
+          <div class="tv-item-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}">
             <div style="display:flex;align-items:center;gap:8px;font-size:12px">
               <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
               <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
@@ -3405,7 +3517,7 @@
               </div>
               <div class="tv-kanban-cards">
                 ${colItems.map(it => `
-                  <div class="tv-kanban-card ${it.semaphore}" id="kcard-tv-${it.id}" draggable="true" ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)" onclick="if(!IS_DRAGGING) openModal(${it.id})">
+                  <div class="tv-kanban-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-tv-${it.id}" draggable="true" ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)" onclick="if(!IS_DRAGGING) openModal(${it.id})">
                     <div style="display:flex;align-items:center;gap:6px;font-size:11px">
                       <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
                       <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
@@ -3447,7 +3559,7 @@
       ` : `
         <div class="tv-card-grid">
           ${unassigned.map(it => `
-            <div class="tv-item-card ${it.semaphore}" style="border-left-color:#f39c12">
+            <div class="tv-item-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" style="border-left-color:#f39c12">
               <div style="display:flex;align-items:center;gap:8px;font-size:12px">
                 <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
                 <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
