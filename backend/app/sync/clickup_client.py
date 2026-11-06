@@ -152,12 +152,15 @@ class ClickUpClient:
     def update_task_status(self, task_id: str, new_status: str) -> bool:
         """
         Actualiza el estado de la tarea en ClickUp.
-        new_status: 'pendiente', 'curso', 'espera', 'cerrado'
+        ClickUp solo cuenta con: 'to do' (pendiente), 'in progress' (curso) y 'complete' (cerrado).
+        'espera' no existe en ClickUp.
         """
+        if new_status == "espera":
+            return False
+
         status_map = {
             "pendiente": "to do",
             "curso": "in progress",
-            "espera": "waiting",
             "cerrado": "complete"
         }
         target = status_map.get(new_status, new_status)
@@ -171,8 +174,6 @@ class ClickUpClient:
                 res = requests.put(url, headers=self.get_headers(), json={"status": "open"}, timeout=10)
             elif target == "complete":
                 res = requests.put(url, headers=self.get_headers(), json={"status": "closed"}, timeout=10)
-            elif target == "waiting":
-                res = requests.put(url, headers=self.get_headers(), json={"status": "in progress"}, timeout=10)
             return res.status_code == 200
         except Exception as e:
             print(f"[ClickUpClient] Error actualizando estado de tarea {task_id} a {new_status}: {e}")

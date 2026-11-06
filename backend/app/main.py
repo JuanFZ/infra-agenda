@@ -454,6 +454,14 @@ def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Dep
 
     source = item.source
     ext_id = item.external_id
+
+    # ClickUp solo admite TO DO (pendiente), IN PROGRESS (curso) y COMPLETE (cerrado)
+    if source == "ClickUp" and new_st == "espera":
+        raise HTTPException(
+            status_code=400, 
+            detail="ClickUp no admite el estado 'En espera'. Solo admite: Pendiente (TO DO), En curso (IN PROGRESS) y Cerrado (COMPLETE). 'En espera' es exclusivo de GLPI."
+        )
+
     success = False
 
     if source == "GLPI":

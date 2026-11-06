@@ -1339,8 +1339,19 @@ function handleDragEnd(e) {
 
 function handleDragOver(e) {
   e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
   const col = e.currentTarget;
+  const colStatus = col.getAttribute('data-col');
+
+  // Si se arrastra una tarea de ClickUp hacia la columna 'espera', bloquear drop
+  if (DRAGGED_ITEM_ID) {
+    const item = ALL_ITEMS.find(i => i.id === DRAGGED_ITEM_ID);
+    if (item && item.source === 'ClickUp' && colStatus === 'espera') {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
+  }
+
+  e.dataTransfer.dropEffect = 'move';
   if (!col.classList.contains('drag-over')) {
     col.classList.add('drag-over');
   }
@@ -1361,6 +1372,12 @@ async function handleDrop(e, targetStatus) {
 
   const item = ALL_ITEMS.find(i => i.id === itemId);
   if (!item || item.status === targetStatus) return;
+
+  // Validación: ClickUp no posee estado 'En espera'
+  if (item.source === 'ClickUp' && targetStatus === 'espera') {
+    alert("Las tareas de ClickUp solo tienen 3 estados: Pendientes (TO DO), En curso (IN PROGRESS) y Cerrados (COMPLETE).\n\nEl estado 'En espera' es exclusivo de GLPI.");
+    return;
+  }
 
   const oldStatus = item.status;
   item.status = targetStatus;
@@ -1557,10 +1574,10 @@ function openModal(id) {
           <b>${it.status_origin || it.status}</b>
           <div style="display:inline-flex;align-items:center;gap:6px;margin-left:auto">
             <select onchange="changeStatusFromModal(${it.id}, this.value)" style="background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:11.5px;outline:none;cursor:pointer">
-              <option value="pendiente" ${it.status === 'pendiente' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: Pendiente</option>
-              <option value="curso" ${it.status === 'curso' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: En curso</option>
-              <option value="espera" ${it.status === 'espera' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: En espera</option>
-              <option value="cerrado" ${it.status === 'cerrado' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: Cerrado</option>
+              <option value="pendiente" ${it.status === 'pendiente' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: Pendiente ${it.source === 'ClickUp' ? '(TO DO)' : '(Nuevo)'}</option>
+              <option value="curso" ${it.status === 'curso' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: En curso ${it.source === 'ClickUp' ? '(IN PROGRESS)' : '(Asignado)'}</option>
+              ${it.source === 'GLPI' ? `<option value="espera" ${it.status === 'espera' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: En espera (4 - En espera)</option>` : ''}
+              <option value="cerrado" ${it.status === 'cerrado' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: Cerrado ${it.source === 'ClickUp' ? '(COMPLETE)' : '(Resuelto)'}</option>
             </select>
           </div>
         </div>
