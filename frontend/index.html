@@ -91,6 +91,61 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
 .modal dl{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;margin:16px 0;font-size:13px}
 .modal dt{color:var(--muted)}
 .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+
+/* MODO TV (SALA DE OPERACIONES Y REUNIONES) */
+.tv-overlay {
+  position: fixed; inset: 0; background: #0c1015; color: #f0f6fc; z-index: 9999;
+  display: flex; flex-direction: column; padding: 20px 32px; overflow-y: auto; font-size: 15px;
+}
+.tv-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  border-bottom: 1px solid #25303d; padding-bottom: 14px; margin-bottom: 20px;
+}
+.tv-brand { display: flex; align-items: center; gap: 14px; }
+.tv-logo { height: 38px; background: #ffffff; padding: 3px 8px; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,.35); }
+.tv-title { font-size: 20px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px; }
+.tv-sub { font-size: 12px; color: #8b98a5; margin-top: 2px; }
+.tv-progress-container {
+  flex: 1; max-width: 260px; height: 6px; background: #1e2731; border-radius: 4px; overflow: hidden; margin: 0 12px;
+}
+.tv-progress-bar { height: 100%; width: 100%; background: var(--accent); transition: width 1s linear; }
+.tv-controls { display: flex; align-items: center; gap: 8px; }
+.tv-timer {
+  background: #1c2430; border: 1px solid #303c4c; padding: 5px 12px; border-radius: 20px;
+  font-size: 13px; font-weight: 600; color: #4f8cff;
+}
+.tv-btn {
+  background: #1e2731; border: 1px solid #303c4c; color: #e6edf3; padding: 7px 12px;
+  border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s;
+}
+.tv-btn:hover { background: #2a3746; border-color: #4f8cff; }
+.tv-btn.danger { background: rgba(255,93,93,.15); border-color: rgba(255,93,93,.4); color: #ff5d5d; }
+.tv-btn.danger:hover { background: #ff5d5d; color: #ffffff; }
+.tv-body { flex: 1; display: flex; flex-direction: column; }
+.tv-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
+.tv-item-card {
+  background: #151c24; border: 1px solid #263443; border-left: 5px solid #4f8cff;
+  border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25); transition: transform .15s;
+}
+.tv-item-card:hover { transform: translateY(-2px); border-color: #4f8cff; }
+.tv-item-card.rojo { border-left-color: var(--red); }
+.tv-item-card.amarillo { border-left-color: var(--yellow); }
+.tv-item-card.verde { border-left-color: var(--green); }
+.tv-unassigned-banner {
+  background: linear-gradient(90deg, rgba(243,156,18,.15), rgba(79,140,255,.1));
+  border: 1px solid rgba(243,156,18,.35); border-radius: 12px; padding: 14px 20px;
+  margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between;
+}
+.tv-action-btn {
+  background: var(--accent); color: #fff; padding: 6px 12px; border-radius: 6px;
+  text-decoration: none; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
+}
+.tv-action-btn:hover { filter: brightness(1.15); }
+.tv-stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.tv-stat-box { background: #151c24; border: 1px solid #263443; border-radius: 10px; padding: 14px 18px; }
+.tv-stat-box .num { font-size: 28px; font-weight: 700; margin-top: 4px; }
+
 </style>
 </head>
 <body>
@@ -122,6 +177,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
     <div class="clock" id="clock">--:--:--</div>
     <button class="btn" id="btnSync" onclick="forceSync()">🔄 Sincronizar Ahora</button>
     <button class="btn" id="btnTheme">🌓 Tema</button>
+    <button class="btn primary" id="btnTvMode" onclick="toggleTvMode()" title="Presentación continua para pantalla grande y reuniones">📺 Modo TV</button>
   </header>
 
   <div class="filters">
@@ -219,6 +275,32 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
 <!-- Modal Detalle -->
 <div class="modal-bg" id="modalBg">
   <div class="modal" id="modalContent"></div>
+</div>
+
+<!-- MODO TV / PRESENTACIÓN SALA DE OPERACIONES -->
+<div id="tvOverlay" class="tv-overlay" style="display:none">
+  <div class="tv-header">
+    <div class="tv-brand">
+      <img src="sycom.png" alt="Sycom" class="tv-logo">
+      <div>
+        <div class="tv-title" id="tvSlideTitle">📺 Cargando Modo TV...</div>
+        <div class="tv-sub" id="tvSlideSub">Agenda de Infra · Sala de Operaciones</div>
+      </div>
+    </div>
+    <div class="tv-progress-container">
+      <div class="tv-progress-bar" id="tvProgressBar"></div>
+    </div>
+    <div class="tv-controls">
+      <span class="tv-timer" id="tvTimerBadge">⏱️ 15s</span>
+      <button class="tv-btn" onclick="tvPrevSlide()" title="Diapositiva Anterior (←)">⏮</button>
+      <button class="tv-btn" id="tvPlayPauseBtn" onclick="tvTogglePause()" title="Pausar / Reanudar (Espacio)">⏸ Pausa</button>
+      <button class="tv-btn" onclick="tvNextSlide()" title="Siguiente Diapositiva (→)">⏭</button>
+      <button class="tv-btn danger" onclick="toggleTvMode()" title="Salir del Modo TV (Esc)">✕ Salir</button>
+    </div>
+  </div>
+  <div class="tv-body" id="tvBody">
+    <!-- Se llena dinámicamente según el slide -->
+  </div>
 </div>
 
 <script>
@@ -495,6 +577,257 @@ document.getElementById('modalBg').onclick = (e) => {
 setInterval(() => {
   document.getElementById('clock').textContent = new Date().toLocaleTimeString();
 }, 1000);
+
+// ==========================================
+// MODO TV / PRESENTACIÓN SALA DE OPERACIONES
+// ==========================================
+let TV_MODE_ACTIVE = false;
+let TV_CURRENT_SLIDE = 0;
+let TV_TIMER = null;
+let TV_TIME_LEFT = 18;
+const TV_SLIDE_DURATION = 18;
+let TV_IS_PAUSED = false;
+
+const TV_SPECIALISTS = [
+  { name: "Juan Fernández", tag: "@Juuan8", key: "juan" },
+  { name: "Yoxaide Jiménez", tag: "@Yjimenezg", key: "yoxaide" },
+  { name: "Luis Acosta", tag: "@lapsy0", key: "luis" },
+  { name: "Adonis Lozada", tag: "@adonislozada", key: "adonis", isCoord: true }
+];
+
+function getTvSlides() {
+  return [
+    { type: 'resumen', title: '📊 Panorama General del Equipo', sub: 'Indicadores globales y casos prioritarios en curso' },
+    { type: 'unassigned', title: '⚠️ Asuntos Sin Asignar', sub: '¡Disponibles para asignación inmediata del equipo!' },
+    { type: 'specialist', spec: TV_SPECIALISTS[0], title: '👤 Especialista: Juan Fernández', sub: 'Tareas y tickets asignados (@Juuan8)' },
+    { type: 'specialist', spec: TV_SPECIALISTS[1], title: '👤 Especialista: Yoxaide Jiménez', sub: 'Tareas y tickets asignados (@Yjimenezg)' },
+    { type: 'specialist', spec: TV_SPECIALISTS[2], title: '👤 Especialista: Luis Acosta', sub: 'Tareas y tickets asignados (@lapsy0)' },
+    { type: 'specialist', spec: TV_SPECIALISTS[3], title: '👤 Coordinación: Adonis Lozada', sub: 'Casos y seguimiento de coordinación (@adonislozada)' }
+  ];
+}
+
+function toggleTvMode() {
+  TV_MODE_ACTIVE = !TV_MODE_ACTIVE;
+  const overlay = document.getElementById('tvOverlay');
+  if (TV_MODE_ACTIVE) {
+    overlay.style.display = 'flex';
+    TV_CURRENT_SLIDE = 0;
+    TV_IS_PAUSED = false;
+    renderTvSlide();
+    startTvTimer();
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  } else {
+    overlay.style.display = 'none';
+    clearInterval(TV_TIMER);
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+}
+
+function startTvTimer() {
+  clearInterval(TV_TIMER);
+  TV_TIME_LEFT = TV_SLIDE_DURATION;
+  updateTvTimerUI();
+  TV_TIMER = setInterval(() => {
+    if (!TV_IS_PAUSED) {
+      TV_TIME_LEFT--;
+      updateTvTimerUI();
+      if (TV_TIME_LEFT <= 0) {
+        tvNextSlide();
+      }
+    }
+  }, 1000);
+}
+
+function updateTvTimerUI() {
+  const badge = document.getElementById('tvTimerBadge');
+  const bar = document.getElementById('tvProgressBar');
+  if (badge) badge.textContent = `⏱️ ${TV_TIME_LEFT}s`;
+  if (bar) {
+    const pct = Math.max(0, (TV_TIME_LEFT / TV_SLIDE_DURATION) * 100);
+    bar.style.width = `${pct}%`;
+  }
+}
+
+function tvTogglePause() {
+  TV_IS_PAUSED = !TV_IS_PAUSED;
+  const btn = document.getElementById('tvPlayPauseBtn');
+  if (btn) btn.textContent = TV_IS_PAUSED ? '▶ Reanudar' : '⏸ Pausa';
+}
+
+function tvNextSlide() {
+  const slides = getTvSlides();
+  TV_CURRENT_SLIDE = (TV_CURRENT_SLIDE + 1) % slides.length;
+  renderTvSlide();
+  startTvTimer();
+}
+
+function tvPrevSlide() {
+  const slides = getTvSlides();
+  TV_CURRENT_SLIDE = (TV_CURRENT_SLIDE - 1 + slides.length) % slides.length;
+  renderTvSlide();
+  startTvTimer();
+}
+
+function renderTvSlide() {
+  const slides = getTvSlides();
+  const s = slides[TV_CURRENT_SLIDE];
+  document.getElementById('tvSlideTitle').innerHTML = `${s.title} <small style="font-size:13px;color:var(--muted);font-weight:400">(${TV_CURRENT_SLIDE + 1}/${slides.length})</small>`;
+  document.getElementById('tvSlideSub').textContent = s.sub;
+
+  const container = document.getElementById('tvBody');
+
+  if (s.type === 'resumen') {
+    const active = ALL_ITEMS.filter(i => i.status !== 'cerrado');
+    const criticos = active.filter(i => i.priority === 'Crítica').length;
+    const atrasados = active.filter(i => i.is_overdue || i.semaphore === 'rojo').length;
+    const enCurso = active.filter(i => i.status === 'curso').length;
+    const pendientes = active.filter(i => i.status === 'pendiente').length;
+
+    container.innerHTML = `
+      <div class="tv-stat-row">
+        <div class="tv-stat-box" style="border-left:4px solid var(--accent)">
+          <span class="muted" style="font-size:12px;text-transform:uppercase">Pendientes</span>
+          <div class="num">${pendientes}</div>
+        </div>
+        <div class="tv-stat-box" style="border-left:4px solid var(--cyan)">
+          <span class="muted" style="font-size:12px;text-transform:uppercase">En Atención</span>
+          <div class="num">${enCurso}</div>
+        </div>
+        <div class="tv-stat-box" style="border-left:4px solid var(--red)">
+          <span class="muted" style="font-size:12px;text-transform:uppercase">Atrasados / Fuera SLA</span>
+          <div class="num" style="color:var(--red)">${atrasados}</div>
+        </div>
+        <div class="tv-stat-box" style="border-left:4px solid var(--yellow)">
+          <span class="muted" style="font-size:12px;text-transform:uppercase">Casos Críticos</span>
+          <div class="num" style="color:var(--yellow)">${criticos}</div>
+        </div>
+      </div>
+      <h3 style="margin-bottom:12px;font-size:16px">🔥 Casos Prioritarios y Actividades en Atención</h3>
+      <div class="tv-card-grid">
+        ${active.slice(0, 6).map(it => `
+          <div class="tv-item-card ${it.semaphore}">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+              <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
+              <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
+            </div>
+            <div style="font-size:15px;font-weight:700">${it.title}</div>
+            <div class="muted" style="font-size:12px">🏢 ${it.client_name} · 👤 <b>${it.assignee_name || 'Sin asignar'}</b></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;font-size:12px;border-top:1px solid #25303d;padding-top:8px">
+              <span>SLA: <b>${it.sla_percent}%</b></span>
+              <span class="${it.is_overdue ? 'txt-red' : 'muted'}">Vence: ${formatDate(it.due_at)}</span>
+            </div>
+          </div>
+        `).join('') || '<div class="muted" style="padding:40px;text-align:center">No hay tickets activos en este momento.</div>'}
+      </div>
+    `;
+  } else if (s.type === 'unassigned') {
+    const unassigned = ALL_ITEMS.filter(it => it.status !== 'cerrado' && (!it.assignee_name || it.assignee_name.toLowerCase().includes('sin asignar') || it.assignee_name.toLowerCase().includes('técnico glpi')));
+
+    container.innerHTML = `
+      <div class="tv-unassigned-banner">
+        <div>
+          <b style="font-size:16px;color:#f39c12">📢 ${unassigned.length} Asunto(s) Disponibles para Tomar</b>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Cualquier especialista puede tomarlos en GLPI o ClickUp para comenzar a atenderlos.</div>
+        </div>
+        <span class="badge" style="background:#f39c12;color:#000;font-size:13px;padding:4px 10px">${unassigned.length} disponibles</span>
+      </div>
+      ${unassigned.length === 0 ? `
+        <div style="background:#151c24;border:1px dashed #2ecc71;border-radius:12px;padding:50px;text-align:center">
+          <div style="font-size:40px;margin-bottom:10px">🎉</div>
+          <b style="font-size:18px;color:#2ecc71">¡Excelente trabajo de equipo!</b>
+          <div class="muted" style="margin-top:6px;font-size:14px">No hay tickets ni tareas pendientes por asignar en este momento.</div>
+        </div>
+      ` : `
+        <div class="tv-card-grid">
+          ${unassigned.map(it => `
+            <div class="tv-item-card ${it.semaphore}" style="border-left-color:#f39c12">
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
+                <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
+              </div>
+              <div style="font-size:15px;font-weight:700">${it.title}</div>
+              <div class="muted" style="font-size:12px">🏢 Cliente: ${it.client_name}</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;border-top:1px solid #25303d;padding-top:10px">
+                <span style="font-size:12px">Vence: <b>${formatDate(it.due_at)}</b></span>
+                <a href="${it.url}" target="_blank" class="tv-action-btn">Tomar en ${it.source} ↗</a>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    `;
+  } else if (s.type === 'specialist') {
+    const spec = s.spec;
+    const items = ALL_ITEMS.filter(it => it.status !== 'cerrado' && it.assignee_name && it.assignee_name.toLowerCase().includes(spec.key));
+    const enCurso = items.filter(i => i.status === 'curso').length;
+    const pendientes = items.filter(i => i.status === 'pendiente').length;
+    const vencidos = items.filter(i => i.is_overdue || i.semaphore === 'rojo').length;
+
+    container.innerHTML = `
+      <div class="tv-stat-row">
+        <div class="tv-stat-box" style="border-left:4px solid var(--accent)">
+          <span class="muted" style="font-size:12px;text-transform:uppercase">Total Asignadas</span>
+          <div class="num">${items.length}</div>
+        </div>
+        <div class="tv-stat-box" style="border-left:4px solid var(--cyan)">
+          <span class="muted" style="font-size:12px;text-transform:uppercase">En Curso</span>
+          <div class="num">${enCurso}</div>
+        </div>
+        <div class="tv-stat-box" style="border-left:4px solid var(--yellow)">
+          <span class="muted" style="font-size:12px;text-transform:uppercase">Pendientes</span>
+          <div class="num">${pendientes}</div>
+        </div>
+        <div class="tv-stat-box" style="border-left:4px solid var(--red)">
+          <span class="muted" style="font-size:12px;text-transform:uppercase">Fuera de SLA</span>
+          <div class="num" style="color:var(--red)">${vencidos}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <h3 style="font-size:16px">Actividades de ${spec.name} <span class="muted" style="font-weight:400">(${spec.tag})</span></h3>
+        <span class="badge" style="background:#1e2731;color:#fff">${items.length} tarea(s)</span>
+      </div>
+      ${items.length === 0 ? `
+        <div style="background:#151c24;border:1px dashed #303c4c;border-radius:12px;padding:40px;text-align:center">
+          <div style="font-size:32px;margin-bottom:8px">✨</div>
+          <b style="font-size:16px">${spec.name} tiene todas sus tareas al día.</b>
+          <div class="muted" style="margin-top:4px;font-size:13px">Sin actividades pendientes actualmente.</div>
+        </div>
+      ` : `
+        <div class="tv-card-grid">
+          ${items.map(it => `
+            <div class="tv-item-card ${it.semaphore}">
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
+                <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
+              </div>
+              <div style="font-size:15px;font-weight:700">${it.title}</div>
+              <div class="muted" style="font-size:12px">🏢 ${it.client_name} · Estado: <b>${it.status_origin || it.status}</b></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;border-top:1px solid #25303d;padding-top:10px;font-size:12px">
+                <span>SLA: <b>${it.sla_percent}%</b></span>
+                <span class="${it.is_overdue ? 'txt-red' : 'muted'}">Vence: ${formatDate(it.due_at)}</span>
+                <a href="${it.url}" target="_blank" class="tv-action-btn" style="padding:4px 8px;font-size:11px">Abrir ↗</a>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    `;
+  }
+}
+
+// Atajos de teclado para Modo TV
+window.addEventListener('keydown', (e) => {
+  if (TV_MODE_ACTIVE) {
+    if (e.key === 'Escape') toggleTvMode();
+    if (e.key === 'ArrowRight') tvNextSlide();
+    if (e.key === 'ArrowLeft') tvPrevSlide();
+    if (e.key === ' ') { e.preventDefault(); tvTogglePause(); }
+  }
+});
 
 // Carga inicial y refresco cada 30 segundos
 loadData();
