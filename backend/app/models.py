@@ -137,11 +137,13 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     full_name = Column(String(150), unique=True, index=True)
-    username = Column(String(100), nullable=True) # j.fernandez, a.lozada, etc.
-    email = Column(String(150), nullable=True) # j.fernandez@sycom.com.ve
+    username = Column(String(100), unique=True, index=True, nullable=True) # j.fernandez, a.lozada, etc.
+    email = Column(String(150), unique=True, index=True, nullable=True) # j.fernandez@sycom.com.ve
     telegram_username = Column(String(100), nullable=True) # @Juuan8, etc.
-    role = Column(String(50), default="especialista") # 'coordinador' o 'especialista'
+    role = Column(String(50), default="especialista") # 'coordinador', 'especialista', 'analista'
+    password_hash = Column(String(200), nullable=True)
     is_active = Column(Integer, default=1)
+    last_login = Column(DateTime, nullable=True)
 
 
 

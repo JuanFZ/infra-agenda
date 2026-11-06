@@ -1,5 +1,6 @@
 import datetime
-from fastapi import FastAPI, Depends, Query, HTTPException
+import hashlib
+from fastapi import FastAPI, Depends, Query, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import or_, and_
@@ -12,9 +13,19 @@ from .config import SYNC_INTERVAL_MINUTES
 from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
 from .sync.glpi_client import GLPIClient
 from .sync.clickup_client import ClickUpClient
+from .notifications.telegram_notifier import CARACAS_TZ, format_caracas_time, now_caracas_str
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
+
+def hash_password(password: str) -> str:
+    salt = "sycom_infra_salt_2026"
+    return hashlib.sha256(f"{salt}{password}".encode("utf-8")).hexdigest()
+
+def verify_password(plain_password: str, hashed_password: str | None) -> bool:
+    if not hashed_password:
+        return False
+    return hash_password(plain_password) == hashed_password
 
 def ensure_db_schema():
     try:
@@ -24,11 +35,27 @@ def ensure_db_schema():
             cols = [row[1] for row in cursor.fetchall()]
             if "assigned_at" not in cols:
                 cursor.execute("ALTER TABLE items ADD COLUMN assigned_at DATETIME")
-                conn.connection.commit()
+            
+            cursor.execute("PRAGMA table_info(users)")
+            u_cols = [row[1] for row in cursor.fetchall()]
+            if "password_hash" not in u_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN password_hash VARCHAR(200)")
+            if "last_login" not in u_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN last_login DATETIME")
+            conn.connection.commit()
     except Exception as e:
         print(f"[DB Schema Check] {e}")
 
 ensure_db_schema()
+
+def verify_coordinator_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
+    """Valida que la solicitud provenga de un usuario con rol Coordinador."""
+    if not x_user_role or x_user_role.strip().lower() != "coordinador":
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Solo el rol Coordinador tiene permisos para crear, asignar, mover estados o eliminar actividades."
+        )
+    return x_user_role
 
 SPECIALISTS_MAP = {
     "adonis": {
@@ -84,11 +111,21 @@ class CreateItemRequest(BaseModel):
     specialist_keys: list[str] | None = None
     due_at: str | None = None
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class ChangePasswordRequest(BaseModel):
+    username: str
+    old_password: str
+    new_password: str
+
 DEFAULT_USERS = [
     {"full_name": "Adonis Lozada", "username": "a.lozada", "email": "a.lozada@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
     {"full_name": "Juan Fernández", "username": "j.fernandez", "email": "j.fernandez@sycom.com.ve", "telegram_username": "@Juuan8", "role": "especialista"},
     {"full_name": "Yoxaide Jiménez", "username": "y.jimenez", "email": "y.jimenez@sycom.com.ve", "telegram_username": "@Yjimenezg", "role": "especialista"},
     {"full_name": "Luis Acosta", "username": "l.acosta", "email": "l.acosta@sycom.com.ve", "telegram_username": "@lapsy0", "role": "especialista"},
+    {"full_name": "Analista de Operaciones", "username": "analista", "email": "analista@sycom.com.ve", "telegram_username": None, "role": "analista"},
 ]
 
 def init_users():
@@ -102,15 +139,24 @@ def init_users():
         ).delete()
         db.commit()
 
+        default_pw_hash = hash_password("sycom2026")
         for u in DEFAULT_USERS:
-            exists = db.query(User).filter(User.full_name == u["full_name"]).first()
+            exists = db.query(User).filter(
+                or_(
+                    User.username == u["username"],
+                    User.full_name == u["full_name"],
+                    User.email == u["email"]
+                )
+            ).first()
             if not exists:
-                db.add(User(**u))
+                db.add(User(**u, password_hash=default_pw_hash))
             else:
                 exists.telegram_username = u["telegram_username"]
                 exists.role = u["role"]
                 exists.username = u["username"]
                 exists.email = u["email"]
+                if not exists.password_hash:
+                    exists.password_hash = default_pw_hash
         db.commit()
     finally:
         db.close()
@@ -314,6 +360,73 @@ def get_users(db: Session = Depends(get_db)):
         "role": u.role
     } for u in users]
 
+@app.post("/api/auth/login")
+def login(req: LoginRequest, db: Session = Depends(get_db)):
+    u_str = req.username.strip()
+    user = db.query(User).filter(
+        or_(
+            User.username.ilike(u_str),
+            User.email.ilike(u_str),
+            User.full_name.ilike(u_str)
+        )
+    ).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario no encontrado o no registrado.")
+    
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Usuario inactivo en la plataforma.")
+        
+    if not verify_password(req.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta.")
+        
+    user.last_login = datetime.datetime.utcnow()
+    db.commit()
+    
+    return {
+        "status": "ok",
+        "user": {
+            "id": user.id,
+            "full_name": user.full_name,
+            "username": user.username,
+            "email": user.email,
+            "telegram_username": user.telegram_username,
+            "role": user.role
+        }
+    }
+
+@app.get("/api/auth/users")
+def get_auth_users(db: Session = Depends(get_db)):
+    """Retorna los usuarios activos para el selector rápido del formulario de acceso."""
+    users = db.query(User).filter(User.is_active == 1).all()
+    return [{
+        "id": u.id,
+        "full_name": u.full_name,
+        "username": u.username,
+        "email": u.email,
+        "role": u.role
+    } for u in users]
+
+@app.post("/api/auth/change-password")
+def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
+    u_str = req.username.strip()
+    user = db.query(User).filter(
+        or_(
+            User.username.ilike(u_str),
+            User.email.ilike(u_str),
+            User.full_name.ilike(u_str)
+        )
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if not verify_password(req.old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta.")
+    if len(req.new_password) < 4:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 4 caracteres.")
+    
+    user.password_hash = hash_password(req.new_password)
+    db.commit()
+    return {"status": "ok", "message": "Contraseña actualizada con éxito"}
+
 @app.get("/api/clients")
 def get_clients_summary(db: Session = Depends(get_db)):
     yesterday_start = get_yesterday_start()
@@ -351,7 +464,7 @@ def get_clients_summary(db: Session = Depends(get_db)):
     return list(clients.values())
 
 @app.post("/api/items/{item_id}/assign")
-def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db)):
+def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item no encontrado")
@@ -420,7 +533,7 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
         mentions = ", ".join(f"{html.escape(m['name'])} ({m['telegram']})" for m in matched_list)
         plural_label = "Responsables" if len(matched_list) > 1 else "Responsable"
         icon = "👥" if len(matched_list) > 1 else "👤"
-        now_str = datetime.datetime.now().strftime('%d-%m-%Y %I:%M %p')
+        now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
         safe_title = html.escape(item.title or "")
         safe_source = html.escape(item.source or "")
         msg = (
@@ -451,7 +564,7 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
     }
 
 @app.post("/api/items/{item_id}/status")
-def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Depends(get_db)):
+def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item no encontrado")
@@ -518,12 +631,14 @@ def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Dep
         safe_source = html.escape(item.source or "")
         safe_status_orig = html.escape(item.status_origin or "")
         safe_assignee = html.escape(item.assignee_name or "Sin asignar")
+        now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
         msg = (
             f"📋 <b>Cambio de estado en Tablero Kanban</b>\n\n"
             f"📌 <b>Asunto:</b> {safe_title}\n"
             f"🏷 <b>Origen:</b> {safe_source} #{item.external_id}\n"
             f"📊 <b>Nuevo estado:</b> {status_labels.get(new_st, new_st)} ({safe_status_orig})\n"
             f"👤 <b>Responsable:</b> {safe_assignee}\n"
+            f"🕒 <b>Hora:</b> {now_str}\n"
             f"⚡ <i>Actualizado arrastrando desde el Kanban</i>"
         )
         send_telegram_message(msg, parse_mode="HTML")
@@ -547,7 +662,7 @@ def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Dep
     }
 
 @app.post("/api/items")
-def create_item(req: CreateItemRequest, db: Session = Depends(get_db)):
+def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
     src = req.source.strip()
     if src.lower() in ["clickup", "click_up"]:
         source = "ClickUp"
@@ -665,7 +780,8 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db)):
         from .notifications.telegram_notifier import send_telegram_message
         mentions = ", ".join(f"{html.escape(m['name'])} ({m['telegram']})" for m in matched_list) if matched_list else "⚠️ <b>Sin asignar</b> (Atención: @adonislozada)"
         plural_label = "Responsables" if len(matched_list) > 1 else "Responsable"
-        due_str = due_dt.strftime('%d-%m-%Y %I:%M %p') if due_dt else "Sin límite"
+        due_str = format_caracas_time(due_dt, '%d-%m-%Y %I:%M %p') if due_dt else "Sin límite"
+        now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
         safe_title = html.escape(title)
         safe_source = html.escape(source)
         safe_desc = f"\n📝 <b>Descripción:</b>\n{html.escape(req.description.strip())}\n" if req.description and req.description.strip() else ""
@@ -677,6 +793,7 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db)):
             f"{prio_icon} <b>Prioridad:</b> {priority}\n"
             f"🎯 <b>{plural_label}:</b> {mentions}\n"
             f"⏳ <b>Límite SLA:</b> {due_str}\n"
+            f"🕒 <b>Hora registro:</b> {now_str}\n"
             f"{safe_desc}\n"
             f"🔗 <a href='{url}'>Abrir en {safe_source}</a>"
         )
@@ -701,7 +818,7 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db)):
 
 
 @app.delete("/api/items/{item_id}")
-def delete_item(item_id: int, db: Session = Depends(get_db)):
+def delete_item(item_id: int, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Actividad no encontrada")
@@ -726,10 +843,12 @@ def delete_item(item_id: int, db: Session = Depends(get_db)):
     try:
         import html
         from .notifications.telegram_notifier import send_telegram_message
+        now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
         msg = (
             f"🗑 <b>Actividad Eliminada</b>\n\n"
             f"📌 <b>Asunto:</b> {html.escape(title)}\n"
             f"🏷 <b>Origen:</b> {html.escape(source)} #{ext_id}\n"
+            f"🕒 <b>Hora eliminación:</b> {now_str}\n"
             f"⚡ <i>Eliminada desde la Agenda de Infraestructura</i>"
         )
         send_telegram_message(msg, parse_mode="HTML")

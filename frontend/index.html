@@ -1786,10 +1786,450 @@
         justify-content: center;
       }
     }
+
+    /* ========================================================
+       ESTILOS SISTEMA DE AUTENTICACIÓN Y ROLES
+       ======================================================== */
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999999;
+      background: rgba(9, 13, 20, 0.90);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeInOverlay .3s cubic-bezier(.16,1,.3,1);
+    }
+
+    @keyframes fadeInOverlay {
+      from { opacity: 0; transform: scale(.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 480px;
+      background: rgba(16, 22, 34, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 18px;
+      padding: 26px 24px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(79, 140, 255, 0.15);
+      position: relative;
+      overflow: hidden;
+    }
+
+    body.light .login-card {
+      background: rgba(255, 255, 255, 0.96);
+      border-color: rgba(0, 0, 0, 0.1);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18), 0 0 30px rgba(79, 140, 255, 0.1);
+    }
+
+    .login-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #10b981, #3b82f6, #a855f7);
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    .login-logo-wrap {
+      display: inline-flex;
+      padding: 8px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 10px;
+    }
+
+    .login-logo {
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+    }
+
+    .login-title {
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 3px;
+      letter-spacing: -0.3px;
+    }
+
+    .login-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .login-quick-users {
+      margin-bottom: 16px;
+    }
+
+    .login-quick-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .login-quick-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .quick-user-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      color: var(--text);
+      cursor: pointer;
+      transition: all .16s ease;
+      text-align: left;
+      width: 100%;
+    }
+
+    .quick-user-btn:hover, .quick-user-btn.active {
+      background: rgba(79, 140, 255, 0.14);
+      border-color: rgba(79, 140, 255, 0.4);
+      transform: translateX(3px);
+    }
+
+    body.light .quick-user-btn {
+      background: rgba(0, 0, 0, 0.02);
+      border-color: rgba(0, 0, 0, 0.07);
+    }
+
+    body.light .quick-user-btn:hover, body.light .quick-user-btn.active {
+      background: rgba(79, 140, 255, 0.08);
+      border-color: rgba(79, 140, 255, 0.4);
+    }
+
+    .qu-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .qu-avatar.coord { background: linear-gradient(135deg, #10b981, #059669); }
+    .qu-avatar.spec { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+    .qu-avatar.anal { background: linear-gradient(135deg, #a855f7, #7e22ce); }
+
+    .qu-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .qu-name {
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .qu-role {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      flex-shrink: 0;
+    }
+
+    .qu-role.coord {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .qu-role.spec {
+      background: rgba(59, 130, 246, 0.18);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .qu-role.anal {
+      background: rgba(168, 85, 247, 0.18);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+    }
+
+    .login-alert {
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      margin-bottom: 12px;
+      background: rgba(255, 93, 93, 0.15);
+      border: 1px solid rgba(255, 93, 93, 0.4);
+      color: #fca5a5;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .login-footer {
+      margin-top: 14px;
+      text-align: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      padding-top: 12px;
+    }
+
+    .btn-guest-tv {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 11.5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color .15s;
+    }
+
+    .btn-guest-tv:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
+    /* Sidebar User Profile Widget */
+    .sidebar-user {
+      margin-top: auto;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 12px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    body.light .sidebar-user {
+      background: rgba(0, 0, 0, 0.03);
+      border-color: rgba(0, 0, 0, 0.08);
+    }
+
+    .sidebar-user-info {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .sidebar-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 12px;
+      color: #fff;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, #10b981, #059669);
+    }
+
+    .sidebar-details {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .sidebar-user-name {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.2;
+    }
+
+    .sidebar-user-role {
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-top: 2px;
+    }
+
+    .btn-logout {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--muted);
+      border-radius: 7px;
+      padding: 5px 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      transition: all .15s;
+      flex-shrink: 0;
+    }
+
+    .btn-logout:hover {
+      background: rgba(255, 93, 93, 0.18);
+      border-color: rgba(255, 93, 93, 0.4);
+      color: #f87171;
+    }
+
+    aside.collapsed .sidebar-user {
+      padding: 8px 4px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    aside.collapsed .sidebar-details,
+    aside.collapsed .logout-text {
+      display: none !important;
+    }
+
+    aside.collapsed .btn-logout {
+      padding: 6px;
+    }
   </style>
 </head>
 
 <body>
+
+  <!-- MODAL DE ACCESO / LOGIN POR ROLES -->
+  <div id="loginOverlay" class="login-overlay" style="display:none">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo-wrap">
+          <img src="ICOSYCOM.png?v=2" alt="Sycom" class="login-logo">
+        </div>
+        <h2 class="login-title">Agenda de Infraestructura</h2>
+        <p class="login-sub">Control de Acceso Operativo · Sycom</p>
+      </div>
+
+      <!-- Selector rápido de usuario -->
+      <div class="login-quick-users">
+        <div class="login-quick-label">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span>Selecciona tu usuario:</span>
+        </div>
+        <div class="login-quick-grid">
+          <button type="button" class="quick-user-btn" onclick="quickSelectUser('a.lozada', 'coordinador')">
+            <span class="qu-avatar coord">A</span>
+            <div class="qu-info">
+              <span class="qu-name">Adonis Lozada</span>
+              <span class="qu-role coord">Coordinador</span>
+            </div>
+          </button>
+          <button type="button" class="quick-user-btn" onclick="quickSelectUser('j.fernandez', 'especialista')">
+            <span class="qu-avatar spec">J</span>
+            <div class="qu-info">
+              <span class="qu-name">Juan Fernández</span>
+              <span class="qu-role spec">Especialista</span>
+            </div>
+          </button>
+          <button type="button" class="quick-user-btn" onclick="quickSelectUser('y.jimenez', 'especialista')">
+            <span class="qu-avatar spec">Y</span>
+            <div class="qu-info">
+              <span class="qu-name">Yoxaide Jiménez</span>
+              <span class="qu-role spec">Especialista</span>
+            </div>
+          </button>
+          <button type="button" class="quick-user-btn" onclick="quickSelectUser('l.acosta', 'especialista')">
+            <span class="qu-avatar spec">L</span>
+            <div class="qu-info">
+              <span class="qu-name">Luis Acosta</span>
+              <span class="qu-role spec">Especialista</span>
+            </div>
+          </button>
+          <button type="button" class="quick-user-btn" onclick="quickSelectUser('analista', 'analista')">
+            <span class="qu-avatar anal">A</span>
+            <div class="qu-info">
+              <span class="qu-name">Analista de Operaciones</span>
+              <span class="qu-role anal">Analista</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Formulario de login -->
+      <form id="formLogin" onsubmit="event.preventDefault(); handleLoginSubmit();">
+        <div id="loginAlert" class="login-alert" style="display:none"></div>
+
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label" for="loginUser">Usuario o Correo Institucional:</label>
+          <div style="position:relative">
+            <input type="text" id="loginUser" class="form-input" placeholder="ej: a.lozada o a.lozada@sycom.com.ve" required autocomplete="username" style="padding-left:36px">
+            <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:18px">
+          <label class="form-label" for="loginPass">Contraseña:</label>
+          <div style="position:relative">
+            <input type="password" id="loginPass" class="form-input" placeholder="Ingresa tu contraseña..." required autocomplete="current-password" style="padding-left:36px;padding-right:38px">
+            <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <button type="button" onclick="togglePasswordVisibility()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px" title="Mostrar/ocultar contraseña">
+              <svg id="eyeIcon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn primary" id="btnLoginSubmit" style="width:100%;padding:11px;font-size:14px;font-weight:700;justify-content:center">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          <span id="btnLoginText">Iniciar Sesión</span>
+        </button>
+      </form>
+
+      <div class="login-footer">
+        <button type="button" class="btn-guest-tv" onclick="enterGuestTvMode()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>
+          </svg>
+          <span>Acceder en Modo TV Público (Informativo)</span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Notificaciones Toast flotantes -->
   <div id="toastContainer" style="position:fixed;top:24px;right:24px;z-index:999999;display:flex;flex-direction:column;gap:10px;pointer-events:none"></div>
@@ -1841,6 +2281,24 @@
       </svg>
       <span class="label">Clientes</span>
     </div>
+
+    <!-- Perfil de Usuario Activo en Sidebar -->
+    <div class="sidebar-user" id="sidebarUserBox">
+      <div class="sidebar-user-info">
+        <div class="sidebar-avatar" id="sidebarAvatar">A</div>
+        <div class="sidebar-details">
+          <div class="sidebar-user-name" id="sidebarUserName">Usuario</div>
+          <div class="sidebar-user-role" id="sidebarUserRole">Coordinador</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="handleLogout()" title="Cerrar Sesión">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        <span class="logout-text">Salir</span>
+      </button>
+    </div>
+
     <div class="side-foot">
       <div><span class="dot"></span><span class="foot-text" id="apiStatus">Conectando API...</span></div>
       <div id="syncTime" class="foot-text" style="margin-top:4px">Última sync: —</div>
@@ -1870,6 +2328,7 @@
       <div class="spacer"></div>
       <div class="clock" id="clock">--:--:--</div>
       <div class="header-actions">
+        <div id="roleBadgeHeader" style="display:none"></div>
         <button class="btn" id="btnNewActivityHeader" onclick="openCreateModal()"
           style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700"
           title="Crear nueva actividad en ClickUp o GLPI">
@@ -1985,10 +2444,9 @@
         style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
         <div>
           <h3 style="font-size:16px;margin:0">Tablero Kanban (Flujo de Trabajo)</h3>
-          <span class="muted" style="font-size:12px">Arrastra actividades entre columnas para sincronizar su
-            estado</span>
+          <span class="muted" id="kanbanSubText" style="font-size:12px">Arrastra actividades entre columnas para sincronizar su estado</span>
         </div>
-        <button class="btn" onclick="openCreateModal()"
+        <button class="btn" id="btnKanbanNewActivity" onclick="openCreateModal()"
           style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700"
           title="Crear nueva actividad">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -2062,7 +2520,7 @@
         <div class="tv-progress-bar" id="tvProgressBar"></div>
       </div>
       <div class="tv-controls">
-        <button class="tv-btn" onclick="openCreateModal()"
+        <button class="tv-btn" id="tvBtnNewActivity" onclick="openCreateModal()"
           style="background:linear-gradient(135deg, rgba(16,185,129,.22), rgba(5,150,105,.32));border-color:rgba(16,185,129,.5);color:#34d399;font-weight:600"
           title="Crear nueva actividad en ClickUp o GLPI">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -2119,6 +2577,36 @@
     let ALL_ITEMS = [];
     let ACTIVE_KPI_FILTER = null;
     let HIGHLIGHT_ITEM_ID = null;
+    let CURRENT_USER = null;
+
+    function isCoordinator() {
+      return CURRENT_USER && (CURRENT_USER.role || '').toLowerCase() === 'coordinador';
+    }
+
+    function isSpecialist() {
+      return CURRENT_USER && (CURRENT_USER.role || '').toLowerCase() === 'especialista';
+    }
+
+    function isAnalyst() {
+      return CURRENT_USER && (CURRENT_USER.role || '').toLowerCase() === 'analista';
+    }
+
+    function formatRoleName(role) {
+      if (!role) return 'Lector';
+      const r = role.toLowerCase();
+      if (r === 'coordinador') return 'Coordinador';
+      if (r === 'analista') return 'Analista';
+      if (r === 'especialista') return 'Especialista';
+      return role;
+    }
+
+    function getAuthHeaders() {
+      const headers = { 'Content-Type': 'application/json' };
+      if (CURRENT_USER && CURRENT_USER.role) {
+        headers['X-User-Role'] = CURRENT_USER.role;
+      }
+      return headers;
+    }
 
     function showToast(title, message = '', type = 'success', duration = 4500) {
       const container = document.getElementById('toastContainer');
@@ -2377,11 +2865,14 @@
           ${it.status === 'cerrado'
             ? `<span style="font-weight:600;opacity:.85">${it.assignee_name || 'Sin asignar'}</span>`
             : (it.assignee_name && !it.assignee_name.toLowerCase().includes('sin asignar')
-              ? `<div style="display:inline-flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation();openModal(${it.id})" title="Click para reasignar o sumar especialistas">
+              ? `<div style="display:inline-flex;align-items:center;gap:6px;cursor:${isCoordinator() ? 'pointer' : 'default'}" ${isCoordinator() ? `onclick="event.stopPropagation();openModal(${it.id})" title="Click para reasignar o sumar especialistas"` : ''}>
                      <span style="font-weight:600">${it.assignee_name}</span>
-                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5;color:var(--accent)"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                     ${isCoordinator() ? `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5;color:var(--accent)"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>` : ''}
                    </div>`
-              : `<button type="button" class="badge" style="background:rgba(243,156,18,.15);color:#f39c12;border:1px solid rgba(243,156,18,.35);cursor:pointer;padding:3px 8px;font-weight:600;border-radius:6px;font-size:11px;transition:all .15s" onclick="event.stopPropagation();openModal(${it.id})" title="Click para asignar responsable">+ Asignar</button>`
+              : (isCoordinator()
+                  ? `<button type="button" class="badge" style="background:rgba(243,156,18,.15);color:#f39c12;border:1px solid rgba(243,156,18,.35);cursor:pointer;padding:3px 8px;font-weight:600;border-radius:6px;font-size:11px;transition:all .15s" onclick="event.stopPropagation();openModal(${it.id})" title="Click para asignar responsable">+ Asignar</button>`
+                  : `<span class="muted" style="font-size:11px">Sin asignar</span>`
+                )
             )
           }
         </td>
@@ -2466,6 +2957,10 @@
     let IS_DRAGGING = false;
 
     function handleDragStart(e, itemId) {
+      if (!isCoordinator()) {
+        e.preventDefault();
+        return;
+      }
       DRAGGED_ITEM_ID = itemId;
       IS_DRAGGING = true;
       e.dataTransfer.effectAllowed = 'move';
@@ -2516,6 +3011,11 @@
       e.preventDefault();
       e.currentTarget.classList.remove('drag-over');
 
+      if (!isCoordinator()) {
+        alert("Permiso denegado: Solo el rol Coordinador tiene permisos para mover actividades entre estados.");
+        return;
+      }
+
       const itemId = DRAGGED_ITEM_ID || parseInt(e.dataTransfer.getData('text/plain'));
       if (!itemId) return;
 
@@ -2536,7 +3036,7 @@
       try {
         const res = await fetch(`${API_URL}/items/${itemId}/status`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ status: targetStatus })
         });
         const data = await res.json();
@@ -2571,10 +3071,10 @@
       document.getElementById('kanbanGrid').innerHTML = cols.map(c => {
         const colItems = list.filter(i => i.status === c.k);
         return `
-      <div class="col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
+      <div class="col" data-col="${c.k}" ${isCoordinator() ? `ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')"` : ''}>
         <h4>${c.title} <span class="muted" style="margin-left:auto">${colItems.length}</span></h4>
         ${colItems.map(it => `
-          <div class="tcard ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-${it.id}" draggable="true" ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)" onclick="if(!IS_DRAGGING) openModal(${it.id})">
+          <div class="tcard ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-${it.id}" draggable="${isCoordinator() ? 'true' : 'false'}" ${isCoordinator() ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!isCoordinator() ? 'cursor:pointer;' : ''}">
             <div class="top">
               <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
               <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
@@ -2590,7 +3090,7 @@
               <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA</span>
             </div>
           </div>
-        `).join('') || '<div class="muted" style="font-size:12px;text-align:center;padding:24px;border:1px dashed rgba(255,255,255,.08);border-radius:8px;pointer-events:none">Arrastra actividades aquí</div>'}
+        `).join('') || `<div class="muted" style="font-size:12px;text-align:center;padding:24px;border:1px dashed rgba(255,255,255,.08);border-radius:8px;pointer-events:none">${isCoordinator() ? 'Arrastra actividades aquí' : 'Sin actividades en esta columna'}</div>`}
       </div>
     `;
       }).join('');
@@ -2855,6 +3355,11 @@
     }
 
     async function submitCreateItem() {
+      if (!isCoordinator()) {
+        alert('Permiso denegado: Solo el rol Coordinador tiene autorización para crear actividades.');
+        return;
+      }
+
       const source = CREATE_SOURCE;
       const title = (document.getElementById('createTitle').value || '').trim();
       const desc = (document.getElementById('createDesc').value || '').trim();
@@ -2888,7 +3393,7 @@
 
         const res = await fetch(`${API_URL}/items`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
         const data = await res.json();
@@ -2946,6 +3451,11 @@
     }
 
     function openCreateModal() {
+      if (!isCoordinator()) {
+        alert('Permiso denegado: Solo el rol Coordinador tiene permisos para crear nuevas actividades.');
+        return;
+      }
+
       if (TV_MODE_ACTIVE && !TV_IS_PAUSED) {
         TV_PAUSED_BY_MODAL = true;
         tvTogglePause();
@@ -3077,7 +3587,15 @@
         }
       });
 
+      const roleBanner = !isCoordinator() ? `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(79,140,255,0.12);border:1px solid rgba(79,140,255,0.25);border-radius:8px;margin-bottom:12px;font-size:12px;color:#93c5fd">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span><b>Modo Informativo (${formatRoleName(CURRENT_USER ? CURRENT_USER.role : '')}):</b> Solo el Coordinador puede editar estados, reasignar o eliminar actividades.</span>
+        </div>
+      ` : '';
+
       document.getElementById('modalContent').innerHTML = `
+    ${roleBanner}
     <div style="margin-bottom:10px">
       <span class="badge src-${it.source}">${it.source}</span> #${it.external_id} · <span class="sem ${it.semaphore}"></span>
     </div>
@@ -3087,6 +3605,7 @@
       <dd>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <b>${it.status_origin || it.status}</b>
+          ${isCoordinator() ? `
           <div style="display:inline-flex;align-items:center;gap:6px;margin-left:auto">
             <select onchange="changeStatusFromModal(${it.id}, this.value)" style="background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:11.5px;outline:none;cursor:pointer">
               <option value="pendiente" ${it.status === 'pendiente' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: Pendiente ${it.source === 'ClickUp' ? '(TO DO)' : '(Nuevo)'}</option>
@@ -3094,16 +3613,16 @@
               ${it.source === 'GLPI' ? `<option value="espera" ${it.status === 'espera' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: En espera (4 - En espera)</option>` : ''}
               <option value="cerrado" ${it.status === 'cerrado' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: Cerrado ${it.source === 'ClickUp' ? '(COMPLETE)' : '(Resuelto)'}</option>
             </select>
-          </div>
+          </div>` : ''}
         </div>
       </dd>
       <dt>Responsable(s):</dt>
       <dd>
-        ${it.status === 'cerrado' ? `
+        ${(it.status === 'cerrado' || !isCoordinator()) ? `
           <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <span style="font-size:12px;font-weight:600;color:var(--text)">Especialistas que atendieron:</span>
-              <span class="badge" style="background:rgba(46,204,113,.15);color:#2ecc71;font-size:11px">Actividad Completada</span>
+              <span style="font-size:12px;font-weight:600;color:var(--text)">Integrantes asignados:</span>
+              ${it.status === 'cerrado' ? '<span class="badge" style="background:rgba(46,204,113,.15);color:#2ecc71;font-size:11px">Actividad Completada</span>' : ''}
             </div>
             <div id="selectedAssigneeChips" class="selected-chips-wrap"></div>
             <div style="margin-top:8px;font-size:11.5px;color:var(--muted)">
@@ -3167,11 +3686,12 @@
       <dt>SLA / Plazo:</dt><dd><b>${it.sla_percent}%</b> consumido (${it.semaphore.toUpperCase()}) ${getItemSlaRemaining(it) ? '· <b>' + getItemSlaRemaining(it) + '</b>' : ''}</dd>
     </dl>
     <div class="actions" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      ${isCoordinator() ? `
       <button type="button" class="btn" onclick="deleteItem(${it.id})" style="background:rgba(255,93,93,.14);border-color:rgba(255,93,93,.35);color:#f87171;font-weight:600;display:inline-flex;align-items:center;gap:6px;margin-right:auto" title="Eliminar actividad permanentemente">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
         <span>Eliminar</span>
-      </button>
-      <div style="display:flex;align-items:center;gap:8px">
+      </button>` : ''}
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
         <button class="btn" onclick="closeModal()">Cerrar</button>
         <a href="${it.url}" target="_blank" class="btn primary" style="text-decoration:none">
           <span>Abrir en ${it.source}</span>
@@ -3185,6 +3705,11 @@
     }
 
     async function deleteItem(itemId) {
+      if (!isCoordinator()) {
+        alert('Permiso denegado: Solo el rol Coordinador tiene permisos para eliminar actividades.');
+        return;
+      }
+
       const it = ALL_ITEMS.find(i => i.id === itemId);
       if (!it) return;
 
@@ -3197,7 +3722,8 @@
 
       try {
         const res = await fetch(`${API_URL}/items/${itemId}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: getAuthHeaders()
         });
         const data = await res.json();
         if (!res.ok) {
@@ -3216,12 +3742,17 @@
     }
 
     async function assignItem(itemId, specialistKeys) {
+      if (!isCoordinator()) {
+        alert('Permiso denegado: Solo el rol Coordinador puede asignar o transferir responsables.');
+        return false;
+      }
+
       const keys = Array.isArray(specialistKeys) ? specialistKeys : [specialistKeys];
       if (!keys.length) return false;
       try {
         const res = await fetch(`${API_URL}/items/${itemId}/assign`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ specialist_keys: keys })
         });
         const data = await res.json();
@@ -3240,6 +3771,10 @@
     }
 
     async function saveAssignmentFromModal(itemId) {
+      if (!isCoordinator()) {
+        alert('Permiso denegado: Solo el rol Coordinador puede guardar asignaciones.');
+        return;
+      }
       if (!MODAL_SELECTED_KEYS.length) {
         alert('Por favor selecciona al menos un especialista de la lista por su correo @sycom.com.ve.');
         return;
@@ -3258,6 +3793,10 @@
     }
 
     async function changeStatusFromModal(itemId, newStatus) {
+      if (!isCoordinator()) {
+        alert('Permiso denegado: Solo el rol Coordinador puede cambiar el estado.');
+        return;
+      }
       const item = ALL_ITEMS.find(i => i.id === itemId);
       if (!item || item.status === newStatus) return;
       const oldStatus = item.status;
@@ -3265,7 +3804,7 @@
       try {
         const res = await fetch(`${API_URL}/items/${itemId}/status`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ status: newStatus })
         });
         const data = await res.json();
@@ -3288,6 +3827,10 @@
     }
 
     async function assignItemDirect(itemId, specialistKey) {
+      if (!isCoordinator()) {
+        alert('Permiso denegado: Solo el rol Coordinador puede asignar responsables.');
+        return;
+      }
       if (!specialistKey) return;
       const specialistNames = {
         adonis: 'Adonis Lozada',
@@ -3560,23 +4103,30 @@
           <span style="font-weight:700;font-size:14px">Tablero Kanban en Tiempo Real</span>
           <span class="badge" style="background:rgba(79,140,255,.15);color:var(--accent);font-size:11px">${ALL_ITEMS.length} asuntos totales</span>
         </div>
+        ${isCoordinator() ? `
         <button type="button" class="btn" onclick="openCreateModal()" style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700;padding:7px 14px;font-size:12.5px;box-shadow:0 4px 14px rgba(16,185,129,.25);cursor:pointer;display:inline-flex;align-items:center;gap:6px">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           <span>Nueva Actividad</span>
         </button>
+        ` : `
+        <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#93c5fd;font-weight:600">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>Modo Lectura</span>
+        </div>
+        `}
       </div>
       <div class="tv-kanban-grid">
         ${cols.map(c => {
           const colItems = ALL_ITEMS.filter(i => i.status === c.k);
           return `
-            <div class="tv-kanban-col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
+            <div class="tv-kanban-col" data-col="${c.k}" ${isCoordinator() ? `ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')"` : ''}>
               <div class="tv-kanban-col-header" style="border-top:3px solid ${c.color}">
                 <div style="display:flex;align-items:center;gap:8px">
                   <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color}"></span>
                   <span>${c.title}</span>
                 </div>
                 <div style="display:inline-flex;align-items:center;gap:6px">
-                  ${c.k === 'pendiente' ? `
+                  ${(c.k === 'pendiente' && isCoordinator()) ? `
                     <button type="button" onclick="openCreateModal()" style="padding:2px 8px;font-size:10.5px;font-weight:700;background:rgba(16,185,129,.2);border:1px solid rgba(16,185,129,.4);color:#34d399;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="Crear nueva actividad">
                       <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       Crear
@@ -3587,7 +4137,7 @@
               </div>
               <div class="tv-kanban-cards">
                 ${colItems.map(it => `
-                  <div class="tv-kanban-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-tv-${it.id}" draggable="true" ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)" onclick="if(!IS_DRAGGING) openModal(${it.id})">
+                  <div class="tv-kanban-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-tv-${it.id}" draggable="${isCoordinator() ? 'true' : 'false'}" ${isCoordinator() ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!isCoordinator() ? 'cursor:pointer;' : ''}">
                     <div style="display:flex;align-items:center;gap:6px;font-size:11px">
                       <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
                       <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
@@ -3644,6 +4194,7 @@
                     <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                   </a>
                 </div>
+                ${isCoordinator() ? `
                 <div style="display:flex;align-items:center;gap:6px;width:100%">
                   <select onchange="assignItemDirect(${it.id}, this.value)" style="flex:1;min-width:0;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:7px;padding:6px 8px;font-size:11.5px;cursor:pointer;outline:none;text-overflow:ellipsis;overflow:hidden;white-space:nowrap">
                     <option value="" style="background:#141c2b;color:#fff">Asignar a...</option>
@@ -3656,6 +4207,11 @@
                     <span>+ Varios</span>
                   </button>
                 </div>
+                ` : `
+                <div>
+                  <span class="badge" style="background:rgba(243,156,18,.15);color:#f39c12;font-size:11px">Pendiente de asignación</span>
+                </div>
+                `}
               </div>
             </div>
           `).join('')}
@@ -3712,9 +4268,10 @@
                 <span style="font-weight:600;color:var(--accent)">${getItemTimeLabel(it)}</span>
                 <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? '· ' + getItemSlaRemaining(it) : ''}</span>
                 <div style="display:inline-flex;align-items:center;gap:6px">
+                  ${isCoordinator() ? `
                   <button type="button" onclick="openModal(${it.id})" class="tv-action-btn" style="cursor:pointer;padding:4px 8px;font-size:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)" title="Reasignar o sumar especialistas">
                     <span>Reasignar</span>
-                  </button>
+                  </button>` : ''}
                   <a href="${it.url}" target="_blank" class="tv-action-btn" style="padding:4px 8px;font-size:11px">
                     <span>Abrir</span>
                     <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -3729,6 +4286,208 @@
       }
     }
 
+    /* ========================================================
+       FUNCIONES DE LOGIN, AUTENTICACIÓN Y ROLES
+       ======================================================== */
+    function quickSelectUser(username, role) {
+      const uInput = document.getElementById('loginUser');
+      const pInput = document.getElementById('loginPass');
+      if (uInput) uInput.value = username;
+      if (pInput) {
+        pInput.value = 'sycom2026';
+        pInput.focus();
+      }
+      document.querySelectorAll('.quick-user-btn').forEach(b => b.classList.remove('active'));
+      if (window.event && window.event.currentTarget) {
+        window.event.currentTarget.classList.add('active');
+      }
+    }
+
+    function togglePasswordVisibility() {
+      const pInput = document.getElementById('loginPass');
+      const eye = document.getElementById('eyeIcon');
+      if (!pInput) return;
+      if (pInput.type === 'password') {
+        pInput.type = 'text';
+        if (eye) {
+          eye.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+        }
+      } else {
+        pInput.type = 'password';
+        if (eye) {
+          eye.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+        }
+      }
+    }
+
+    async function handleLoginSubmit() {
+      const uInput = document.getElementById('loginUser');
+      const pInput = document.getElementById('loginPass');
+      const alertBox = document.getElementById('loginAlert');
+      const btn = document.getElementById('btnLoginSubmit');
+      const btnText = document.getElementById('btnLoginText');
+
+      const username = (uInput.value || '').trim();
+      const password = (pInput.value || '').trim();
+
+      if (!username || !password) {
+        if (alertBox) {
+          alertBox.style.display = 'flex';
+          alertBox.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Por favor ingresa usuario y contraseña.</span>';
+        }
+        return;
+      }
+
+      btn.disabled = true;
+      const origText = btnText.textContent;
+      btnText.textContent = 'Verificando...';
+      if (alertBox) alertBox.style.display = 'none';
+
+      try {
+        const res = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          btn.disabled = false;
+          btnText.textContent = origText;
+          if (alertBox) {
+            alertBox.style.display = 'flex';
+            alertBox.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${data.detail || 'Credenciales inválidas.'}</span>`;
+          }
+          return;
+        }
+
+        CURRENT_USER = data.user;
+        localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
+
+        document.getElementById('loginOverlay').style.display = 'none';
+        btn.disabled = false;
+        btnText.textContent = origText;
+
+        applyRolePermissions();
+        showToast('Bienvenido', `Sesión iniciada como ${CURRENT_USER.full_name} (${formatRoleName(CURRENT_USER.role)})`, 'success', 4000);
+      } catch (err) {
+        console.error('Error logging in:', err);
+        btn.disabled = false;
+        btnText.textContent = origText;
+        if (alertBox) {
+          alertBox.style.display = 'flex';
+          alertBox.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Error al conectar con el servidor de autenticación.</span>';
+        }
+      }
+    }
+
+    function enterGuestTvMode() {
+      CURRENT_USER = {
+        id: 0,
+        full_name: 'Pantalla Modo TV',
+        username: 'modo.tv',
+        role: 'especialista'
+      };
+      localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
+      document.getElementById('loginOverlay').style.display = 'none';
+      applyRolePermissions();
+      if (!TV_MODE_ACTIVE) {
+        toggleTvMode();
+      }
+    }
+
+    function handleLogout() {
+      if (!confirm('¿Deseas cerrar tu sesión actual en la Agenda?')) return;
+      localStorage.removeItem('sycom_user');
+      CURRENT_USER = null;
+      checkAuthAndInit();
+    }
+
+    function applyRolePermissions() {
+      if (!CURRENT_USER) return;
+
+      const role = (CURRENT_USER.role || '').toLowerCase();
+      const isCoord = role === 'coordinador';
+      const roleName = formatRoleName(role);
+
+      // 1. Sidebar user widget
+      const av = document.getElementById('sidebarAvatar');
+      const uName = document.getElementById('sidebarUserName');
+      const uRole = document.getElementById('sidebarUserRole');
+
+      if (av) {
+        av.textContent = (CURRENT_USER.full_name || 'U').charAt(0).toUpperCase();
+        av.style.background = isCoord 
+          ? 'linear-gradient(135deg, #10b981, #059669)'
+          : (role === 'analista' ? 'linear-gradient(135deg, #a855f7, #7e22ce)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)');
+      }
+      if (uName) uName.textContent = CURRENT_USER.full_name || CURRENT_USER.username;
+      if (uRole) {
+        uRole.textContent = roleName;
+        uRole.style.color = isCoord ? '#34d399' : (role === 'analista' ? '#c084fc' : '#60a5fa');
+      }
+
+      // 2. Botón Crear Actividad en cabecera principal
+      const btnHeadCreate = document.getElementById('btnNewActivityHeader');
+      const rolePill = document.getElementById('roleBadgeHeader');
+      if (btnHeadCreate) {
+        btnHeadCreate.style.display = isCoord ? 'inline-flex' : 'none';
+      }
+      if (rolePill) {
+        if (isCoord) {
+          rolePill.style.display = 'none';
+        } else {
+          rolePill.style.display = 'inline-flex';
+          rolePill.innerHTML = `
+            <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(79,140,255,0.12);border:1px solid rgba(79,140,255,0.3);border-radius:20px;font-size:12px;color:#93c5fd;font-weight:600">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <span>Modo Informativo · ${roleName}</span>
+            </div>
+          `;
+        }
+      }
+
+      // 3. Botón Crear Actividad en vista Kanban y subtítulo
+      const btnKanbanCreate = document.getElementById('btnKanbanNewActivity');
+      const kanbanSub = document.getElementById('kanbanSubText');
+      if (btnKanbanCreate) {
+        btnKanbanCreate.style.display = isCoord ? 'inline-flex' : 'none';
+      }
+      if (kanbanSub) {
+        kanbanSub.textContent = isCoord 
+          ? 'Arrastra actividades entre columnas para sincronizar su estado'
+          : `Modo Informativo (${roleName}) · Solo el Coordinador puede mover estados o reasignar`;
+      }
+
+      // 4. Botón Actividad en Modo TV
+      const btnTvAct = document.getElementById('tvBtnNewActivity');
+      if (btnTvAct) {
+        btnTvAct.style.display = isCoord ? 'inline-flex' : 'none';
+      }
+
+      // 5. Re-renderizar vistas si los items ya cargaron
+      if (ALL_ITEMS && ALL_ITEMS.length) {
+        renderAll();
+        if (TV_MODE_ACTIVE) renderTvSlide();
+      }
+    }
+
+    function checkAuthAndInit() {
+      try {
+        CURRENT_USER = JSON.parse(localStorage.getItem('sycom_user') || 'null');
+      } catch (e) {
+        CURRENT_USER = null;
+      }
+
+      const overlay = document.getElementById('loginOverlay');
+      if (!CURRENT_USER) {
+        if (overlay) overlay.style.display = 'flex';
+      } else {
+        if (overlay) overlay.style.display = 'none';
+        applyRolePermissions();
+      }
+    }
+
     // Atajos de teclado para Modo TV
     window.addEventListener('keydown', (e) => {
       if (TV_MODE_ACTIVE) {
@@ -3740,6 +4499,7 @@
     });
 
     // Carga inicial y refresco cada 30 segundos
+    checkAuthAndInit();
     loadData();
     setInterval(loadData, 30000);
   </script>

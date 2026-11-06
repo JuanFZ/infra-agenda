@@ -5,6 +5,22 @@ from sqlalchemy.orm import Session
 from .. import config
 from ..models import Item, AlertLog, User
 
+# Zona Horaria de Venezuela (Caracas: UTC-4)
+CARACAS_TZ = datetime.timezone(datetime.timedelta(hours=-4))
+
+def format_caracas_time(dt: datetime.datetime | None, format_str: str = "%d-%m-%Y %I:%M %p") -> str:
+    """Convierte cualquier fecha UTC o local a la zona horaria oficial de Caracas (UTC-4)."""
+    if not dt:
+        return "No especificada"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(CARACAS_TZ).strftime(format_str)
+
+def now_caracas_str(format_str: str = "%d-%m-%Y %I:%M %p") -> str:
+    """Retorna la fecha y hora actual exacta en Caracas (UTC-4)."""
+    now_utc = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
+    return now_utc.astimezone(CARACAS_TZ).strftime(format_str)
+
 def send_telegram_message(text: str, parse_mode: str | None = None) -> bool:
     token = config.TELEGRAM_BOT_TOKEN
     chat_id = config.TELEGRAM_CHAT_ID
@@ -105,7 +121,7 @@ def check_and_notify_alerts(db: Session):
 
             if not new_alerted:
                 assignee_str = resolve_assignee_mention(db, item.assignee_name, is_critical=False)
-                due_str = item.due_at.strftime("%d-%m-%Y %H:%M") if item.due_at else "No especificada"
+                due_str = format_caracas_time(item.due_at, "%d-%m-%Y %I:%M %p") if item.due_at else "No especificada"
                 ticket_url = item.url or "http://200.74.215.44:7070/"
                 msg_nuevo = (
                     f"🆕 *NUEVO REQUERIMIENTO ASIGNADO ({item.source.upper()})*\n"
@@ -139,7 +155,7 @@ def check_and_notify_alerts(db: Session):
 
         is_critical = (sem == "rojo")
         assignee_str = resolve_assignee_mention(db, item.assignee_name, is_critical=is_critical)
-        due_str = item.due_at.strftime("%d-%m-%Y %H:%M") if item.due_at else "No especificada"
+        due_str = format_caracas_time(item.due_at, "%d-%m-%Y %I:%M %p") if item.due_at else "No especificada"
         ticket_url = item.url or "http://200.74.215.44:7070/"
 
         if sem == "amarillo":
