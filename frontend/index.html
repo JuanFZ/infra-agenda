@@ -10,6 +10,7 @@
   <link rel="apple-touch-icon" href="ICOSYCOM.png?v=2">
   <style>
     :root {
+      color-scheme: dark;
       --bg: #090d14;
       --panel: rgba(255, 255, 255, 0.03);
       --panel2: rgba(255, 255, 255, 0.06);
@@ -28,6 +29,7 @@
     }
 
     body.light {
+      color-scheme: light;
       --bg: #edf2f9;
       --panel: rgba(255, 255, 255, 0.55);
       --panel2: rgba(255, 255, 255, 0.75);
@@ -490,9 +492,29 @@
       box-shadow: 0 4px 16px rgba(31, 38, 135, 0.05);
     }
 
+    select {
+      color-scheme: dark;
+    }
+
+    body.light select {
+      color-scheme: light;
+    }
+
+    select option,
+    select optgroup {
+      background: #101622;
+      color: #f0f6fc;
+    }
+
+    body.light select option,
+    body.light select optgroup {
+      background: #ffffff;
+      color: #0f172a;
+    }
+
     .filters select,
     .filters input {
-      background: rgba(255, 255, 255, .04);
+      background: rgba(255, 255, 255, .05);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       border: 1px solid var(--border);
@@ -501,6 +523,7 @@
       border-radius: 8px;
       font-size: 13px;
       transition: all .15s ease;
+      color-scheme: dark;
     }
 
     .filters select:focus,
