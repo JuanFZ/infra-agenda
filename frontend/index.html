@@ -2042,6 +2042,10 @@
         <div class="tv-progress-bar" id="tvProgressBar"></div>
       </div>
       <div class="tv-controls">
+        <button class="tv-btn" onclick="openCreateModal()" style="background:linear-gradient(135deg, rgba(16,185,129,.22), rgba(5,150,105,.32));border-color:rgba(16,185,129,.5);color:#34d399;font-weight:600" title="Crear nueva actividad en ClickUp o GLPI">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>+ Actividad</span>
+        </button>
         <span class="tv-timer" id="tvTimerBadge">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
@@ -2585,6 +2589,10 @@
     function closeModal() {
       const modalBg = document.getElementById('modalBg');
       if (modalBg) modalBg.classList.remove('show');
+      if (TV_MODE_ACTIVE && TV_PAUSED_BY_MODAL && TV_IS_PAUSED) {
+        TV_PAUSED_BY_MODAL = false;
+        tvTogglePause();
+      }
     }
 
     document.addEventListener('click', (e) => {
@@ -2790,6 +2798,10 @@
     }
 
     function openCreateModal() {
+      if (TV_MODE_ACTIVE && !TV_IS_PAUSED) {
+        TV_PAUSED_BY_MODAL = true;
+        tvTogglePause();
+      }
       CREATE_SOURCE = 'ClickUp';
       CREATE_SELECTED_KEYS = [];
 
@@ -2902,6 +2914,10 @@
 
     function openModal(id) {
       if (IS_DRAGGING) return;
+      if (TV_MODE_ACTIVE && !TV_IS_PAUSED) {
+        TV_PAUSED_BY_MODAL = true;
+        tvTogglePause();
+      }
       const it = ALL_ITEMS.find(i => i.id === id);
       if (!it) return;
 
@@ -3191,6 +3207,7 @@
     let TV_TIME_LEFT = 18;
     const TV_SLIDE_DURATION = 18;
     let TV_IS_PAUSED = false;
+    let TV_PAUSED_BY_MODAL = false;
 
     const TV_SPECIALISTS = [
       { name: "Adonis Lozada", tag: "@adonislozada", key: "adonis", isCoord: true },
@@ -3229,6 +3246,7 @@
           document.documentElement.requestFullscreen().catch(() => { });
         }
       } else {
+        TV_PAUSED_BY_MODAL = false;
         overlay.style.display = 'none';
         clearInterval(TV_TIMER);
         if (document.fullscreenElement && document.exitFullscreen) {
@@ -3349,6 +3367,16 @@
         ];
 
         container.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 16px;backdrop-filter:blur(14px);flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-weight:700;font-size:14px">Tablero Kanban en Tiempo Real</span>
+          <span class="badge" style="background:rgba(79,140,255,.15);color:var(--accent);font-size:11px">${ALL_ITEMS.length} asuntos totales</span>
+        </div>
+        <button type="button" class="btn" onclick="openCreateModal()" style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700;padding:7px 14px;font-size:12.5px;box-shadow:0 4px 14px rgba(16,185,129,.25);cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>+ Nueva Actividad</span>
+        </button>
+      </div>
       <div class="tv-kanban-grid">
         ${cols.map(c => {
           const colItems = ALL_ITEMS.filter(i => i.status === c.k);
@@ -3359,7 +3387,15 @@
                   <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color}"></span>
                   <span>${c.title}</span>
                 </div>
-                <span class="badge" style="background:rgba(255,255,255,.08);color:#fff;font-size:12px">${colItems.length}</span>
+                <div style="display:inline-flex;align-items:center;gap:6px">
+                  ${c.k === 'pendiente' ? `
+                    <button type="button" onclick="openCreateModal()" style="padding:2px 8px;font-size:10.5px;font-weight:700;background:rgba(16,185,129,.2);border:1px solid rgba(16,185,129,.4);color:#34d399;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="Crear nueva actividad">
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      + Crear
+                    </button>
+                  ` : ''}
+                  <span class="badge" style="background:rgba(255,255,255,.08);color:#fff;font-size:12px">${colItems.length}</span>
+                </div>
               </div>
               <div class="tv-kanban-cards">
                 ${colItems.map(it => `
