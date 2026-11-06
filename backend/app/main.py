@@ -13,6 +13,7 @@ from .sync.synchronizer import sync_all
 Base.metadata.create_all(bind=engine)
 
 DEFAULT_USERS = [
+    {"full_name": "Richard Bravo", "username": "r.bravo", "email": "r.bravo@sycom.com.ve", "telegram_username": "@richardbravo", "role": "gerente"},
     {"full_name": "Adonis Lozada", "username": "a.lozada", "email": "a.lozada@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
     {"full_name": "Juan Fernández", "username": "j.fernandez", "email": "j.fernandez@sycom.com.ve", "telegram_username": "@Juuan8", "role": "especialista"},
     {"full_name": "Yoxaide Jiménez", "username": "y.jimenez", "email": "y.jimenez@sycom.com.ve", "telegram_username": "@Yjimenezg", "role": "especialista"},

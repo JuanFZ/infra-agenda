@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
 <title>Agenda de Infra · Infraestructura y BD (En Vivo)</title>
 <link rel="icon" type="image/png" href="sycom.png">
 <link rel="shortcut icon" type="image/png" href="sycom.png">
@@ -16,7 +16,9 @@
 body.light{ --bg:#f3f5f8; --panel:#ffffff; --panel2:#f2f5f8; --border:#dfe4ea; --text:#1d2733; --muted:#5f6b78; }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;display:flex;min-height:100vh}
-aside{width:230px;background:var(--panel);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;flex-shrink:0;transition:width .22s ease, padding .22s ease;overflow-x:hidden}
+
+/* Sidebar */
+aside{width:230px;background:var(--panel);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;flex-shrink:0;transition:width .22s ease, padding .22s ease, transform .25s ease;overflow-x:hidden;z-index:100}
 aside.collapsed{width:68px;padding:20px 8px}
 .brand{font-weight:700;font-size:15px;margin-bottom:20px;display:flex;align-items:center;gap:10px;position:relative}
 .brand .logo-sycom{height:34px;width:auto;max-width:90px;object-fit:contain;border-radius:6px;background:#ffffff;padding:3px 7px;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:all .2s ease}
@@ -41,19 +43,33 @@ aside.collapsed .side-foot{text-align:center}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 2s infinite}
 aside.collapsed .dot{margin-right:0}
 @keyframes pulse{50%{opacity:.35}}
-main{flex:1;padding:20px 26px;min-width:0}
+
+/* Mobile Drawer Backdrop */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(2px);
+  z-index: 99;
+}
+.sidebar-backdrop.show { display: block; }
+
+main{flex:1;padding:20px 26px;min-width:0;max-width:100%}
 header{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
 header h1{font-size:20px}
 header .sub{color:var(--muted);font-size:12px}
 .spacer{flex:1}
 .clock{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
-.btn{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px}
+.header-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;transition:all .15s}
 .btn:hover{border-color:var(--accent)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.1)}
 .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;background:var(--panel);border:1px solid var(--border);padding:10px 12px;border-radius:10px;align-items:center}
 .filters select,.filters input{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-size:13px}
 .filters input{min-width:240px;flex:1}
-.filters label{color:var(--muted);font-size:12px}
+.filters label{color:var(--muted);font-size:12px;display:flex;align-items:center;gap:6px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
 .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;cursor:pointer;transition:all .18s ease;user-select:none}
 .kpi:hover{border-color:var(--c,var(--accent));transform:translateY(-2px);background:var(--panel2)}
@@ -65,29 +81,38 @@ header .sub{color:var(--muted);font-size:12px}
 .kpi .hint{font-size:11px;color:var(--muted);margin-top:2px}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
 .card h3{font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-table{width:100%;border-collapse:collapse}
-th{text-align:left;color:var(--muted);font-weight:500;font-size:12px;padding:6px 8px;border-bottom:1px solid var(--border)}
-td{padding:8px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+
+/* Tablas responsivas con desplazamiento suave */
+.table-responsive{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:6px;margin-bottom:4px}
+table{width:100%;border-collapse:collapse;min-width:680px}
+#tblClients{min-width:520px}
+#tblOverdue{min-width:540px}
+th{text-align:left;color:var(--muted);font-weight:500;font-size:12px;padding:8px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 8px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
 tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
-.badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600}
+.badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;white-space:nowrap}
 .src-GLPI{background:rgba(243,156,18,.18);color:var(--glpi)}
 .src-ClickUp{background:rgba(123,104,238,.2);color:var(--clickup)}
 .sem{display:inline-block;width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .sem.verde{background:var(--green)} .sem.amarillo{background:var(--yellow)} .sem.rojo{background:var(--red);box-shadow:0 0 8px var(--red)}
-.prio{font-size:11px;font-weight:600}
+.prio{font-size:11px;font-weight:600;white-space:nowrap}
 .prio-Crítica{color:var(--red)} .prio-Alta{color:var(--yellow)} .prio-Media{color:var(--cyan)} .prio-Baja{color:var(--muted)}
+.txt-red{color:var(--red);font-weight:600}
 .view{display:none} .view.active{display:block}
 .kanban-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-@media(max-width:1100px){.kanban-grid{grid-template-columns:1fr}}
+@media(max-width:1100px){.kanban-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.kanban-grid{grid-template-columns:1fr}}
 .col{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;min-height:300px}
 .col h4{font-size:13px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .tcard{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:10px;margin-bottom:10px;cursor:pointer}
 .tcard.verde{border-left-color:var(--green)} .tcard.amarillo{border-left-color:var(--yellow)} .tcard.rojo{border-left-color:var(--red)}
 .tcard .top{display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:6px}
 .tcard .title{font-size:13px;font-weight:600;margin-bottom:6px}
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;place-items:center}
-.modal-bg.show{display:grid}
-.modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;max-width:540px;width:90%;padding:22px}
+
+/* Modal Detalle Responsive */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(3px);z-index:99999;align-items:center;justify-content:center;padding:14px}
+.modal-bg.show{display:flex}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:min(100%, 540px);max-height:88vh;overflow-y:auto;padding:20px;box-shadow:0 12px 32px rgba(0,0,0,.5)}
 .modal dl{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;margin:16px 0;font-size:13px}
 .modal dt{color:var(--muted)}
 .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
@@ -122,11 +147,12 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
 .tv-btn.danger { background: rgba(255,93,93,.15); border-color: rgba(255,93,93,.4); color: #ff5d5d; }
 .tv-btn.danger:hover { background: #ff5d5d; color: #ffffff; }
 .tv-body { flex: 1; display: flex; flex-direction: column; }
-.tv-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
+.tv-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 310px), 1fr)); gap: 16px; }
 .tv-item-card {
   background: #151c24; border: 1px solid #263443; border-left: 5px solid #4f8cff;
   border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
   box-shadow: 0 4px 14px rgba(0,0,0,.25); transition: transform .15s;
+  word-break: break-word; overflow-wrap: break-word;
 }
 .tv-item-card:hover { transform: translateY(-2px); border-color: #4f8cff; }
 .tv-item-card.rojo { border-left-color: var(--red); }
@@ -135,17 +161,193 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
 .tv-unassigned-banner {
   background: linear-gradient(90deg, rgba(243,156,18,.15), rgba(79,140,255,.1));
   border: 1px solid rgba(243,156,18,.35); border-radius: 12px; padding: 14px 20px;
-  margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
 .tv-action-btn {
   background: var(--accent); color: #fff; padding: 6px 12px; border-radius: 6px;
   text-decoration: none; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
 }
 .tv-action-btn:hover { filter: brightness(1.15); }
 .tv-stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
 .tv-stat-box { background: #151c24; border: 1px solid #263443; border-radius: 10px; padding: 14px 18px; }
 .tv-stat-box .num { font-size: 28px; font-weight: 700; margin-top: 4px; }
 
+/* MEDIA QUERIES GENERALES PARA SMARTPHONES, TABLETS Y DISPOSITIVOS SMART */
+@media(max-width: 768px) {
+  body {
+    flex-direction: column;
+  }
+  aside {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+    width: 250px;
+    height: 100vh;
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+  aside.mobile-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0,0,0,.6);
+  }
+  .btn-toggle-side {
+    display: none;
+  }
+  main {
+    padding: 12px 14px;
+    width: 100%;
+  }
+  header {
+    gap: 8px;
+    align-items: flex-start;
+  }
+  header h1 {
+    font-size: 18px;
+  }
+  .clock {
+    display: none;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+  .header-actions .btn {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+    padding: 7px 8px;
+    font-size: 12px;
+  }
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+  }
+  .filters label {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+  .filters select, .filters input {
+    width: 100%;
+    min-width: 0;
+  }
+  .kpis {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .kpi {
+    padding: 10px 12px;
+  }
+  .kpi .val {
+    font-size: 22px;
+  }
+  .card {
+    padding: 12px;
+  }
+
+  /* Modo TV en móvil / smart */
+  .tv-overlay {
+    padding: 12px 14px;
+  }
+  .tv-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+  }
+  .tv-brand {
+    width: 100%;
+  }
+  .tv-title {
+    font-size: 16px;
+  }
+  .tv-progress-container {
+    max-width: 100%;
+    width: 100%;
+    margin: 2px 0;
+  }
+  .tv-controls {
+    width: 100%;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .tv-btn {
+    padding: 6px 8px;
+    font-size: 12px;
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+  .tv-timer {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+  .tv-stat-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .tv-stat-box {
+    padding: 10px 12px;
+  }
+  .tv-stat-box .num {
+    font-size: 22px;
+  }
+  .tv-unassigned-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .tv-card-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .tv-item-card {
+    padding: 12px 14px;
+  }
+}
+
+@media(max-width: 540px) {
+  .modal {
+    padding: 16px 14px;
+    max-height: 85vh;
+  }
+  .modal h2 {
+    font-size: 16px;
+    word-break: break-word;
+  }
+  .modal dl {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .modal dt {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+  .modal dd {
+    word-break: break-word;
+  }
+  .modal .actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  .modal .actions .btn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+}
 </style>
 </head>
 <body>
@@ -166,18 +368,25 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
   </div>
 </aside>
 
+<!-- Telón oscuro para cerrar menú móvil -->
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebarMobile()"></div>
+
 <main>
   <header>
-    <button class="btn" id="btnHeaderToggle" onclick="toggleSidebar()" title="Abrir / Cerrar menú" style="padding:8px 11px">☰</button>
-    <div>
-      <h1 id="viewTitle">Resumen general</h1>
-      <div class="sub">Consolidación en vivo: GLPI + ClickUp</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn" id="btnHeaderToggle" onclick="toggleSidebar()" title="Abrir / Cerrar menú" style="padding:8px 11px">☰</button>
+      <div>
+        <h1 id="viewTitle">Resumen general</h1>
+        <div class="sub">Consolidación en vivo: GLPI + ClickUp</div>
+      </div>
     </div>
     <div class="spacer"></div>
     <div class="clock" id="clock">--:--:--</div>
-    <button class="btn" id="btnSync" onclick="forceSync()">🔄 Sincronizar Ahora</button>
-    <button class="btn" id="btnTheme">🌓 Tema</button>
-    <button class="btn primary" id="btnTvMode" onclick="toggleTvMode()" title="Presentación continua para pantalla grande y reuniones">📺 Modo TV</button>
+    <div class="header-actions">
+      <button class="btn" id="btnSync" onclick="forceSync()">🔄 <span class="btn-text">Sincronizar</span></button>
+      <button class="btn" id="btnTheme">🌓 <span class="btn-text">Tema</span></button>
+      <button class="btn primary" id="btnTvMode" onclick="toggleTvMode()" title="Presentación continua para pantalla grande y reuniones">📺 Modo TV</button>
+    </div>
   </header>
 
   <div class="filters">
@@ -200,10 +409,11 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
     <label>Responsable:
       <select id="fResp">
         <option value="">Todo el equipo</option>
+        <option value="Bravo">👤 Richard Bravo</option>
+        <option value="Adonis">👤 Adonis Lozada</option>
         <option value="Juan">👤 Juan Fernández</option>
         <option value="Yoxaide">👤 Yoxaide Jiménez</option>
         <option value="Luis">👤 Luis Acosta</option>
-        <option value="Adonis">👤 Adonis Lozada</option>
         <option value="Sin asignar">⚠️ Sin asignar</option>
       </select>
     </label>
@@ -220,24 +430,26 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
   <div class="view active" id="v-resumen">
     <div class="card">
       <h3>Todos los Asuntos Recientes (<span id="totalItemsCount">0</span>)</h3>
-      <table id="tblItems">
-        <thead>
-          <tr>
-            <th></th>
-            <th>ID</th>
-            <th>Asunto</th>
-            <th>Cliente</th>
-            <th>Responsable</th>
-            <th>Prioridad</th>
-            <th>Estado</th>
-            <th>SLA Consumido</th>
-            <th>Vencimiento</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td colspan="8" style="text-align:center;padding:20px" class="muted">Cargando tickets en vivo...</td></tr>
-        </tbody>
-      </table>
+      <div class="table-responsive">
+        <table id="tblItems">
+          <thead>
+            <tr>
+              <th></th>
+              <th>ID</th>
+              <th>Asunto</th>
+              <th>Cliente</th>
+              <th>Responsable</th>
+              <th>Prioridad</th>
+              <th>Estado</th>
+              <th>SLA Consumido</th>
+              <th>Vencimiento</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="9" style="text-align:center;padding:20px" class="muted">Cargando tickets en vivo...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -250,24 +462,28 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
   <div class="view" id="v-atrasados">
     <div class="card">
       <h3 style="color:var(--red)">Asuntos Fuera de SLA</h3>
-      <table id="tblOverdue">
-        <thead>
-          <tr><th></th><th>ID</th><th>Asunto</th><th>Prioridad</th><th>SLA</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div class="table-responsive">
+        <table id="tblOverdue">
+          <thead>
+            <tr><th></th><th>ID</th><th>Asunto</th><th>Prioridad</th><th>SLA</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
   <div class="view" id="v-clientes">
     <div class="card">
       <h3>Estado por Cliente / Entidad</h3>
-      <table id="tblClients">
-        <thead>
-          <tr><th>Cliente</th><th>Abiertos</th><th>Atrasados</th><th>Cerrados</th><th>Cumplimiento SLA</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div class="table-responsive">
+        <table id="tblClients">
+          <thead>
+            <tr><th>Cliente</th><th>Abiertos</th><th>Atrasados</th><th>Cerrados</th><th>Cumplimiento SLA</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </main>
@@ -291,7 +507,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--panel2)}
       <div class="tv-progress-bar" id="tvProgressBar"></div>
     </div>
     <div class="tv-controls">
-      <span class="tv-timer" id="tvTimerBadge">⏱️ 15s</span>
+      <span class="tv-timer" id="tvTimerBadge">⏱️ 18s</span>
       <button class="tv-btn" onclick="tvPrevSlide()" title="Diapositiva Anterior (←)">⏮</button>
       <button class="tv-btn" id="tvPlayPauseBtn" onclick="tvTogglePause()" title="Pausar / Reanudar (Espacio)">⏸ Pausa</button>
       <button class="tv-btn" onclick="tvNextSlide()" title="Siguiente Diapositiva (→)">⏭</button>
@@ -436,7 +652,7 @@ function renderAll() {
   // 1. Tabla Resumen
   const tbody = document.querySelector('#tblItems tbody');
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center" class="muted">Sin tickets que coincidan.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px" class="muted">Sin tickets que coincidan con los filtros.</td></tr>';
   } else {
     tbody.innerHTML = list.map(it => `
       <tr class="click" onclick="openModal(${it.id})">
@@ -466,7 +682,50 @@ function renderAll() {
       <td>${it.priority}</td>
       <td style="color:var(--red)">${it.sla_percent}% consumido (Vence: ${formatDate(it.due_at)})</td>
     </tr>
-  `).join('') || '<tr><td colspan="5" class="muted" style="text-align:center">🎉 Ningún asunto atrasado</td></tr>';
+  `).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">🎉 Ningún asunto atrasado</td></tr>';
+
+  // 4. Clientes
+  renderClients(list);
+}
+
+function renderClients(list) {
+  const clientsMap = {};
+  list.forEach(it => {
+    const name = it.client_name || 'Sin Especificar';
+    if (!clientsMap[name]) {
+      clientsMap[name] = { total: 0, open: 0, overdue: 0, closed: 0 };
+    }
+    clientsMap[name].total++;
+    if (it.status === 'cerrado') {
+      clientsMap[name].closed++;
+    } else {
+      clientsMap[name].open++;
+      if (it.is_overdue || it.semaphore === 'rojo') {
+        clientsMap[name].overdue++;
+      }
+    }
+  });
+
+  const tbody = document.querySelector('#tblClients tbody');
+  const keys = Object.keys(clientsMap);
+  if (!keys.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">Sin datos de clientes.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = keys.map(k => {
+    const c = clientsMap[k];
+    const slaCompliance = c.total > 0 ? Math.round(((c.total - c.overdue) / c.total) * 100) : 100;
+    return `
+      <tr>
+        <td><b>${k}</b></td>
+        <td><span class="badge" style="background:rgba(79,140,255,.2);color:var(--accent)">${c.open}</span></td>
+        <td><span class="badge" style="background:rgba(255,93,93,.2);color:var(--red)">${c.overdue}</span></td>
+        <td><span class="badge" style="background:rgba(46,204,113,.2);color:var(--green)">${c.closed}</span></td>
+        <td><b>${slaCompliance}%</b></td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function renderKanban(list) {
@@ -504,7 +763,7 @@ function openModal(id) {
     <div style="margin-bottom:10px">
       <span class="badge src-${it.source}">${it.source}</span> #${it.external_id} · <span class="sem ${it.semaphore}"></span>
     </div>
-    <h2>${it.title}</h2>
+    <h2 style="font-size:18px;line-height:1.3;margin-bottom:8px">${it.title}</h2>
     <dl>
       <dt>Estado:</dt><dd>${it.status_origin || it.status}</dd>
       <dt>Responsable:</dt><dd><b>${it.assignee_name || 'Sin asignar'}</b></dd>
@@ -529,22 +788,37 @@ async function forceSync() {
     await fetch(`${API_URL}/sync`, { method: 'POST' });
     await loadData();
     btn.textContent = '✅ Sincronizado';
-    setTimeout(() => btn.textContent = '🔄 Sincronizar Ahora', 2000);
+    setTimeout(() => btn.innerHTML = '🔄 <span class="btn-text">Sincronizar</span>', 2000);
   } catch (e) {
     btn.textContent = '❌ Error Sync';
   }
 }
 
-// Colapsar / Abrir Menú Lateral
+// Colapsar / Abrir Menú Lateral Responsive
 function toggleSidebar() {
+  const isMobile = window.innerWidth <= 768;
   const sb = document.getElementById('sidebar');
-  const isCollapsed = sb.classList.toggle('collapsed');
-  const btn = document.getElementById('btnToggleSidebar');
-  if (btn) btn.textContent = isCollapsed ? '▶' : '◀';
-  localStorage.setItem('sidebar_collapsed', isCollapsed ? '1' : '0');
+  const backdrop = document.getElementById('sidebarBackdrop');
+
+  if (isMobile) {
+    const isOpen = sb.classList.toggle('mobile-open');
+    if (backdrop) backdrop.classList.toggle('show', isOpen);
+  } else {
+    const isCollapsed = sb.classList.toggle('collapsed');
+    const btn = document.getElementById('btnToggleSidebar');
+    if (btn) btn.textContent = isCollapsed ? '▶' : '◀';
+    localStorage.setItem('sidebar_collapsed', isCollapsed ? '1' : '0');
+  }
 }
 
-if (localStorage.getItem('sidebar_collapsed') === '1') {
+function closeSidebarMobile() {
+  const sb = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (sb) sb.classList.remove('mobile-open');
+  if (backdrop) backdrop.classList.remove('show');
+}
+
+if (localStorage.getItem('sidebar_collapsed') === '1' && window.innerWidth > 768) {
   document.getElementById('sidebar')?.classList.add('collapsed');
   const btn = document.getElementById('btnToggleSidebar');
   if (btn) btn.textContent = '▶';
@@ -560,6 +834,9 @@ document.querySelectorAll('.nav').forEach(n => {
     document.getElementById(`v-${viewName}`).classList.add('active');
     const label = n.querySelector('.label')?.textContent || n.textContent.trim();
     document.getElementById('viewTitle').textContent = label;
+    if (window.innerWidth <= 768) {
+      closeSidebarMobile();
+    }
   };
 });
 
@@ -575,7 +852,8 @@ document.getElementById('modalBg').onclick = (e) => {
 
 // Reloj
 setInterval(() => {
-  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+  const clk = document.getElementById('clock');
+  if (clk) clk.textContent = new Date().toLocaleTimeString();
 }, 1000);
 
 // ==========================================
@@ -589,21 +867,27 @@ const TV_SLIDE_DURATION = 18;
 let TV_IS_PAUSED = false;
 
 const TV_SPECIALISTS = [
+  { name: "Richard Bravo", tag: "Jefatura", key: "bravo" },
+  { name: "Adonis Lozada", tag: "@adonislozada", key: "adonis", isCoord: true },
   { name: "Juan Fernández", tag: "@Juuan8", key: "juan" },
   { name: "Yoxaide Jiménez", tag: "@Yjimenezg", key: "yoxaide" },
-  { name: "Luis Acosta", tag: "@lapsy0", key: "luis" },
-  { name: "Adonis Lozada", tag: "@adonislozada", key: "adonis", isCoord: true }
+  { name: "Luis Acosta", tag: "@lapsy0", key: "luis" }
 ];
 
 function getTvSlides() {
-  return [
+  const slides = [
     { type: 'resumen', title: '📊 Panorama General del Equipo', sub: 'Indicadores globales y casos prioritarios en curso' },
-    { type: 'unassigned', title: '⚠️ Asuntos Sin Asignar', sub: '¡Disponibles para asignación inmediata del equipo!' },
-    { type: 'specialist', spec: TV_SPECIALISTS[0], title: '👤 Especialista: Juan Fernández', sub: 'Tareas y tickets asignados (@Juuan8)' },
-    { type: 'specialist', spec: TV_SPECIALISTS[1], title: '👤 Especialista: Yoxaide Jiménez', sub: 'Tareas y tickets asignados (@Yjimenezg)' },
-    { type: 'specialist', spec: TV_SPECIALISTS[2], title: '👤 Especialista: Luis Acosta', sub: 'Tareas y tickets asignados (@lapsy0)' },
-    { type: 'specialist', spec: TV_SPECIALISTS[3], title: '👤 Coordinación: Adonis Lozada', sub: 'Casos y seguimiento de coordinación (@adonislozada)' }
+    { type: 'unassigned', title: '⚠️ Asuntos Sin Asignar', sub: '¡Disponibles para asignación inmediata del equipo!' }
   ];
+  TV_SPECIALISTS.forEach(spec => {
+    slides.push({
+      type: 'specialist',
+      spec: spec,
+      title: `${spec.isCoord ? '👤 Coordinación' : (spec.key === 'bravo' ? '👤 Jefatura' : '👤 Especialista')}: ${spec.name}`,
+      sub: `Tareas y tickets asignados (${spec.tag})`
+    });
+  });
+  return slides;
 }
 
 function toggleTvMode() {
@@ -786,7 +1070,7 @@ function renderTvSlide() {
           <div class="num" style="color:var(--red)">${vencidos}</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
         <h3 style="font-size:16px">Actividades de ${spec.name} <span class="muted" style="font-weight:400">(${spec.tag})</span></h3>
         <span class="badge" style="background:#1e2731;color:#fff">${items.length} tarea(s)</span>
       </div>
@@ -836,4 +1120,3 @@ setInterval(loadData, 30000);
 
 </body>
 </html>
-
