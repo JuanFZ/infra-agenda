@@ -131,6 +131,7 @@ body.light aside{
   box-shadow:4px 0 20px rgba(31, 38, 135, 0.05);
 }
 aside.collapsed{width:68px;padding:20px 8px}
+aside.collapsed .brand{flex-direction:column;align-items:center;justify-content:center;gap:10px}
 .brand{font-weight:700;font-size:15px;margin-bottom:20px;display:flex;align-items:center;gap:10px;position:relative}
 .brand .logo-sycom{height:36px;width:36px;object-fit:contain;border-radius:9px;background:#ffffff;padding:3px;box-shadow:0 3px 10px rgba(0,0,0,.25);transition:all .2s ease;flex-shrink:0}
 aside.collapsed .brand .logo-sycom{width:36px;height:36px;padding:3px;margin:0 auto}
@@ -154,7 +155,7 @@ aside.collapsed .brand-text{display:none}
   transition:all .15s;
 }
 .btn-toggle-side:hover{color:var(--text);border-color:var(--accent);background:rgba(79,140,255,.18)}
-aside.collapsed .btn-toggle-side{margin:8px auto 0 auto}
+aside.collapsed .btn-toggle-side{margin:0 auto}
 .brand small{display:block;font-weight:400;color:var(--muted);font-size:11px;margin-top:2px}
 
 .nav{
