@@ -2230,7 +2230,6 @@
       try {
         const resKpi = await fetch(`${API_URL}/kpis`);
         const kpis = await resKpi.json();
-        renderKPIs(kpis);
         document.getElementById('apiStatus').textContent = 'API Conectada';
         document.getElementById('syncTime').textContent = kpis.last_sync ? `Última sync: ${formatDate(kpis.last_sync, true)}` : 'Sync: OK';
 
@@ -2293,23 +2292,13 @@
       renderAll();
     }
 
-    function filterItems() {
+    function getBaseFilteredItems() {
       const src = document.getElementById('fSrc').value;
       const prio = document.getElementById('fPrio').value;
       const resp = document.getElementById('fResp').value.toLowerCase();
       const q = document.getElementById('fSearch').value.toLowerCase().trim();
 
-      const hasFilter = src || prio || resp || q || ACTIVE_KPI_FILTER;
-      const btnReset = document.getElementById('btnResetFilters');
-      if (btnReset) btnReset.style.display = hasFilter ? 'inline-flex' : 'none';
-
       return ALL_ITEMS.filter(it => {
-        if (ACTIVE_KPI_FILTER === 'pendiente' && it.status !== 'pendiente') return false;
-        if (ACTIVE_KPI_FILTER === 'curso' && it.status !== 'curso') return false;
-        if (ACTIVE_KPI_FILTER === 'espera' && it.status !== 'espera') return false;
-        if (ACTIVE_KPI_FILTER === 'atrasados' && !(it.is_overdue || it.semaphore === 'rojo')) return false;
-        if (ACTIVE_KPI_FILTER === 'cumplimiento' && (it.is_overdue || it.semaphore === 'rojo')) return false;
-
         if (src && it.source !== src) return false;
         if (prio && it.priority !== prio) return false;
         if (resp) {
@@ -2325,7 +2314,50 @@
       });
     }
 
+    function computeKpisFromItems(items) {
+      const pendientes = items.filter(i => i.status === 'pendiente').length;
+      const en_curso = items.filter(i => i.status === 'curso').length;
+      const en_espera = items.filter(i => i.status === 'espera').length;
+      const atrasados = items.filter(i => i.is_overdue || i.semaphore === 'rojo').length;
+      const cerrados = items.filter(i => i.status === 'cerrado');
+      let cumplimiento_sla = 100.0;
+      if (cerrados.length > 0) {
+        const dentro_sla = cerrados.filter(i => !i.is_overdue && i.semaphore !== 'rojo').length;
+        cumplimiento_sla = Math.round((dentro_sla / cerrados.length) * 1000) / 10;
+      }
+      return {
+        pendientes,
+        en_curso,
+        en_espera,
+        atrasados,
+        cumplimiento_sla,
+        total_registrados: items.length
+      };
+    }
+
+    function filterItems() {
+      const baseItems = getBaseFilteredItems();
+      const hasFilter = document.getElementById('fSrc').value || document.getElementById('fPrio').value || document.getElementById('fResp').value || document.getElementById('fSearch').value || ACTIVE_KPI_FILTER;
+      const btnReset = document.getElementById('btnResetFilters');
+      if (btnReset) btnReset.style.display = hasFilter ? 'inline-flex' : 'none';
+
+      if (!ACTIVE_KPI_FILTER) return baseItems;
+
+      return baseItems.filter(it => {
+        if (ACTIVE_KPI_FILTER === 'pendiente' && it.status !== 'pendiente') return false;
+        if (ACTIVE_KPI_FILTER === 'curso' && it.status !== 'curso') return false;
+        if (ACTIVE_KPI_FILTER === 'espera' && it.status !== 'espera') return false;
+        if (ACTIVE_KPI_FILTER === 'atrasados' && !(it.is_overdue || it.semaphore === 'rojo')) return false;
+        if (ACTIVE_KPI_FILTER === 'cumplimiento' && (it.is_overdue || it.semaphore === 'rojo')) return false;
+        return true;
+      });
+    }
+
     function renderAll() {
+      const baseItems = getBaseFilteredItems();
+      const dynamicKpis = computeKpisFromItems(baseItems);
+      renderKPIs(dynamicKpis);
+
       const list = filterItems();
       document.getElementById('totalItemsCount').textContent = list.length;
 
