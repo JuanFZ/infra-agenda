@@ -564,10 +564,35 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db),
     }
 
 @app.post("/api/items/{item_id}/status")
-def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
+def update_item_status(
+    item_id: int, 
+    req: StatusUpdateRequest, 
+    db: Session = Depends(get_db), 
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name")
+):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item no encontrado")
+
+    role = (x_user_role or "").strip().lower()
+    if role == "coordinador":
+        pass  # Coordinador tiene autorización total sobre cualquier actividad
+    elif role == "especialista":
+        # Especialista solo puede cambiar de estado sus propias actividades asignadas
+        user_name_clean = (x_user_name or "").strip().lower()
+        first_name = user_name_clean.split()[0] if user_name_clean else ""
+        assignee_clean = (item.assignee_name or "").lower()
+        if not user_name_clean or (user_name_clean not in assignee_clean and first_name not in assignee_clean):
+            raise HTTPException(
+                status_code=403,
+                detail="Permiso denegado: Como Especialista, solo puedes actualizar el estado de tus propias actividades asignadas."
+            )
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="Permiso denegado: El rol Analista tiene permisos exclusivos de consulta y análisis."
+        )
 
     new_st = req.status.lower().strip()
     if new_st not in ["pendiente", "curso", "espera", "cerrado"]:
@@ -632,6 +657,7 @@ def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Dep
         safe_status_orig = html.escape(item.status_origin or "")
         safe_assignee = html.escape(item.assignee_name or "Sin asignar")
         now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
+        user_info = f" por {html.escape(x_user_name)}" if x_user_name else ""
         msg = (
             f"📋 <b>Cambio de estado en Tablero Kanban</b>\n\n"
             f"📌 <b>Asunto:</b> {safe_title}\n"
@@ -639,7 +665,7 @@ def update_item_status(item_id: int, req: StatusUpdateRequest, db: Session = Dep
             f"📊 <b>Nuevo estado:</b> {status_labels.get(new_st, new_st)} ({safe_status_orig})\n"
             f"👤 <b>Responsable:</b> {safe_assignee}\n"
             f"🕒 <b>Hora:</b> {now_str}\n"
-            f"⚡ <i>Actualizado arrastrando desde el Kanban</i>"
+            f"⚡ <i>Actualizado{user_info} desde la Agenda</i>"
         )
         send_telegram_message(msg, parse_mode="HTML")
     except Exception as e:

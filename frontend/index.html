@@ -1554,9 +1554,19 @@
     }
 
     @keyframes pulseHighlight {
-      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.85); border-color: #10b981 !important; }
-      50% { box-shadow: 0 0 24px 6px rgba(16, 185, 129, 0.5); border-color: #34d399 !important; }
-      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+      0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.85);
+        border-color: #10b981 !important;
+      }
+
+      50% {
+        box-shadow: 0 0 24px 6px rgba(16, 185, 129, 0.5);
+        border-color: #34d399 !important;
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+      }
     }
 
     .highlight-new {
@@ -1801,12 +1811,19 @@
       align-items: center;
       justify-content: center;
       padding: 20px;
-      animation: fadeInOverlay .3s cubic-bezier(.16,1,.3,1);
+      animation: fadeInOverlay .3s cubic-bezier(.16, 1, .3, 1);
     }
 
     @keyframes fadeInOverlay {
-      from { opacity: 0; transform: scale(.98); }
-      to { opacity: 1; transform: scale(1); }
+      from {
+        opacity: 0;
+        transform: scale(.98);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
     }
 
     .login-card {
@@ -1907,7 +1924,8 @@
       width: 100%;
     }
 
-    .quick-user-btn:hover, .quick-user-btn.active {
+    .quick-user-btn:hover,
+    .quick-user-btn.active {
       background: rgba(79, 140, 255, 0.14);
       border-color: rgba(79, 140, 255, 0.4);
       transform: translateX(3px);
@@ -1918,7 +1936,8 @@
       border-color: rgba(0, 0, 0, 0.07);
     }
 
-    body.light .quick-user-btn:hover, body.light .quick-user-btn.active {
+    body.light .quick-user-btn:hover,
+    body.light .quick-user-btn.active {
       background: rgba(79, 140, 255, 0.08);
       border-color: rgba(79, 140, 255, 0.4);
     }
@@ -1936,9 +1955,17 @@
       flex-shrink: 0;
     }
 
-    .qu-avatar.coord { background: linear-gradient(135deg, #10b981, #059669); }
-    .qu-avatar.spec { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-    .qu-avatar.anal { background: linear-gradient(135deg, #a855f7, #7e22ce); }
+    .qu-avatar.coord {
+      background: linear-gradient(135deg, #10b981, #059669);
+    }
+
+    .qu-avatar.spec {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    }
+
+    .qu-avatar.anal {
+      background: linear-gradient(135deg, #a855f7, #7e22ce);
+    }
 
     .qu-info {
       display: flex;
@@ -2139,8 +2166,12 @@
       <!-- Selector rápido de usuario -->
       <div class="login-quick-users">
         <div class="login-quick-label">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
           </svg>
           <span>Selecciona tu usuario:</span>
         </div>
@@ -2190,9 +2221,13 @@
         <div class="form-group" style="margin-bottom:12px">
           <label class="form-label" for="loginUser">Usuario o Correo Institucional:</label>
           <div style="position:relative">
-            <input type="text" id="loginUser" class="form-input" placeholder="ej: a.lozada o a.lozada@sycom.com.ve" required autocomplete="username" style="padding-left:36px">
-            <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            <input type="text" id="loginUser" class="form-input" placeholder="ej: a.lozada o a.lozada@sycom.com.ve"
+              required autocomplete="username" style="padding-left:36px">
+            <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)"
+              viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
             </svg>
           </div>
         </div>
@@ -2200,21 +2235,33 @@
         <div class="form-group" style="margin-bottom:18px">
           <label class="form-label" for="loginPass">Contraseña:</label>
           <div style="position:relative">
-            <input type="password" id="loginPass" class="form-input" placeholder="Ingresa tu contraseña..." required autocomplete="current-password" style="padding-left:36px;padding-right:38px">
-            <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            <input type="password" id="loginPass" class="form-input" placeholder="Ingresa tu contraseña..." required
+              autocomplete="current-password" style="padding-left:36px;padding-right:38px">
+            <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)"
+              viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
-            <button type="button" onclick="togglePasswordVisibility()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px" title="Mostrar/ocultar contraseña">
-              <svg id="eyeIcon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            <button type="button" onclick="togglePasswordVisibility()"
+              style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px"
+              title="Mostrar/ocultar contraseña">
+              <svg id="eyeIcon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
               </svg>
             </button>
           </div>
         </div>
 
-        <button type="submit" class="btn primary" id="btnLoginSubmit" style="width:100%;padding:11px;font-size:14px;font-weight:700;justify-content:center">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+        <button type="submit" class="btn primary" id="btnLoginSubmit"
+          style="width:100%;padding:11px;font-size:14px;font-weight:700;justify-content:center">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+            <polyline points="10 17 15 12 10 7" />
+            <line x1="15" y1="12" x2="3" y2="12" />
           </svg>
           <span id="btnLoginText">Iniciar Sesión</span>
         </button>
@@ -2222,8 +2269,10 @@
 
       <div class="login-footer">
         <button type="button" class="btn-guest-tv" onclick="enterGuestTvMode()">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
+            <polyline points="17 2 12 7 7 2" />
           </svg>
           <span>Acceder en Modo TV Público (Informativo)</span>
         </button>
@@ -2232,7 +2281,9 @@
   </div>
 
   <!-- Notificaciones Toast flotantes -->
-  <div id="toastContainer" style="position:fixed;top:24px;right:24px;z-index:999999;display:flex;flex-direction:column;gap:10px;pointer-events:none"></div>
+  <div id="toastContainer"
+    style="position:fixed;top:24px;right:24px;z-index:999999;display:flex;flex-direction:column;gap:10px;pointer-events:none">
+  </div>
 
   <aside id="sidebar">
     <div class="brand">
@@ -2292,8 +2343,11 @@
         </div>
       </div>
       <button class="btn-logout" onclick="handleLogout()" title="Cerrar Sesión">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
         </svg>
         <span class="logout-text">Salir</span>
       </button>
@@ -2444,9 +2498,13 @@
         style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
         <div>
           <h3 style="font-size:16px;margin:0">Tablero Kanban (Flujo de Trabajo)</h3>
-          <span class="muted" id="kanbanSubText" style="font-size:12px">Arrastra actividades entre columnas para sincronizar su estado</span>
+          <span class="muted" style="font-size:12px">Arrastra actividades entre columnas para sincronizar su
+            estado</span>
+          <span class="muted" id="kanbanSubText" style="font-size:12px">Arrastra actividades entre columnas para
+            sincronizar su estado</span>
         </div>
-        <button class="btn" id="btnKanbanNewActivity" onclick="openCreateModal()"
+        <button class="btn" onclick="openCreateModal()" <button class="btn" id="btnKanbanNewActivity"
+          onclick="openCreateModal()"
           style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700"
           title="Crear nueva actividad">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -2602,10 +2660,25 @@
 
     function getAuthHeaders() {
       const headers = { 'Content-Type': 'application/json' };
-      if (CURRENT_USER && CURRENT_USER.role) {
-        headers['X-User-Role'] = CURRENT_USER.role;
+      if (CURRENT_USER) {
+        if (CURRENT_USER.role) headers['X-User-Role'] = CURRENT_USER.role;
+        if (CURRENT_USER.full_name) headers['X-User-Name'] = CURRENT_USER.full_name;
+        else if (CURRENT_USER.username) headers['X-User-Name'] = CURRENT_USER.username;
       }
       return headers;
+    }
+
+    function canUserEditItem(it) {
+      if (!CURRENT_USER) return false;
+      if (isCoordinator()) return true;
+      if (isSpecialist()) {
+        if (!it || !it.assignee_name) return false;
+        const curName = (CURRENT_USER.full_name || CURRENT_USER.username || '').toLowerCase();
+        const curFirst = curName.split(' ')[0];
+        const assignees = it.assignee_name.toLowerCase();
+        return (curFirst && assignees.includes(curFirst)) || assignees.includes(curName);
+      }
+      return false; // Analista u otros son modo consulta 100%
     }
 
     function showToast(title, message = '', type = 'success', duration = 4500) {
@@ -2866,9 +2939,9 @@
             ? `<span style="font-weight:600;opacity:.85">${it.assignee_name || 'Sin asignar'}</span>`
             : (it.assignee_name && !it.assignee_name.toLowerCase().includes('sin asignar')
               ? `<div style="display:inline-flex;align-items:center;gap:6px;cursor:${isCoordinator() ? 'pointer' : 'default'}" ${isCoordinator() ? `onclick="event.stopPropagation();openModal(${it.id})" title="Click para reasignar o sumar especialistas"` : ''}>
-                     <span style="font-weight:600">${it.assignee_name}</span>
-                     ${isCoordinator() ? `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5;color:var(--accent)"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>` : ''}
-                   </div>`
+                   <span style="font-weight:600">${it.assignee_name}</span>
+                   ${isCoordinator() ? `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5;color:var(--accent)"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>` : ''}
+                 </div>`
               : (isCoordinator()
                   ? `<button type="button" class="badge" style="background:rgba(243,156,18,.15);color:#f39c12;border:1px solid rgba(243,156,18,.35);cursor:pointer;padding:3px 8px;font-weight:600;border-radius:6px;font-size:11px;transition:all .15s" onclick="event.stopPropagation();openModal(${it.id})" title="Click para asignar responsable">+ Asignar</button>`
                   : `<span class="muted" style="font-size:11px">Sin asignar</span>`
@@ -2885,14 +2958,14 @@
         <td class="${it.is_overdue ? 'txt-red' : 'muted'}">${formatDate(it.due_at)}</td>
       </tr>
     `).join('');
-      }
+    }
 
-      // 2. Kanban
-      renderKanban(list);
+    // 2. Kanban
+    renderKanban(list);
 
-      // 3. Atrasados
-      const over = list.filter(i => i.is_overdue || i.semaphore === 'rojo');
-      document.querySelector('#tblOverdue tbody').innerHTML = over.map(it => `
+    // 3. Atrasados
+    const over = list.filter(i => i.is_overdue || i.semaphore === 'rojo');
+    document.querySelector('#tblOverdue tbody').innerHTML = over.map(it => `
     <tr class="click" onclick="openModal(${it.id})">
       <td><span class="sem rojo"></span></td>
       <td>${it.source} #${it.external_id}</td>
@@ -2905,12 +2978,12 @@
     </tr>
   `).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">Sin asuntos fuera de SLA.</td></tr>';
 
-      // 4. Clientes
-      renderClients(list);
+    // 4. Clientes
+    renderClients(list);
 
-      if (TV_MODE_ACTIVE) {
-        renderTvSlide();
-      }
+    if (TV_MODE_ACTIVE) {
+      renderTvSlide();
+    }
     }
 
     function renderClients(list) {
@@ -2957,8 +3030,10 @@
     let IS_DRAGGING = false;
 
     function handleDragStart(e, itemId) {
-      if (!isCoordinator()) {
+      const item = ALL_ITEMS.find(i => i.id === itemId);
+      if (!canUserEditItem(item)) {
         e.preventDefault();
+        showToast('Acción no permitida', isSpecialist() ? 'Solo puedes mover tus propias tareas asignadas.' : 'Modo solo lectura: solo el Coordinador puede mover estados.', 'error', 3500);
         return;
       }
       DRAGGED_ITEM_ID = itemId;
@@ -3011,16 +3086,18 @@
       e.preventDefault();
       e.currentTarget.classList.remove('drag-over');
 
-      if (!isCoordinator()) {
-        alert("Permiso denegado: Solo el rol Coordinador tiene permisos para mover actividades entre estados.");
-        return;
-      }
-
       const itemId = DRAGGED_ITEM_ID || parseInt(e.dataTransfer.getData('text/plain'));
       if (!itemId) return;
 
       const item = ALL_ITEMS.find(i => i.id === itemId);
       if (!item || item.status === targetStatus) return;
+
+      if (!canUserEditItem(item)) {
+        alert(isSpecialist()
+          ? "Permiso denegado: Como Especialista, solo puedes actualizar el estado de tus propias actividades asignadas."
+          : "Permiso denegado: El modo actual es solo de lectura. Solo el Coordinador puede mover tareas.");
+        return;
+      }
 
       // Validación: ClickUp no posee estado 'En espera'
       if (item.source === 'ClickUp' && targetStatus === 'espera') {
@@ -3071,10 +3148,12 @@
       document.getElementById('kanbanGrid').innerHTML = cols.map(c => {
         const colItems = list.filter(i => i.status === c.k);
         return `
-      <div class="col" data-col="${c.k}" ${isCoordinator() ? `ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')"` : ''}>
+      <div class="col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
         <h4>${c.title} <span class="muted" style="margin-left:auto">${colItems.length}</span></h4>
-        ${colItems.map(it => `
-          <div class="tcard ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-${it.id}" draggable="${isCoordinator() ? 'true' : 'false'}" ${isCoordinator() ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!isCoordinator() ? 'cursor:pointer;' : ''}">
+        ${colItems.map(it => {
+          const canDrag = canUserEditItem(it);
+          return `
+          <div class="tcard ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-${it.id}" draggable="${canDrag ? 'true' : 'false'}" ${canDrag ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!canDrag ? 'cursor:pointer;' : ''}">
             <div class="top">
               <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
               <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
@@ -3090,9 +3169,10 @@
               <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA</span>
             </div>
           </div>
-        `).join('') || `<div class="muted" style="font-size:12px;text-align:center;padding:24px;border:1px dashed rgba(255,255,255,.08);border-radius:8px;pointer-events:none">${isCoordinator() ? 'Arrastra actividades aquí' : 'Sin actividades en esta columna'}</div>`}
+        `;
+        }).join('') || `<div class="muted" style="font-size:12px;text-align:center;padding:24px;border:1px dashed rgba(255,255,255,.08);border-radius:8px;pointer-events:none">${isCoordinator() ? 'Arrastra actividades aquí' : 'Sin actividades en esta columna'}</div>`}
       </div>
-    `;
+      `;
       }).join('');
     }
 
@@ -3112,11 +3192,11 @@
       const diffSec = Math.floor((new Date() - d) / 1000);
       if (diffSec < 45) return 'hace un momento';
       const diffMin = Math.floor(diffSec / 60);
-      if (diffMin < 60) return `hace ${diffMin} min`;
+      if (diffMin < 60) return `hace ${ diffMin } min`;
       const diffHours = Math.floor(diffMin / 60);
-      if (diffHours < 24) return `hace ${diffHours}h ${diffMin % 60}m`;
+      if (diffHours < 24) return `hace ${ diffHours }h ${ diffMin % 60 } m`;
       const diffDays = Math.floor(diffHours / 24);
-      return `hace ${diffDays} d`;
+      return `hace ${ diffDays } d`;
     }
 
     function renderSelectedAssigneeChips(itemId) {
@@ -3139,9 +3219,9 @@
           <div class="chip-name">${spec.name}</div>
           <div class="chip-email">${spec.email}</div>
         </div>
-        ${!isClosed ? `<button type="button" class="chip-remove" onclick="removeAssigneeKey('${spec.key}', ${itemId})" title="Quitar">&times;</button>` : ''}
+        ${ !isClosed ? `<button type="button" class="chip-remove" onclick="removeAssigneeKey('${spec.key}', ${itemId})" title="Quitar">&times;</button>` : '' }
       </div>
-    `;
+      `;
       }).join('');
     }
 
@@ -3167,7 +3247,7 @@
       menu.innerHTML = matches.map(s => {
         const isSelected = MODAL_SELECTED_KEYS.includes(s.key);
         return `
-      <div class="dropdown-option ${isSelected ? 'selected' : ''}" onclick="selectAssigneeKey('${s.key}', ${itemId})">
+      <div class="dropdown-option ${isSelected ? 'selected' : ''}" onclick = "selectAssigneeKey('${s.key}', ${itemId})" >
         <div class="opt-avatar">${s.name.charAt(0)}</div>
         <div class="opt-details">
           <div style="display:flex;align-items:center;justify-content:space-between">
@@ -3176,9 +3256,9 @@
           </div>
           <span class="opt-email">${s.email}</span>
         </div>
-        ${isSelected ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#2ecc71;margin-left:6px"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+        ${ isSelected ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#2ecc71;margin-left:6px"><polyline points="20 6 9 17 4 12"/></svg>' : '' }
       </div>
-    `;
+      `;
       }).join('');
       menu.style.display = 'block';
     }
@@ -3231,7 +3311,7 @@
       const day = pad(d.getDate());
       const h = pad(d.getHours());
       const min = pad(d.getMinutes());
-      return `${y}-${m}-${day}T${h}:${min}`;
+      return `${ y } -${ m } -${ day }T${ h }:${ min } `;
     }
 
     function setCreateSource(src) {
@@ -3281,7 +3361,7 @@
         </div>
         <button type="button" class="chip-remove" onclick="removeCreateAssigneeKey('${spec.key}')" title="Quitar">&times;</button>
       </div>
-    `;
+      `;
       }).join('');
     }
 
@@ -3307,7 +3387,7 @@
       menu.innerHTML = matches.map(s => {
         const isSelected = CREATE_SELECTED_KEYS.includes(s.key);
         return `
-      <div class="dropdown-option ${isSelected ? 'selected' : ''}" onclick="toggleSelectCreateAssigneeKey('${s.key}')">
+      <div class="dropdown-option ${isSelected ? 'selected' : ''}" onclick = "toggleSelectCreateAssigneeKey('${s.key}')" >
         <div class="opt-avatar">${s.name.charAt(0)}</div>
         <div class="opt-details">
           <div style="display:flex;align-items:center;justify-content:space-between">
@@ -3316,9 +3396,9 @@
           </div>
           <span class="opt-email">${s.email}</span>
         </div>
-        ${isSelected ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#2ecc71;margin-left:6px"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+        ${ isSelected ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#2ecc71;margin-left:6px"><polyline points="20 6 9 17 4 12"/></svg>' : '' }
       </div>
-    `;
+      `;
       }).join('');
       menu.style.display = 'block';
     }
@@ -3377,9 +3457,9 @@
       btn.disabled = true;
       const origBtnContent = btn.innerHTML;
       btn.innerHTML = `
-    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
-    <span>Creando en ${source}...</span>
-  `;
+      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+        <span>Creando en ${source}...</span>
+    `;
 
       try {
         const payload = {
@@ -3396,58 +3476,58 @@
           headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
-        const data = await res.json();
+    const data = await res.json();
 
-        if (!res.ok) {
-          alert(`Error al crear la actividad: ${data.detail || 'Ocurrió un error en el servidor'}`);
-          btn.disabled = false;
-          btn.innerHTML = origBtnContent;
-          return;
-        }
+    if (!res.ok) {
+      alert(`Error al crear la actividad: ${data.detail || 'Ocurrió un error en el servidor'}`);
+      btn.disabled = false;
+      btn.innerHTML = origBtnContent;
+      return;
+    }
 
-        const createdItem = data.item;
-        closeModal();
+    const createdItem = data.item;
+    closeModal();
 
-        // 1. Limpiar filtros en vista principal para garantizar visibilidad inmediata
-        resetAllFilters();
+    // 1. Limpiar filtros en vista principal para garantizar visibilidad inmediata
+    resetAllFilters();
 
-        // 2. Si estamos en Modo TV, saltar al slide de Tablero Kanban
-        if (TV_MODE_ACTIVE) {
-          const slides = getTvSlides();
-          const kanbanIdx = slides.findIndex(s => s.type === 'kanban');
-          if (kanbanIdx !== -1) {
-            TV_CURRENT_SLIDE = kanbanIdx;
-          }
-        }
-
-        // 3. Resaltar visualmente la actividad recién creada
-        if (createdItem && createdItem.id) {
-          HIGHLIGHT_ITEM_ID = createdItem.id;
-          setTimeout(() => {
-            HIGHLIGHT_ITEM_ID = null;
-            if (TV_MODE_ACTIVE) renderTvSlide();
-            else renderAll();
-          }, 7000);
-        }
-
-        // 4. Recargar datos de la API
-        await loadData();
-
-        if (TV_MODE_ACTIVE) {
-          renderTvSlide();
-          startTvTimer();
-        }
-
-        // 5. Notificación Toast elegante
-        const itemTitle = createdItem ? createdItem.title : title;
-        const itemSrc = createdItem ? `${createdItem.source} #${createdItem.external_id}` : source;
-        showToast('¡Actividad creada con éxito!', `${itemSrc}: "${itemTitle}" agregada a Pendientes y sincronizada.`, 'success', 5000);
-      } catch (err) {
-        console.error('Error creando actividad:', err);
-        alert('Error de conexión al conectar con el servidor.');
-        btn.disabled = false;
-        btn.innerHTML = origBtnContent;
+    // 2. Si estamos en Modo TV, saltar al slide de Tablero Kanban
+    if (TV_MODE_ACTIVE) {
+      const slides = getTvSlides();
+      const kanbanIdx = slides.findIndex(s => s.type === 'kanban');
+      if (kanbanIdx !== -1) {
+        TV_CURRENT_SLIDE = kanbanIdx;
       }
+    }
+
+    // 3. Resaltar visualmente la actividad recién creada
+    if (createdItem && createdItem.id) {
+      HIGHLIGHT_ITEM_ID = createdItem.id;
+      setTimeout(() => {
+        HIGHLIGHT_ITEM_ID = null;
+        if (TV_MODE_ACTIVE) renderTvSlide();
+        else renderAll();
+      }, 7000);
+    }
+
+    // 4. Recargar datos de la API
+    await loadData();
+
+    if (TV_MODE_ACTIVE) {
+      renderTvSlide();
+      startTvTimer();
+    }
+
+    // 5. Notificación Toast elegante
+    const itemTitle = createdItem ? createdItem.title : title;
+    const itemSrc = createdItem ? `${createdItem.source} #${createdItem.external_id}` : source;
+    showToast('¡Actividad creada con éxito!', `${itemSrc}: "${itemTitle}" agregada a Pendientes y sincronizada.`, 'success', 5000);
+      } catch (err) {
+      console.error('Error creando actividad:', err);
+      alert('Error de conexión al conectar con el servidor.');
+      btn.disabled = false;
+      btn.innerHTML = origBtnContent;
+    }
     }
 
     function openCreateModal() {
@@ -3605,7 +3685,7 @@
       <dd>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <b>${it.status_origin || it.status}</b>
-          ${isCoordinator() ? `
+          ${(isCoordinator() || canUserEditItem(it)) ? `
           <div style="display:inline-flex;align-items:center;gap:6px;margin-left:auto">
             <select onchange="changeStatusFromModal(${it.id}, this.value)" style="background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:11.5px;outline:none;cursor:pointer">
               <option value="pendiente" ${it.status === 'pendiente' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: Pendiente ${it.source === 'ClickUp' ? '(TO DO)' : '(Nuevo)'}</option>
@@ -3660,10 +3740,10 @@
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 <span>
                   ${it.assigned_at
-          ? `Agregado a la actividad: <b style="color:var(--text)">${formatDate(it.assigned_at, true)}</b> <span style="color:var(--accent)">(${getTimeAgo(it.assigned_at)})</span>`
-          : (it.assignee_name && !it.assignee_name.toLowerCase().includes('sin asignar')
-            ? `Agregado en registro inicial: <b style="color:var(--text)">${formatDate(it.created_at, true)}</b>`
-            : `Disponible para asignación`)}
+            ? `Agregado a la actividad: <b style="color:var(--text)">${formatDate(it.assigned_at, true)}</b> <span style="color:var(--accent)">(${getTimeAgo(it.assigned_at)})</span>`
+            : (it.assignee_name && !it.assignee_name.toLowerCase().includes('sin asignar')
+              ? `Agregado en registro inicial: <b style="color:var(--text)">${formatDate(it.created_at, true)}</b>`
+              : `Disponible para asignación`)}
                 </span>
               </div>
               <button class="btn primary" id="btnModalAssign" onclick="saveAssignmentFromModal(${it.id})" style="padding:6px 14px;font-size:12px">
@@ -3793,12 +3873,16 @@
     }
 
     async function changeStatusFromModal(itemId, newStatus) {
-      if (!isCoordinator()) {
-        alert('Permiso denegado: Solo el rol Coordinador puede cambiar el estado.');
-        return;
-      }
       const item = ALL_ITEMS.find(i => i.id === itemId);
       if (!item || item.status === newStatus) return;
+
+      if (!canUserEditItem(item)) {
+        alert(isSpecialist()
+          ? 'Permiso denegado: Como Especialista, solo puedes cambiar el estado de tus propias actividades asignadas.'
+          : 'Permiso denegado: Solo el Coordinador puede cambiar estados de actividades.');
+        return;
+      }
+
       const oldStatus = item.status;
       item.status = newStatus;
       try {
@@ -4119,7 +4203,7 @@
         ${cols.map(c => {
           const colItems = ALL_ITEMS.filter(i => i.status === c.k);
           return `
-            <div class="tv-kanban-col" data-col="${c.k}" ${isCoordinator() ? `ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')"` : ''}>
+            <div class="tv-kanban-col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
               <div class="tv-kanban-col-header" style="border-top:3px solid ${c.color}">
                 <div style="display:flex;align-items:center;gap:8px">
                   <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color}"></span>
@@ -4136,8 +4220,10 @@
                 </div>
               </div>
               <div class="tv-kanban-cards">
-                ${colItems.map(it => `
-                  <div class="tv-kanban-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-tv-${it.id}" draggable="${isCoordinator() ? 'true' : 'false'}" ${isCoordinator() ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!isCoordinator() ? 'cursor:pointer;' : ''}">
+                ${colItems.map(it => {
+                  const canDrag = canUserEditItem(it);
+                  return `
+                  <div class="tv-kanban-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-tv-${it.id}" draggable="${canDrag ? 'true' : 'false'}" ${canDrag ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!canDrag ? 'cursor:pointer;' : ''}">
                     <div style="display:flex;align-items:center;gap:6px;font-size:11px">
                       <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
                       <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
@@ -4152,7 +4238,8 @@
                       <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? '· ' + getItemSlaRemaining(it) : ''}</span>
                     </div>
                   </div>
-                `).join('') || '<div class="muted" style="padding:24px 10px;text-align:center;font-size:12px;border:1px dashed rgba(255,255,255,.08);border-radius:8px">Sin actividades en esta columna</div>'}
+                `;
+                }).join('') || '<div class="muted" style="padding:24px 10px;text-align:center;font-size:12px;border:1px dashed rgba(255,255,255,.08);border-radius:8px">Sin actividades en esta columna</div>'}
               </div>
             </div>
           `;
@@ -4271,6 +4358,7 @@
                   ${isCoordinator() ? `
                   <button type="button" onclick="openModal(${it.id})" class="tv-action-btn" style="cursor:pointer;padding:4px 8px;font-size:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)" title="Reasignar o sumar especialistas">
                     <span>Reasignar</span>
+                  </button>
                   </button>` : ''}
                   <a href="${it.url}" target="_blank" class="tv-action-btn" style="padding:4px 8px;font-size:11px">
                     <span>Abrir</span>
@@ -4408,6 +4496,8 @@
 
       const role = (CURRENT_USER.role || '').toLowerCase();
       const isCoord = role === 'coordinador';
+      const isSpec = role === 'especialista';
+      const isAnal = role === 'analista';
       const roleName = formatRoleName(role);
 
       // 1. Sidebar user widget
@@ -4417,17 +4507,17 @@
 
       if (av) {
         av.textContent = (CURRENT_USER.full_name || 'U').charAt(0).toUpperCase();
-        av.style.background = isCoord 
+        av.style.background = isCoord
           ? 'linear-gradient(135deg, #10b981, #059669)'
-          : (role === 'analista' ? 'linear-gradient(135deg, #a855f7, #7e22ce)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)');
+          : (isAnal ? 'linear-gradient(135deg, #a855f7, #7e22ce)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)');
       }
       if (uName) uName.textContent = CURRENT_USER.full_name || CURRENT_USER.username;
       if (uRole) {
         uRole.textContent = roleName;
-        uRole.style.color = isCoord ? '#34d399' : (role === 'analista' ? '#c084fc' : '#60a5fa');
+        uRole.style.color = isCoord ? '#34d399' : (isAnal ? '#c084fc' : '#60a5fa');
       }
 
-      // 2. Botón Crear Actividad en cabecera principal
+      // 2. Botón Crear Actividad en cabecera principal y Role Badge
       const btnHeadCreate = document.getElementById('btnNewActivityHeader');
       const rolePill = document.getElementById('roleBadgeHeader');
       if (btnHeadCreate) {
@@ -4436,12 +4526,20 @@
       if (rolePill) {
         if (isCoord) {
           rolePill.style.display = 'none';
+        } else if (isSpec) {
+          rolePill.style.display = 'inline-flex';
+          rolePill.innerHTML = `
+            <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(59,130,246,0.14);border:1px solid rgba(59,130,246,0.35);border-radius:20px;font-size:12px;color:#93c5fd;font-weight:600">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span>Especialista · ${CURRENT_USER.full_name || CURRENT_USER.username}</span>
+            </div>
+          `;
         } else {
           rolePill.style.display = 'inline-flex';
           rolePill.innerHTML = `
-            <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(79,140,255,0.12);border:1px solid rgba(79,140,255,0.3);border-radius:20px;font-size:12px;color:#93c5fd;font-weight:600">
+            <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(168,85,247,0.14);border:1px solid rgba(168,85,247,0.35);border-radius:20px;font-size:12px;color:#d8b4fe;font-weight:600">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              <span>Modo Informativo · ${roleName}</span>
+              <span>Modo Lectura / Métricas · Analista</span>
             </div>
           `;
         }
@@ -4454,9 +4552,13 @@
         btnKanbanCreate.style.display = isCoord ? 'inline-flex' : 'none';
       }
       if (kanbanSub) {
-        kanbanSub.textContent = isCoord 
-          ? 'Arrastra actividades entre columnas para sincronizar su estado'
-          : `Modo Informativo (${roleName}) · Solo el Coordinador puede mover estados o reasignar`;
+        if (isCoord) {
+          kanbanSub.textContent = 'Arrastra actividades entre columnas para sincronizar su estado';
+        } else if (isSpec) {
+          kanbanSub.textContent = `Modo Especialista (${CURRENT_USER.full_name || CURRENT_USER.username}) · Puedes arrastrar y actualizar tus propias tareas asignadas`;
+        } else {
+          kanbanSub.textContent = `Modo Analista · Visualización global y análisis de métricas (solo lectura)`;
+        }
       }
 
       // 4. Botón Actividad en Modo TV
@@ -4465,7 +4567,31 @@
         btnTvAct.style.display = isCoord ? 'inline-flex' : 'none';
       }
 
-      // 5. Re-renderizar vistas si los items ya cargaron
+      // 5. Pre-filtro automático según rol
+      const respSelect = document.getElementById('fResp');
+      if (respSelect) {
+        if (isSpec) {
+          // Pre-filtrar por el especialista logueado
+          const uFull = (CURRENT_USER.full_name || '').toLowerCase();
+          const uFirst = uFull.split(' ')[0] || (CURRENT_USER.username || '').toLowerCase();
+          for (let opt of respSelect.options) {
+            const optVal = opt.value.toLowerCase();
+            if (optVal && (optVal.includes(uFirst) || uFull.includes(optVal))) {
+              respSelect.value = opt.value;
+              break;
+            }
+          }
+        } else if (isAnal) {
+          // Analista ve todo el equipo por defecto
+          respSelect.value = '';
+          const curNav = document.querySelector('.nav.active')?.dataset?.view;
+          if (curNav && curNav !== 'resumen') {
+            document.querySelector('.nav[data-view="resumen"]')?.click();
+          }
+        }
+      }
+
+      // 6. Re-renderizar vistas si los items ya cargaron
       if (ALL_ITEMS && ALL_ITEMS.length) {
         renderAll();
         if (TV_MODE_ACTIVE) renderTvSlide();
