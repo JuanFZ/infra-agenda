@@ -544,33 +544,99 @@ body.light .modal{
 .modal dl{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;margin:16px 0;font-size:13px}
 .modal dt{color:var(--muted)}
 .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
-.spec-chk-label{
+.selected-chips-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.assignee-chip{
   display:inline-flex;
   align-items:center;
   gap:8px;
-  background:rgba(255,255,255,.04);
+  background:rgba(79, 140, 255, 0.12);
+  border:1px solid rgba(79, 140, 255, 0.35);
+  border-radius:20px;
+  padding:4px 10px 4px 6px;
+  font-size:11.5px;
+  color:var(--text);
+}
+body.light .assignee-chip{
+  background:rgba(79, 140, 255, 0.15);
+  border-color:rgba(79, 140, 255, 0.4);
+}
+.chip-avatar{
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  background:linear-gradient(135deg, #4f8cff, #3a6eeb);
+  color:#fff;
+  font-weight:700;
+  font-size:11px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.chip-info{display:flex;flex-direction:column;line-height:1.15}
+.chip-name{font-weight:600;font-size:11.5px}
+.chip-email{font-size:10px;color:var(--muted)}
+.chip-remove{
+  background:transparent;
+  border:none;
+  color:var(--muted);
+  cursor:pointer;
+  font-size:15px;
+  line-height:1;
+  padding:0 2px;
+  margin-left:3px;
+  transition:color .15s;
+}
+.chip-remove:hover{color:var(--red)}
+
+.assignee-dropdown-menu{
+  position:absolute;
+  top:calc(100% + 4px);
+  left:0;
+  right:0;
+  background:rgba(20, 28, 43, 0.98);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
   border:1px solid var(--border);
-  border-radius:8px;
-  padding:7px 10px;
+  border-radius:10px;
+  box-shadow:0 12px 36px rgba(0,0,0,.6);
+  max-height:220px;
+  overflow-y:auto;
+  z-index:120;
+}
+body.light .assignee-dropdown-menu{
+  background:rgba(255, 255, 255, 0.98);
+  box-shadow:0 10px 30px rgba(0,0,0,.15);
+}
+.dropdown-option{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 12px;
+  cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,.04);
+  transition:background .12s;
+}
+body.light .dropdown-option{border-bottom:1px solid rgba(0,0,0,.04)}
+.dropdown-option:last-child{border-bottom:none}
+.dropdown-option:hover{background:rgba(79, 140, 255, 0.16)}
+.dropdown-option.selected{opacity:0.5;background:rgba(255,255,255,.03)}
+.opt-avatar{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  background:linear-gradient(135deg, #4f8cff, #3a6eeb);
+  color:#fff;
+  font-weight:700;
   font-size:12px;
-  cursor:pointer;
-  transition:all .15s ease;
-  user-select:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
 }
-.spec-chk-label:hover{
-  background:rgba(79,140,255,.12);
-  border-color:rgba(79,140,255,.35);
-}
-.spec-chk-label input[type="checkbox"]{
-  accent-color:#4f8cff;
-  width:14px;
-  height:14px;
-  cursor:pointer;
-}
-body.light .spec-chk-label{
-  background:rgba(255,255,255,.75);
-  border-color:rgba(0,0,0,.08);
-}
+.opt-details{display:flex;flex-direction:column;flex:1;min-width:0}
+.opt-name{font-weight:600;font-size:12.5px}
+.opt-email{font-size:11px;color:var(--accent);font-family:monospace}
+.opt-role{font-size:10.5px;color:var(--muted)}
 
 /* MODO TV Glassmorphism Transparente */
 .tv-overlay {
@@ -1259,14 +1325,125 @@ function renderKanban(list) {
   }).join('');
 }
 
+const SYCOM_SPECIALISTS = [
+  { key: 'adonis', name: 'Adonis Lozada', email: 'a.lozada@sycom.com.ve', role: 'Coordinador Infra & BD' },
+  { key: 'juan', name: 'Juan Fernández', email: 'j.fernandez@sycom.com.ve', role: 'Especialista Infra & BD' },
+  { key: 'yoxaide', name: 'Yoxaide Jiménez', email: 'y.jimenez@sycom.com.ve', role: 'Especialista Infra & BD' },
+  { key: 'luis', name: 'Luis Acosta', email: 'l.acosta@sycom.com.ve', role: 'Especialista Infra & BD' }
+];
+
+let MODAL_SELECTED_KEYS = [];
+
+function getTimeAgo(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const diffSec = Math.floor((new Date() - d) / 1000);
+  if (diffSec < 45) return 'hace un momento';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `hace ${diffMin} min`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `hace ${diffHours}h ${diffMin % 60}m`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `hace ${diffDays} d`;
+}
+
+function renderSelectedAssigneeChips(itemId) {
+  const container = document.getElementById('selectedAssigneeChips');
+  if (!container) return;
+  if (!MODAL_SELECTED_KEYS.length) {
+    container.innerHTML = '<span class="muted" style="font-size:12px;font-style:italic">Sin responsables asignados actualmente.</span>';
+    return;
+  }
+  container.innerHTML = MODAL_SELECTED_KEYS.map(key => {
+    const spec = SYCOM_SPECIALISTS.find(s => s.key === key);
+    if (!spec) return '';
+    return `
+      <div class="assignee-chip">
+        <div class="chip-avatar">${spec.name.charAt(0)}</div>
+        <div class="chip-info">
+          <div class="chip-name">${spec.name}</div>
+          <div class="chip-email">${spec.email}</div>
+        </div>
+        <button type="button" class="chip-remove" onclick="removeAssigneeKey('${spec.key}', ${itemId})" title="Quitar">&times;</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function showAssigneeDropdown(itemId, filter = '') {
+  const menu = document.getElementById('assigneeDropdownMenu');
+  if (!menu) return;
+  const q = filter.trim().toLowerCase();
+  
+  const matches = SYCOM_SPECIALISTS.filter(s => {
+    if (!q) return true;
+    return s.name.toLowerCase().includes(q) || 
+           s.email.toLowerCase().includes(q) || 
+           s.key.toLowerCase().includes(q) || 
+           s.role.toLowerCase().includes(q);
+  });
+
+  if (!matches.length) {
+    menu.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--muted)">No se encontró ningún especialista con ese correo o nombre.</div>';
+    menu.style.display = 'block';
+    return;
+  }
+
+  menu.innerHTML = matches.map(s => {
+    const isSelected = MODAL_SELECTED_KEYS.includes(s.key);
+    return `
+      <div class="dropdown-option ${isSelected ? 'selected' : ''}" onclick="selectAssigneeKey('${s.key}', ${itemId})">
+        <div class="opt-avatar">${s.name.charAt(0)}</div>
+        <div class="opt-details">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span class="opt-name">${s.name}</span>
+            <span class="opt-role">${s.role}</span>
+          </div>
+          <span class="opt-email">${s.email}</span>
+        </div>
+        ${isSelected ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#2ecc71;margin-left:6px"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+      </div>
+    `;
+  }).join('');
+  menu.style.display = 'block';
+}
+
+function selectAssigneeKey(key, itemId) {
+  if (!MODAL_SELECTED_KEYS.includes(key)) {
+    MODAL_SELECTED_KEYS.push(key);
+  }
+  const input = document.getElementById('assignSearchInput');
+  if (input) input.value = '';
+  const menu = document.getElementById('assigneeDropdownMenu');
+  if (menu) menu.style.display = 'none';
+  renderSelectedAssigneeChips(itemId);
+}
+
+function removeAssigneeKey(key, itemId) {
+  MODAL_SELECTED_KEYS = MODAL_SELECTED_KEYS.filter(k => k !== key);
+  renderSelectedAssigneeChips(itemId);
+}
+
+document.addEventListener('click', (e) => {
+  const container = document.querySelector('.assign-search-container');
+  const menu = document.getElementById('assigneeDropdownMenu');
+  if (container && menu && !container.contains(e.target)) {
+    menu.style.display = 'none';
+  }
+});
+
 function openModal(id) {
   const it = ALL_ITEMS.find(i => i.id === id);
   if (!it) return;
+
   const curName = (it.assignee_name || '').toLowerCase();
-  const isAdonis = curName.includes('adonis');
-  const isJuan = curName.includes('juan');
-  const isYoxaide = curName.includes('yoxaide');
-  const isLuis = curName.includes('luis');
+  MODAL_SELECTED_KEYS = [];
+  SYCOM_SPECIALISTS.forEach(spec => {
+    if (curName.includes(spec.key) || curName.includes(spec.name.toLowerCase().split(' ')[0])) {
+      MODAL_SELECTED_KEYS.push(spec.key);
+    }
+  });
 
   document.getElementById('modalContent').innerHTML = `
     <div style="margin-bottom:10px">
@@ -1277,34 +1454,51 @@ function openModal(id) {
       <dt>Estado:</dt><dd>${it.status_origin || it.status}</dd>
       <dt>Responsable(s):</dt>
       <dd>
-        <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-            <b id="modalAssigneeText" style="color:var(--text);font-size:13px">${it.assignee_name || 'Sin asignar'}</b>
-            <span style="font-size:11px;color:var(--muted)">Selecciona 1 o más</span>
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:12px;font-weight:600;color:var(--text)">Integrantes asignados:</span>
+            <span style="font-size:11px;color:var(--muted)">Busca por correo para sumar o transferir</span>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px">
-            <label class="spec-chk-label">
-              <input type="checkbox" name="modal_spec_chk" value="adonis" ${isAdonis ? 'checked' : ''}>
-              <span>Adonis Lozada</span>
-            </label>
-            <label class="spec-chk-label">
-              <input type="checkbox" name="modal_spec_chk" value="juan" ${isJuan ? 'checked' : ''}>
-              <span>Juan Fernández</span>
-            </label>
-            <label class="spec-chk-label">
-              <input type="checkbox" name="modal_spec_chk" value="yoxaide" ${isYoxaide ? 'checked' : ''}>
-              <span>Yoxaide Jiménez</span>
-            </label>
-            <label class="spec-chk-label">
-              <input type="checkbox" name="modal_spec_chk" value="luis" ${isLuis ? 'checked' : ''}>
-              <span>Luis Acosta</span>
-            </label>
+          <div id="selectedAssigneeChips" class="selected-chips-wrap"></div>
+
+          <!-- Buscador desplegable por correo institucional @sycom.com.ve -->
+          <div class="assign-search-container" style="position:relative;margin-top:8px">
+            <div style="position:relative">
+              <input type="text" id="assignSearchInput" 
+                     placeholder="Escribe correo @sycom.com.ve o nombre..." 
+                     autocomplete="off"
+                     onfocus="showAssigneeDropdown(${it.id}, this.value)"
+                     oninput="showAssigneeDropdown(${it.id}, this.value)"
+                     style="width:100%;padding:9px 12px 9px 34px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;outline:none">
+              <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted)" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </div>
+            <div id="assigneeDropdownMenu" class="assignee-dropdown-menu" style="display:none"></div>
           </div>
-          <button class="btn primary" id="btnModalAssign" onclick="assignItemFromModal(${it.id})" style="width:100%;justify-content:center;padding:6px 12px;font-size:12px">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
-            <span>Guardar Asignación</span>
-          </button>
+
+          <!-- Información de cuándo fue agregado a la actividad -->
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <div style="font-size:11.5px;color:var(--muted);display:inline-flex;align-items:center;gap:6px">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>
+                ${it.assigned_at 
+                  ? `Agregado a la actividad: <b style="color:var(--text)">${formatDate(it.assigned_at, true)}</b> <span style="color:var(--accent)">(${getTimeAgo(it.assigned_at)})</span>`
+                  : (it.assignee_name && !it.assignee_name.toLowerCase().includes('sin asignar') 
+                      ? `Agregado en registro inicial: <b style="color:var(--text)">${formatDate(it.created_at, true)}</b>` 
+                      : `Disponible para asignación`)}
+              </span>
+            </div>
+            <button class="btn primary" id="btnModalAssign" onclick="saveAssignmentFromModal(${it.id})" style="padding:6px 14px;font-size:12px">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Guardar Asignación</span>
+            </button>
+          </div>
         </div>
+      </dd>
+      <dt>Asignado el:</dt>
+      <dd>
+        <b>${it.assigned_at ? formatDate(it.assigned_at, true) + ' <span class="muted">(' + getTimeAgo(it.assigned_at) + ')</span>' : (it.assignee_name && !it.assignee_name.toLowerCase().includes('sin asignar') ? formatDate(it.created_at, true) + ' <span class="muted">(inicial)</span>' : '<span class="muted">Sin asignar</span>')}</b>
       </dd>
       <dt>Prioridad:</dt><dd><span class="prio prio-${it.priority}">${it.priority}</span></dd>
       <dt>Cliente / Entidad:</dt><dd>${it.client_name}</dd>
@@ -1321,6 +1515,7 @@ function openModal(id) {
       </a>
     </div>
   `;
+  renderSelectedAssigneeChips(it.id);
   document.getElementById('modalBg').classList.add('show');
 }
 
@@ -1347,18 +1542,16 @@ async function assignItem(itemId, specialistKeys) {
   }
 }
 
-async function assignItemFromModal(itemId) {
-  const chks = document.querySelectorAll('input[name="modal_spec_chk"]:checked');
-  const selectedKeys = Array.from(chks).map(c => c.value);
-  if (!selectedKeys.length) {
-    alert('Por favor selecciona al menos un especialista de la lista.');
+async function saveAssignmentFromModal(itemId) {
+  if (!MODAL_SELECTED_KEYS.length) {
+    alert('Por favor selecciona al menos un especialista de la lista por su correo @sycom.com.ve.');
     return;
   }
   const btn = document.getElementById('btnModalAssign');
   const oldText = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<span>Guardando...</span>';
-  const ok = await assignItem(itemId, selectedKeys);
+  const ok = await assignItem(itemId, MODAL_SELECTED_KEYS);
   if (ok) {
     openModal(itemId);
   } else {
@@ -1655,10 +1848,10 @@ function renderTvSlide() {
                 <div style="display:inline-flex;align-items:center;gap:6px">
                   <select onchange="assignItemDirect(${it.id}, this.value)" style="background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:7px;padding:5px 8px;font-size:12px;cursor:pointer;outline:none">
                     <option value="" style="background:#141c2b;color:#fff">Tomar como...</option>
-                    <option value="adonis" style="background:#141c2b;color:#fff">Adonis Lozada</option>
-                    <option value="juan" style="background:#141c2b;color:#fff">Juan Fernández</option>
-                    <option value="yoxaide" style="background:#141c2b;color:#fff">Yoxaide Jiménez</option>
-                    <option value="luis" style="background:#141c2b;color:#fff">Luis Acosta</option>
+                    <option value="adonis" style="background:#141c2b;color:#fff">Adonis Lozada · a.lozada@sycom.com.ve</option>
+                    <option value="juan" style="background:#141c2b;color:#fff">Juan Fernández · j.fernandez@sycom.com.ve</option>
+                    <option value="yoxaide" style="background:#141c2b;color:#fff">Yoxaide Jiménez · y.jimenez@sycom.com.ve</option>
+                    <option value="luis" style="background:#141c2b;color:#fff">Luis Acosta · l.acosta@sycom.com.ve</option>
                   </select>
                   <button type="button" onclick="openModal(${it.id})" class="tv-action-btn" style="cursor:pointer;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)" title="Asignar múltiples especialistas">
                     <span>+ Varios</span>

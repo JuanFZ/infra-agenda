@@ -16,34 +16,56 @@ from .sync.clickup_client import ClickUpClient
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
 
+def ensure_db_schema():
+    try:
+        with engine.connect() as conn:
+            cursor = conn.connection.cursor()
+            cursor.execute("PRAGMA table_info(items)")
+            cols = [row[1] for row in cursor.fetchall()]
+            if "assigned_at" not in cols:
+                cursor.execute("ALTER TABLE items ADD COLUMN assigned_at DATETIME")
+                conn.connection.commit()
+    except Exception as e:
+        print(f"[DB Schema Check] {e}")
+
+ensure_db_schema()
+
 SPECIALISTS_MAP = {
     "adonis": {
         "key": "adonis",
         "name": "Adonis Lozada",
+        "email": "a.lozada@sycom.com.ve",
         "glpi_id": 8,
         "clickup_id": 49560462,
-        "telegram": "@adonislozada"
+        "telegram": "@adonislozada",
+        "role": "Coordinador"
     },
     "juan": {
         "key": "juan",
         "name": "Juan Fernández",
+        "email": "j.fernandez@sycom.com.ve",
         "glpi_id": 10,
         "clickup_id": None,
-        "telegram": "@Juuan8"
+        "telegram": "@Juuan8",
+        "role": "Especialista"
     },
     "yoxaide": {
         "key": "yoxaide",
         "name": "Yoxaide Jiménez",
+        "email": "y.jimenez@sycom.com.ve",
         "glpi_id": 11,
         "clickup_id": 49560461,
-        "telegram": "@Yjimenezg"
+        "telegram": "@Yjimenezg",
+        "role": "Especialista"
     },
     "luis": {
         "key": "luis",
         "name": "Luis Acosta",
+        "email": "l.acosta@sycom.com.ve",
         "glpi_id": 9,
         "clickup_id": None,
-        "telegram": "@lapsy0"
+        "telegram": "@lapsy0",
+        "role": "Especialista"
     }
 }
 
@@ -193,6 +215,7 @@ def get_items(
             "status": item.status,
             "status_origin": item.status_origin,
             "created_at": item.created_at.isoformat() if item.created_at else None,
+            "assigned_at": item.assigned_at.isoformat() if item.assigned_at else None,
             "due_at": item.due_at.isoformat() if item.due_at else None,
             "closed_at": item.closed_at.isoformat() if item.closed_at else None,
             "updated_at": item.updated_at.isoformat() if item.updated_at else None,
@@ -275,6 +298,7 @@ def get_users(db: Session = Depends(get_db)):
         "id": u.id,
         "full_name": u.full_name,
         "username": u.username,
+        "email": u.email,
         "telegram_username": u.telegram_username,
         "role": u.role
     } for u in users]
@@ -367,12 +391,14 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
 
     # Actualizar estado y responsable en la base de datos operativa
     combined_names = ", ".join(m["name"] for m in matched_list)
+    now_utc = datetime.datetime.utcnow()
     item.assignee_name = combined_names
+    item.assigned_at = now_utc
     if item.status == "pendiente":
         item.status = "curso"
         item.status_origin = "in progress" if source == "ClickUp" else "En curso (asignado)"
-    item.updated_at = datetime.datetime.utcnow()
-    item.synced_at = datetime.datetime.utcnow()
+    item.updated_at = now_utc
+    item.synced_at = now_utc
     db.commit()
     db.refresh(item)
 
@@ -382,11 +408,13 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
         mentions = ", ".join(f"{m['name']} ({m['telegram']})" for m in matched_list)
         plural_label = "Responsables" if len(matched_list) > 1 else "Responsable"
         icon = "👥" if len(matched_list) > 1 else "👤"
+        now_str = datetime.datetime.now().strftime('%d-%m-%Y %I:%M %p')
         msg = (
             f"{icon} <b>Asignación en vivo</b>\n\n"
             f"📌 <b>Asunto:</b> {item.title}\n"
             f"🏷 <b>Origen:</b> {item.source} #{item.external_id}\n"
             f"🎯 <b>{plural_label}:</b> {mentions}\n"
+            f"🕒 <b>Incorporado a la actividad:</b> {now_str}\n"
             f"⚡ <i>Asignado desde la Agenda de Infra</i>"
         )
         send_telegram_message(msg)
@@ -402,6 +430,7 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db))
             "source": item.source,
             "title": item.title,
             "assignee_name": item.assignee_name,
+            "assigned_at": item.assigned_at.isoformat() if item.assigned_at else None,
             "status": item.status,
             "status_origin": item.status_origin
         }

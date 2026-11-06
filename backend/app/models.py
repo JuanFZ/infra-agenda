@@ -19,6 +19,7 @@ class Item(Base):
     status_origin = Column(String(100), nullable=True) # Estado original en origen
     
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    assigned_at = Column(DateTime, nullable=True)
     due_at = Column(DateTime, nullable=True)
     closed_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow)

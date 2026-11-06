@@ -74,9 +74,20 @@ def sync_glpi(db: Session):
             ).first()
 
             if item:
+                # Si tiene responsable y no tenía fecha de asignación o cambió de responsable
+                has_assignee = norm.get("assignee_name") and "sin asignar" not in norm["assignee_name"].lower()
+                if has_assignee:
+                    if not item.assigned_at or item.assignee_name != norm["assignee_name"]:
+                        item.assigned_at = norm.get("updated_at") or norm.get("created_at") or datetime.datetime.utcnow()
+                else:
+                    item.assigned_at = None
+
                 for k, v in norm.items():
                     setattr(item, k, v)
             else:
+                has_assignee = norm.get("assignee_name") and "sin asignar" not in norm["assignee_name"].lower()
+                if has_assignee:
+                    norm["assigned_at"] = norm.get("updated_at") or norm.get("created_at") or datetime.datetime.utcnow()
                 item = Item(**norm)
                 db.add(item)
             count += 1
@@ -131,9 +142,20 @@ def sync_clickup(db: Session):
             ).first()
 
             if item:
+                # Si tiene responsable y no tenía fecha de asignación o cambió de responsable
+                has_assignee = norm.get("assignee_name") and "sin asignar" not in norm["assignee_name"].lower()
+                if has_assignee:
+                    if not item.assigned_at or item.assignee_name != norm["assignee_name"]:
+                        item.assigned_at = norm.get("updated_at") or norm.get("created_at") or datetime.datetime.utcnow()
+                else:
+                    item.assigned_at = None
+
                 for k, v in norm.items():
                     setattr(item, k, v)
             else:
+                has_assignee = norm.get("assignee_name") and "sin asignar" not in norm["assignee_name"].lower()
+                if has_assignee:
+                    norm["assigned_at"] = norm.get("updated_at") or norm.get("created_at") or datetime.datetime.utcnow()
                 item = Item(**norm)
                 db.add(item)
             count += 1
