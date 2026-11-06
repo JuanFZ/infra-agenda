@@ -83,8 +83,14 @@ class ClickUpClient:
         closed_at = datetime.datetime.utcfromtimestamp(int(closed_ms) / 1000) if closed_ms else None
 
         due_ms = raw.get("due_date")
+        has_due_time = bool(raw.get("due_date_time"))
         if due_ms:
             due_at = datetime.datetime.utcfromtimestamp(int(due_ms) / 1000)
+            # En ClickUp, al seleccionar una fecha sin hora específica (ej. "Hoy"),
+            # ClickUp asigna por defecto la madrugada. Si resulta anterior a la creación en el mismo día,
+            # o no tiene hora explícita, se fija al final del día (23:59:59) para dar cumplimiento real al día.
+            if not has_due_time or (due_at.date() == created_at.date() and due_at < created_at):
+                due_at = due_at.replace(hour=23, minute=59, second=59)
         else:
             # Si no tiene due_date, calculamos SLA por prioridad
             sla_hours = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(prio_unif, 72)

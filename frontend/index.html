@@ -947,7 +947,8 @@ let ACTIVE_KPI_FILTER = null;
 
 function formatDate(dateStr, includeTime = false) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
+  const s = (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+')) ? dateStr + 'Z' : dateStr;
+  const d = new Date(s);
   if (isNaN(d.getTime())) return dateStr;
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
