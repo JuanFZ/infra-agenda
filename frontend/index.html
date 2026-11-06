@@ -452,10 +452,19 @@ body.light tr.click:hover td{
 .txt-red{color:var(--red);font-weight:600}
 .view{display:none} .view.active{display:block}
 
-/* Kanban Glassmorphism */
-.kanban-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-@media(max-width:1100px){.kanban-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:640px){.kanban-grid{grid-template-columns:1fr}}
+/* Kanban Glassmorphism: Siempre 4 columnas fijas en una fila */
+#v-kanban{
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:12px;
+}
+.kanban-grid{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(220px, 1fr));
+  gap:14px;
+  width:100%;
+  min-width:920px;
+}
 .col{
   background:linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(18, 26, 38, 0.50) 100%);
   backdrop-filter:blur(18px) saturate(160%);
