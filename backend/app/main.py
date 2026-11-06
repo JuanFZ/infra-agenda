@@ -217,22 +217,41 @@ def get_items(
     prio: str = Query(None, description="Crítica, Alta, Media, Baja"),
     status: str = Query(None, description="pendiente, curso, espera, cerrado"),
     q: str = Query(None, description="Búsqueda por texto en título"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name")
 ):
     query = db.query(Item)
 
-    if src:
+    # Control de visibilidad por perfil:
+    # El usuario regular solo ve las asignadas a él y las que están sin asignar (NO las de los demás)
+    role = (x_user_role.strip().lower()) if isinstance(x_user_role, str) else ""
+    if role and role != "coordinador" and isinstance(x_user_name, str) and x_user_name:
+        clean_name = x_user_name.strip()
+        first_name = clean_name.split()[0] if clean_name else ""
+        query = query.filter(
+            or_(
+                Item.assignee_name == None,
+                Item.assignee_name == "",
+                Item.assignee_name.ilike("%sin asignar%"),
+                Item.assignee_name.ilike("%técnico glpi%"),
+                Item.assignee_name.ilike(f"%{clean_name}%"),
+                Item.assignee_name.ilike(f"%{first_name}%")
+            )
+        )
+
+    if src and isinstance(src, str):
         query = query.filter(Item.source == src)
-    if tipo:
+    if tipo and isinstance(tipo, str):
         query = query.filter(Item.client_type == tipo)
-    if resp:
+    if resp and isinstance(resp, str):
         query = query.filter(Item.assignee_name.ilike(f"%{resp}%"))
-    if prio:
+    if prio and isinstance(prio, str):
         query = query.filter(Item.priority == prio)
     
     # Política de cerrados: solo mostrar activos o cerrados desde el día de ayer en adelante
     yesterday_start = get_yesterday_start()
-    if not status:
+    if not status or not isinstance(status, str):
         query = query.filter(
             or_(
                 Item.status != "cerrado",
@@ -251,7 +270,7 @@ def get_items(
     else:
         query = query.filter(Item.status == status)
 
-    if q:
+    if q and isinstance(q, str):
         query = query.filter(Item.title.ilike(f"%{q}%"))
 
     items = query.order_by(Item.updated_at.desc()).all()
@@ -575,12 +594,12 @@ def update_item_status(
     if not item:
         raise HTTPException(status_code=404, detail="Item no encontrado")
 
-    role = (x_user_role or "").strip().lower()
+    role = (x_user_role.strip().lower()) if isinstance(x_user_role, str) else ""
     if role == "coordinador":
         pass  # Coordinador tiene autorización total sobre cualquier actividad
     elif role == "especialista":
         # Especialista solo puede cambiar de estado sus propias actividades asignadas
-        user_name_clean = (x_user_name or "").strip().lower()
+        user_name_clean = (x_user_name.strip().lower()) if isinstance(x_user_name, str) else ""
         first_name = user_name_clean.split()[0] if user_name_clean else ""
         assignee_clean = (item.assignee_name or "").lower()
         if not user_name_clean or (user_name_clean not in assignee_clean and first_name not in assignee_clean):

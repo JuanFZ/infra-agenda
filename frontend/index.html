@@ -2668,15 +2668,39 @@
       return headers;
     }
 
+    function isItemAssignedToUser(it, user) {
+      if (!it || !user) return false;
+      const assignee = (it.assignee_name || '').toLowerCase();
+      if (!assignee || assignee.includes('sin asignar') || assignee.includes('técnico glpi')) {
+        return false;
+      }
+      const fullName = (user.full_name || '').toLowerCase();
+      const userName = (user.username || '').toLowerCase();
+      const firstName = fullName.split(' ')[0] || userName.split('.')[0] || '';
+      return (fullName && assignee.includes(fullName)) ||
+             (firstName && firstName.length > 2 && assignee.includes(firstName)) ||
+             (userName && assignee.includes(userName));
+    }
+
+    function isItemUnassigned(it) {
+      if (!it) return true;
+      const assignee = (it.assignee_name || '').toLowerCase().trim();
+      return !assignee || assignee.includes('sin asignar') || assignee.includes('técnico glpi');
+    }
+
+    function isItemVisibleForUser(it, user) {
+      if (!user) return true;
+      const role = (user.role || '').toLowerCase();
+      if (role === 'coordinador') return true;
+      // Para Especialista y Analista: solo sus asignadas y las que están sin asignar (NO las de los demás)
+      return isItemAssignedToUser(it, user) || isItemUnassigned(it);
+    }
+
     function canUserEditItem(it) {
       if (!CURRENT_USER) return false;
       if (isCoordinator()) return true;
       if (isSpecialist()) {
-        if (!it || !it.assignee_name) return false;
-        const curName = (CURRENT_USER.full_name || CURRENT_USER.username || '').toLowerCase();
-        const curFirst = curName.split(' ')[0];
-        const assignees = it.assignee_name.toLowerCase();
-        return (curFirst && assignees.includes(curFirst)) || assignees.includes(curName);
+        return isItemAssignedToUser(it, CURRENT_USER);
       }
       return false; // Analista u otros son modo consulta 100%
     }
@@ -2789,12 +2813,12 @@
 
     async function loadData() {
       try {
-        const resKpi = await fetch(`${API_URL}/kpis`);
+        const resKpi = await fetch(`${API_URL}/kpis`, { headers: getAuthHeaders() });
         const kpis = await resKpi.json();
         document.getElementById('apiStatus').textContent = 'API Conectada';
         document.getElementById('syncTime').textContent = kpis.last_sync ? `Última sync: ${formatDate(kpis.last_sync, true)}` : 'Sync: OK';
 
-        const resItems = await fetch(`${API_URL}/items`);
+        const resItems = await fetch(`${API_URL}/items`, { headers: getAuthHeaders() });
         ALL_ITEMS = await resItems.json();
         renderAll();
       } catch (err) {
@@ -2861,12 +2885,15 @@
       const q = document.getElementById('fSearch').value.toLowerCase().trim();
 
       return ALL_ITEMS.filter(it => {
+        // Regla por perfil: la persona solo puede ver las asignadas a él y las que están sin asignar (NO las de los demás)
+        if (!isItemVisibleForUser(it, CURRENT_USER)) return false;
+
         if (src && it.source !== src) return false;
         if (prio && it.priority !== prio) return false;
         if (resp) {
           const itResp = (it.assignee_name || '').toLowerCase();
           if (resp === 'sin asignar') {
-            if (itResp && !itResp.includes('sin asignar') && !itResp.includes('técnico glpi')) return false;
+            if (!isItemUnassigned(it)) return false;
           } else {
             if (!itResp.includes(resp)) return false;
           }
@@ -4037,14 +4064,27 @@
         { type: 'kanban', title: 'Tablero Kanban en Sala', sub: 'Flujo de trabajo en 4 columnas: Pendientes · En curso · En espera · Cerrados' },
         { type: 'unassigned', title: 'Asuntos Sin Asignar', sub: 'Disponibles para asignación inmediata del equipo' }
       ];
-      TV_SPECIALISTS.forEach(spec => {
-        slides.push({
-          type: 'specialist',
-          spec: spec,
-          title: `${spec.isCoord ? 'Coordinación' : 'Especialista'}: ${spec.name}`,
-          sub: `Tareas y tickets asignados (${spec.tag})`
+      if (!CURRENT_USER || isCoordinator() || CURRENT_USER.username === 'modo.tv') {
+        TV_SPECIALISTS.forEach(spec => {
+          slides.push({
+            type: 'specialist',
+            spec: spec,
+            title: `${spec.isCoord ? 'Coordinación' : 'Especialista'}: ${spec.name}`,
+            sub: `Tareas y tickets asignados (${spec.tag})`
+          });
         });
-      });
+      } else {
+        const myFirst = (CURRENT_USER.full_name || '').split(' ')[0].toLowerCase();
+        const mySpec = TV_SPECIALISTS.find(s => s.name.toLowerCase().includes(myFirst));
+        if (mySpec) {
+          slides.push({
+            type: 'specialist',
+            spec: mySpec,
+            title: `Mi Carga de Trabajo: ${mySpec.name}`,
+            sub: `Tus tareas y tickets asignados (${mySpec.tag})`
+          });
+        }
+      }
       return slides;
     }
 
@@ -4128,9 +4168,10 @@
       document.getElementById('tvSlideSub').textContent = s.sub;
 
       const container = document.getElementById('tvBody');
+      const visibleTvItems = (ALL_ITEMS || []).filter(it => isItemVisibleForUser(it, CURRENT_USER));
 
       if (s.type === 'resumen') {
-        const active = ALL_ITEMS.filter(i => i.status !== 'cerrado');
+        const active = visibleTvItems.filter(i => i.status !== 'cerrado');
         const criticos = active.filter(i => i.priority === 'Crítica').length;
         const atrasados = active.filter(i => i.is_overdue || i.semaphore === 'rojo').length;
         const enCurso = active.filter(i => i.status === 'curso').length;
@@ -4185,7 +4226,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 16px;backdrop-filter:blur(14px);flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:10px">
           <span style="font-weight:700;font-size:14px">Tablero Kanban en Tiempo Real</span>
-          <span class="badge" style="background:rgba(79,140,255,.15);color:var(--accent);font-size:11px">${ALL_ITEMS.length} asuntos totales</span>
+          <span class="badge" style="background:rgba(79,140,255,.15);color:var(--accent);font-size:11px">${visibleTvItems.length} asuntos visibles</span>
         </div>
         ${isCoordinator() ? `
         <button type="button" class="btn" onclick="openCreateModal()" style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700;padding:7px 14px;font-size:12.5px;box-shadow:0 4px 14px rgba(16,185,129,.25);cursor:pointer;display:inline-flex;align-items:center;gap:6px">
@@ -4201,7 +4242,7 @@
       </div>
       <div class="tv-kanban-grid">
         ${cols.map(c => {
-          const colItems = ALL_ITEMS.filter(i => i.status === c.k);
+          const colItems = visibleTvItems.filter(i => i.status === c.k);
           return `
             <div class="tv-kanban-col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
               <div class="tv-kanban-col-header" style="border-top:3px solid ${c.color}">
@@ -4567,27 +4608,29 @@
         btnTvAct.style.display = isCoord ? 'inline-flex' : 'none';
       }
 
-      // 5. Pre-filtro automático según rol
+      // 5. Configuración dinámica del selector de Responsable según el perfil
       const respSelect = document.getElementById('fResp');
       if (respSelect) {
-        if (isSpec) {
-          // Pre-filtrar por el especialista logueado
-          const uFull = (CURRENT_USER.full_name || '').toLowerCase();
-          const uFirst = uFull.split(' ')[0] || (CURRENT_USER.username || '').toLowerCase();
-          for (let opt of respSelect.options) {
-            const optVal = opt.value.toLowerCase();
-            if (optVal && (optVal.includes(uFirst) || uFull.includes(optVal))) {
-              respSelect.value = opt.value;
-              break;
-            }
-          }
-        } else if (isAnal) {
-          // Analista ve todo el equipo por defecto
+        if (isCoord) {
+          respSelect.innerHTML = `
+            <option value="">Todo el equipo</option>
+            <option value="Adonis">Adonis Lozada</option>
+            <option value="Juan">Juan Fernández</option>
+            <option value="Yoxaide">Yoxaide Jiménez</option>
+            <option value="Luis">Luis Acosta</option>
+            <option value="Sin asignar">Sin asignar</option>
+          `;
           respSelect.value = '';
-          const curNav = document.querySelector('.nav.active')?.dataset?.view;
-          if (curNav && curNav !== 'resumen') {
-            document.querySelector('.nav[data-view="resumen"]')?.click();
-          }
+        } else {
+          // El especialista/analista solo puede ver las asignadas a él y las sin asignar (NO las de los demás)
+          const uFull = CURRENT_USER.full_name || CURRENT_USER.username;
+          const uFirst = (CURRENT_USER.full_name || '').split(' ')[0] || (CURRENT_USER.username || '').split('.')[0];
+          respSelect.innerHTML = `
+            <option value="">Mis asignadas y sin asignar</option>
+            <option value="${uFirst.toLowerCase()}">Solo mis actividades (${uFirst})</option>
+            <option value="sin asignar">Solo disponibles (Sin asignar)</option>
+          `;
+          respSelect.value = '';
         }
       }
 
