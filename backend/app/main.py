@@ -95,7 +95,7 @@ SPECIALISTS_MAP = {
         "name": "Juan Fernández",
         "email": "j.fernandez@sycom.com.ve",
         "glpi_id": 10,
-        "clickup_id": None,
+        "clickup_id": 107105518,
         "telegram": "@Juuan8",
         "role": "Especialista"
     },
@@ -113,7 +113,7 @@ SPECIALISTS_MAP = {
         "name": "Luis Acosta",
         "email": "l.acosta@sycom.com.ve",
         "glpi_id": 9,
-        "clickup_id": None,
+        "clickup_id": 107105519,
         "telegram": "@lapsy0",
         "role": "Especialista"
     }
