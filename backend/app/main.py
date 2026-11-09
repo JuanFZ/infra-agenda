@@ -1350,6 +1350,30 @@ def api_create_escalation(
     db.commit()
     db.refresh(doc)
 
+    # Notificación a Telegram (Google Docs)
+    try:
+        import html
+        from .notifications.telegram_notifier import send_telegram_message, now_caracas_str
+        now_str = now_caracas_str("%d-%m-%Y %I:%M %p")
+        safe_title = html.escape(title)
+        safe_author = html.escape(user_name)
+        notes_text = (req.notes or "").strip()
+        safe_notes = f"\n📝 <b>Notas:</b> {html.escape(notes_text)}" if notes_text else ""
+        link_html = f"\n🔗 <a href=\"{doc_url}\"><b>Abrir en Google Docs</b></a>"
+
+        msg = (
+            f"📄 <b>Nuevo Escalamiento Registrado</b>\n\n"
+            f"📌 <b>Código / Caso:</b> <code>{safe_title}</code>\n"
+            f"👤 <b>Registrado por:</b> {safe_author} ({role})\n"
+            f"🕒 <b>Fecha:</b> {now_str}"
+            f"{safe_notes}"
+            f"{link_html}\n\n"
+            f"⚡ <i>Agenda de Infraestructura &amp; BD · Soluciones SYCOM</i>"
+        )
+        send_telegram_message(msg, parse_mode="HTML")
+    except Exception as e:
+        print(f"[Telegram Escalation Notification Error] {e}")
+
     return {
         "status": "OK",
         "message": "Documento de escalamiento registrado exitosamente.",
@@ -1438,6 +1462,30 @@ def api_upload_escalation(
     db.add(doc)
     db.commit()
     db.refresh(doc)
+
+    # Notificación a Telegram
+    try:
+        import html
+        from .notifications.telegram_notifier import send_telegram_message, now_caracas_str
+        now_str = now_caracas_str("%d-%m-%Y %I:%M %p")
+        safe_title = html.escape(title)
+        safe_author = html.escape(user_name)
+        safe_file = html.escape(req.filename)
+        notes_text = (req.notes or "").strip()
+        safe_notes = f"\n📝 <b>Notas:</b> {html.escape(notes_text)}" if notes_text else ""
+
+        msg = (
+            f"📄 <b>Nuevo Escalamiento Registrado (PDF)</b>\n\n"
+            f"📌 <b>Código / Caso:</b> <code>{safe_title}</code>\n"
+            f"📎 <b>Archivo:</b> {safe_file}\n"
+            f"👤 <b>Registrado por:</b> {safe_author} ({user_role})\n"
+            f"🕒 <b>Fecha:</b> {now_str}"
+            f"{safe_notes}\n\n"
+            f"⚡ <i>Agenda de Infraestructura &amp; BD · Soluciones SYCOM</i>"
+        )
+        send_telegram_message(msg, parse_mode="HTML")
+    except Exception as e:
+        print(f"[Telegram Escalation Notification Error] {e}")
 
     return {
         "status": "OK",
@@ -1537,6 +1585,25 @@ def api_delete_escalation(
                 os.remove(file_path)
             except Exception as e:
                 print(f"[Delete Escalation File Error] {e}")
+
+    # Notificación a Telegram por eliminación
+    try:
+        import html
+        from .notifications.telegram_notifier import send_telegram_message, now_caracas_str
+        now_str = now_caracas_str("%d-%m-%Y %I:%M %p")
+        safe_title = html.escape(doc.title)
+        remover = html.escape(x_user_name if isinstance(x_user_name, str) and x_user_name.strip() else "Coordinador")
+
+        msg = (
+            f"🗑 <b>Escalamiento Eliminado</b>\n\n"
+            f"📌 <b>Código / Caso:</b> <code>{safe_title}</code>\n"
+            f"👤 <b>Eliminado por:</b> {remover}\n"
+            f"🕒 <b>Hora eliminación:</b> {now_str}\n\n"
+            f"⚡ <i>Agenda de Infraestructura &amp; BD · Soluciones SYCOM</i>"
+        )
+        send_telegram_message(msg, parse_mode="HTML")
+    except Exception as e:
+        print(f"[Telegram Delete Escalation Error] {e}")
 
     db.delete(doc)
     db.commit()
