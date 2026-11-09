@@ -146,4 +146,21 @@ class User(Base):
     last_login = Column(DateTime, nullable=True)
 
 
+class GeneratedReport(Base):
+    __tablename__ = "generated_reports"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    title = Column(String(200))
+    period_label = Column(String(100))
+    start_date = Column(String(50), nullable=True)
+    end_date = Column(String(50), nullable=True)
+    specialist_filter = Column(String(100), nullable=True)
+    generated_by = Column(String(150), default="Adonis Lozada")
+    total_items = Column(Integer, default=0)
+    total_closed = Column(Integer, default=0)
+    sla_percent = Column(Float, default=100.0)
+    avg_resolution_time = Column(String(50), default="0m")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
 

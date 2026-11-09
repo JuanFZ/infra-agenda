@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from .database import engine, Base, get_db, SessionLocal
-from .models import Item, SyncLog, AlertLog, User
+from .models import Item, SyncLog, AlertLog, User, GeneratedReport
 from .config import SYNC_INTERVAL_MINUTES
 from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
 from .sync.glpi_client import GLPIClient
@@ -1052,6 +1052,172 @@ def api_report_print_view(
 
     html_content = generate_executive_html(data)
     return HTMLResponse(content=html_content)
+
+
+class SaveReportRequest(BaseModel):
+    title: str | None = None
+    period_label: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    specialist: str | None = None
+
+
+@app.get("/api/reports/history")
+def api_reports_history(
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    role_param: str = Query(None, alias="role")
+):
+    """Lista el historial de reportes ejecutivos generados (solo Coordinador)."""
+    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
+    if role not in ("coordinador", "admin", "administrador"):
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Solo el Coordinador puede consultar el historial de reportes."
+        )
+
+    reports = db.query(GeneratedReport).order_by(GeneratedReport.created_at.desc()).all()
+
+    # Si aún no hay reportes generados, auto-generar el del mes en curso inicial
+    if not reports:
+        now_dt = datetime.datetime.now(CARACAS_TZ)
+        start_str = f"{now_dt.year}-{now_dt.month:02d}-01"
+        end_str = f"{now_dt.year}-{now_dt.month:02d}-{now_dt.day:02d}"
+        init_data = get_report_data(db, start_date=start_str, end_date=end_str)
+        k = init_data.get("kpis", {})
+        init_rep = GeneratedReport(
+            title=f"Informe Ejecutivo Mensual - {now_dt.strftime('%B %Y').capitalize()}",
+            period_label=init_data.get("period_label", "Mes en curso"),
+            start_date=start_str,
+            end_date=end_str,
+            specialist_filter="Todo el equipo",
+            generated_by="Adonis Lozada Figueroa",
+            total_items=k.get("total_items", 0),
+            total_closed=k.get("total_cerrados", 0),
+            sla_percent=float(k.get("cumplimiento_general", 100.0)),
+            avg_resolution_time=k.get("avg_resolution_str", "0m"),
+            created_at=datetime.datetime.utcnow()
+        )
+        db.add(init_rep)
+        db.commit()
+        db.refresh(init_rep)
+        reports = [init_rep]
+
+    result = []
+    for r in reports:
+        result.append({
+            "id": r.id,
+            "title": r.title,
+            "period_label": r.period_label,
+            "start_date": r.start_date,
+            "end_date": r.end_date,
+            "specialist_filter": r.specialist_filter,
+            "generated_by": r.generated_by,
+            "total_items": r.total_items,
+            "total_closed": r.total_closed,
+            "sla_percent": r.sla_percent,
+            "avg_resolution_time": r.avg_resolution_time,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "created_at_caracas": format_caracas_time(r.created_at, "%d-%m-%Y %I:%M %p") if r.created_at else "—"
+        })
+    return result
+
+
+@app.post("/api/reports/generate-and-save")
+def api_reports_generate_and_save(
+    req: SaveReportRequest,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    role_param: str = Query(None, alias="role"),
+    user_param: str = Query(None, alias="user")
+):
+    """Genera métricas de un reporte ejecutivo y lo registra en el historial persistente."""
+    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
+    if role not in ("coordinador", "admin", "administrador"):
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Solo el Coordinador puede generar reportes ejecutivos."
+        )
+
+    user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")).strip() or "Adonis Lozada Figueroa"
+
+    s_date, e_date, spec = _resolve_report_filters(
+        req.start_date, req.end_date, req.specialist, x_user_role, x_user_name, role_param, user_param
+    )
+
+    data = get_report_data(
+        db=db,
+        start_date=s_date,
+        end_date=e_date,
+        specialist_filter=spec
+    )
+    k = data.get("kpis", {})
+
+    now_dt = datetime.datetime.now(CARACAS_TZ)
+    default_title = f"Informe Ejecutivo - {now_dt.strftime('%B %Y').capitalize()}"
+    title = (req.title or "").strip() or default_title
+
+    report_entry = GeneratedReport(
+        title=title,
+        period_label=data.get("period_label", "Período seleccionado"),
+        start_date=s_date,
+        end_date=e_date,
+        specialist_filter=spec or "Todo el equipo",
+        generated_by=user_name,
+        total_items=k.get("total_items", 0),
+        total_closed=k.get("total_cerrados", 0),
+        sla_percent=float(k.get("cumplimiento_general", 100.0)),
+        avg_resolution_time=k.get("avg_resolution_str", "0m"),
+        created_at=datetime.datetime.utcnow()
+    )
+    db.add(report_entry)
+    db.commit()
+    db.refresh(report_entry)
+
+    return {
+        "status": "OK",
+        "message": "Reporte generado y guardado en el historial",
+        "report": {
+            "id": report_entry.id,
+            "title": report_entry.title,
+            "period_label": report_entry.period_label,
+            "start_date": report_entry.start_date,
+            "end_date": report_entry.end_date,
+            "specialist_filter": report_entry.specialist_filter,
+            "generated_by": report_entry.generated_by,
+            "total_items": report_entry.total_items,
+            "total_closed": report_entry.total_closed,
+            "sla_percent": report_entry.sla_percent,
+            "avg_resolution_time": report_entry.avg_resolution_time,
+            "created_at_caracas": format_caracas_time(report_entry.created_at, "%d-%m-%Y %I:%M %p")
+        },
+        "data": data
+    }
+
+
+@app.delete("/api/reports/history/{report_id}")
+def api_reports_delete_history(
+    report_id: int,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    role_param: str = Query(None, alias="role")
+):
+    """Elimina una entrada del historial de reportes (solo Coordinador)."""
+    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
+    if role not in ("coordinador", "admin", "administrador"):
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Solo el Coordinador puede eliminar reportes del historial."
+        )
+
+    entry = db.query(GeneratedReport).filter(GeneratedReport.id == report_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Reporte no encontrado en el historial.")
+
+    db.delete(entry)
+    db.commit()
+    return {"status": "OK", "deleted_id": report_id}
 
 
 

@@ -2337,7 +2337,7 @@
       <span class="label">Clientes</span>
     </div>
 
-    <div class="nav nav-action" id="sidebarNavReports" onclick="openReportsModal()" title="Reportes Ejecutivos (M9)" style="cursor:pointer">
+    <div class="nav" data-view="reportes" id="sidebarNavReports" title="Reportes Ejecutivos">
       <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -2409,9 +2409,9 @@
           </svg>
           <span class="btn-text">Nueva Actividad</span>
         </button>
-        <button class="btn" id="btnReports" onclick="openReportsModal()"
+        <button class="btn" id="btnReports" onclick="handleHeaderReportClick()"
           style="background:rgba(79,140,255,0.12);color:var(--accent);border-color:rgba(79,140,255,0.3);font-weight:600"
-          title="Generar informe ejecutivo en Excel (.xlsx) o PDF">
+          title="Generar automáticamente informe ejecutivo o consultar historial">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -2582,6 +2582,59 @@
               </tr>
             </thead>
             <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vista de Historial de Reportes Ejecutivos (M9) -->
+    <div class="view" id="v-reportes">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
+          <div>
+            <h3 style="margin:0;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <span>Historial de Reportes Ejecutivos</span>
+              <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px">M9</span>
+            </h3>
+            <span class="muted" style="font-size:12px;margin-top:3px;display:block">Consulta, descarga y reimprime los informes consolidados de gestión y cumplimiento SLA</span>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button class="btn" id="btnAutoReportView" onclick="generateAutoMonthReport()"
+              style="background:rgba(16,185,129,0.12);color:#34d399;border-color:rgba(16,185,129,0.3);font-weight:600;display:inline-flex;align-items:center;gap:7px"
+              title="Generar automáticamente el informe consolidado del mes en curso">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><path d="M21 3v9h-9"/></svg>
+              <span>Generar Mes en Curso</span>
+            </button>
+            <button class="btn primary" id="btnNewReportModal" onclick="openReportsModal()"
+              style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;border-color:rgba(79,140,255,.4);font-weight:700;display:inline-flex;align-items:center;gap:7px"
+              title="Abrir formulario para generar reporte con fechas o filtros personalizados">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>Generar Nuevo Reporte</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table id="tblGeneratedReports">
+            <thead>
+              <tr>
+                <th>Folio</th>
+                <th>Título / Período</th>
+                <th>Generado Por</th>
+                <th>Fecha Generación</th>
+                <th style="text-align:center">Actividades</th>
+                <th style="text-align:center">Cumplimiento SLA</th>
+                <th style="text-align:center">T. Promedio</th>
+                <th style="text-align:center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tblGeneratedReportsBody">
+              <tr>
+                <td colspan="8" style="text-align:center;padding:24px" class="muted">Cargando historial de reportes...</td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -4042,23 +4095,29 @@
       if (arrow) arrow.innerHTML = '<polyline points="9 18 15 12 9 6"/>';
     }
 
+    function switchView(viewName) {
+      if (!viewName) return;
+      const targetView = document.getElementById(`v-${viewName}`);
+      if (!targetView) return;
+      document.querySelectorAll('.nav').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
+      const targetNav = document.querySelector(`.nav[data-view="${viewName}"]`);
+      if (targetNav) targetNav.classList.add('active');
+      targetView.classList.add('active');
+      const label = targetNav ? (targetNav.querySelector('.label')?.textContent || targetNav.textContent.trim()) : viewName;
+      const titleEl = document.getElementById('viewTitle');
+      if (titleEl) titleEl.textContent = label;
+      if (window.innerWidth <= 768) {
+        closeSidebarMobile();
+      }
+      if (viewName === 'reportes') {
+        loadReportsHistory();
+      }
+    }
+
     // Navegación de vistas
     document.querySelectorAll('.nav[data-view]').forEach(n => {
-      n.onclick = () => {
-        const viewName = n.dataset.view;
-        if (!viewName) return;
-        const targetView = document.getElementById(`v-${viewName}`);
-        if (!targetView) return;
-        document.querySelectorAll('.nav').forEach(x => x.classList.remove('active'));
-        document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
-        n.classList.add('active');
-        targetView.classList.add('active');
-        const label = n.querySelector('.label')?.textContent || n.textContent.trim();
-        document.getElementById('viewTitle').textContent = label;
-        if (window.innerWidth <= 768) {
-          closeSidebarMobile();
-        }
-      };
+      n.onclick = () => switchView(n.dataset.view);
     });
 
     // Filtros
@@ -4785,7 +4844,7 @@
       const monthLabel = `${getMonthName(now.getMonth())} ${now.getFullYear()}`;
 
       const specOptions = `
-        <option value="" ${REPORT_FILTER_STATE.specialist === '' ? 'selected' : ''}>Todo el equipo Sycom</option>
+        <option value="" ${REPORT_FILTER_STATE.specialist === '' ? 'selected' : ''}>Todo el equipo</option>
         <option value="Adonis" ${REPORT_FILTER_STATE.specialist.includes('Adonis') ? 'selected' : ''}>Adonis Lozada</option>
         <option value="Juan" ${REPORT_FILTER_STATE.specialist.includes('Juan') ? 'selected' : ''}>Juan Fernández</option>
         <option value="Yoxaide" ${REPORT_FILTER_STATE.specialist.includes('Yoxaide') ? 'selected' : ''}>Yoxaide Jiménez</option>
@@ -5067,7 +5126,7 @@
         const a = document.createElement('a');
         a.href = url;
 
-        let filename = 'Informe_Ejecutivo_Sycom.xlsx';
+        let filename = 'Informe_Ejecutivo_Soluciones_SYCOM.xlsx';
         const disposition = res.headers.get('Content-Disposition');
         if (disposition && disposition.includes('filename=')) {
           const match = disposition.match(/filename="?([^"]+)"?/);
@@ -5081,6 +5140,7 @@
         a.remove();
 
         showToast('¡Descarga Exitosa!', `Se ha generado ${filename}`);
+        recordCurrentReportInHistory();
       } catch (err) {
         console.error('Error al descargar reporte Excel:', err);
         alert(`No se pudo generar el reporte Excel: ${err.message}`);
@@ -5088,6 +5148,37 @@
         btn.disabled = false;
         btn.innerHTML = oldHtml;
       }
+    }
+
+    function getReportFilterTitle() {
+      const spec = REPORT_FILTER_STATE.specialist ? ` (${REPORT_FILTER_STATE.specialist})` : '';
+      if (REPORT_FILTER_STATE.period === 'month') {
+        const now = new Date();
+        return `Informe Ejecutivo - ${getMonthName(now.getMonth())} ${now.getFullYear()}${spec}`;
+      } else if (REPORT_FILTER_STATE.period === '30days') {
+        return `Informe Ejecutivo - Últimos 30 días${spec}`;
+      } else if (REPORT_FILTER_STATE.period === 'all') {
+        return `Informe Ejecutivo - Histórico Completo${spec}`;
+      } else {
+        return `Informe Ejecutivo - ${REPORT_FILTER_STATE.startDate || 'Inicio'} al ${REPORT_FILTER_STATE.endDate || 'Hoy'}${spec}`;
+      }
+    }
+
+    function recordCurrentReportInHistory() {
+      if (!isCoordinator()) return;
+      fetch(`${API_URL}/reports/generate-and-save`, {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: getReportFilterTitle(),
+          start_date: REPORT_FILTER_STATE.startDate,
+          end_date: REPORT_FILTER_STATE.endDate,
+          specialist: REPORT_FILTER_STATE.specialist
+        })
+      }).then(() => loadReportsHistory()).catch(err => console.warn('No se pudo registrar reporte en historial:', err));
     }
 
     function openExecutivePrintView() {
@@ -5102,8 +5193,256 @@
         else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
       }
 
+      recordCurrentReportInHistory();
       const printUrl = `${API_URL}/reports/print-view?${params.toString()}`;
       window.open(printUrl, '_blank');
+    }
+
+    // =========================================================================
+    // GESTIÓN DE HISTORIAL DE REPORTES EJECUTIVOS (TABLA EN MENÚ)
+    // =========================================================================
+    let GENERATED_REPORTS_LIST = [];
+
+    async function handleHeaderReportClick() {
+      if (!isCoordinator()) {
+        alert('Acceso restringido: La generación de reportes ejecutivos está reservada exclusivamente para el rol Coordinador.');
+        return;
+      }
+      switchView('reportes');
+      await generateAutoMonthReport();
+    }
+
+    async function loadReportsHistory() {
+      const tbody = document.getElementById('tblGeneratedReportsBody');
+      if (!tbody) return;
+
+      try {
+        const res = await fetch(`${API_URL}/reports/history`, {
+          headers: getAuthHeaders()
+        });
+        if (!res.ok) {
+          throw new Error(`Error ${res.status}: ${res.statusText}`);
+        }
+        const list = await res.json();
+        GENERATED_REPORTS_LIST = list;
+        renderReportsHistoryTable(list);
+      } catch (err) {
+        console.error('Error cargando historial de reportes:', err);
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align:center;padding:24px;color:var(--red)">
+              Error al cargar historial: ${escapeHtml(err.message)}
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    function renderReportsHistoryTable(list) {
+      const tbody = document.getElementById('tblGeneratedReportsBody');
+      if (!tbody) return;
+
+      if (!list || !list.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">
+              No hay reportes en el historial. Haz clic en "Generar Mes en Curso" o "Generar Nuevo Reporte".
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = list.map(r => {
+        const sla = Number(r.sla_percent) || 0;
+        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 75) ? '#f59e0b' : '#ef4444');
+        const folio = `REP-${String(r.id).padStart(4, '0')}`;
+
+        return `
+          <tr>
+            <td><span class="badge" style="background:rgba(255,255,255,0.06);font-family:monospace;font-weight:700">${folio}</span></td>
+            <td>
+              <strong style="color:var(--text)">${escapeHtml(r.title)}</strong><br>
+              <small class="muted">${escapeHtml(r.period_label || '')} · <span style="color:var(--accent)">${escapeHtml(r.specialist_filter || 'Todo el equipo')}</span></small>
+            </td>
+            <td>
+              <div style="font-weight:600;font-size:12px">${escapeHtml(r.generated_by || 'Coordinador')}</div>
+            </td>
+            <td>
+              <div style="font-size:12px;color:var(--text)">${escapeHtml(r.created_at_caracas || '')}</div>
+            </td>
+            <td style="text-align:center">
+              <span style="font-weight:700;font-size:13px">${r.total_items}</span>
+              <small class="muted"> (${r.total_closed} cerrados)</small>
+            </td>
+            <td style="text-align:center">
+              <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-weight:700">
+                ${sla.toFixed(1)}%
+              </span>
+            </td>
+            <td style="text-align:center;color:var(--muted)">
+              ${escapeHtml(r.avg_resolution_time || '0m')}
+            </td>
+            <td style="text-align:center">
+              <div style="display:inline-flex;align-items:center;gap:6px">
+                <button type="button" class="btn" onclick="downloadReportById(${r.id})"
+                  style="padding:5px 9px;font-size:11px;background:rgba(16,185,129,0.15);color:#34d399;border-color:rgba(16,185,129,0.3);display:inline-flex;align-items:center;gap:5px"
+                  title="Descargar archivo Excel (.xlsx)">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>Excel</span>
+                </button>
+                <button type="button" class="btn" onclick="printReportById(${r.id})"
+                  style="padding:5px 9px;font-size:11px;background:rgba(79,140,255,0.15);color:var(--accent);border-color:rgba(79,140,255,0.3);display:inline-flex;align-items:center;gap:5px"
+                  title="Ver / Imprimir informe ejecutivo PDF">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                  <span>PDF</span>
+                </button>
+                <button type="button" class="btn" onclick="deleteReportHistory(${r.id})"
+                  style="padding:5px 7px;font-size:11px;color:#f87171;background:rgba(255,93,93,0.1);border-color:rgba(255,93,93,0.25)"
+                  title="Eliminar este reporte del historial">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function generateAutoMonthReport() {
+      if (!isCoordinator()) {
+        alert('Acceso restringido: Solo el Coordinador puede generar reportes.');
+        return;
+      }
+
+      const btnHeader = document.getElementById('btnReports');
+      const btnView = document.getElementById('btnAutoReportView');
+      const origH = btnHeader ? btnHeader.innerHTML : '';
+      const origV = btnView ? btnView.innerHTML : '';
+
+      if (btnHeader) {
+        btnHeader.disabled = true;
+        btnHeader.innerHTML = `<svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span class="btn-text">Generando...</span>`;
+      }
+      if (btnView) {
+        btnView.disabled = true;
+        btnView.innerHTML = `<svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>Generando...</span>`;
+      }
+
+      try {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const startStr = `${yyyy}-${mm}-01`;
+        const endStr = `${yyyy}-${mm}-${dd}`;
+        const monthName = getMonthName(now.getMonth());
+
+        const payload = {
+          title: `Informe Ejecutivo Mensual - ${monthName} ${yyyy}`,
+          start_date: startStr,
+          end_date: endStr,
+          specialist: null
+        };
+
+        const res = await fetch(`${API_URL}/reports/generate-and-save`, {
+          method: 'POST',
+          headers: {
+            ...getAuthHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || `Error ${res.status}`);
+        }
+
+        const data = await res.json();
+        await loadReportsHistory();
+        showToast('¡Reporte Generado!', `Informe de ${monthName} ${yyyy} registrado en el historial.`);
+      } catch (err) {
+        console.error('Error generando reporte automático:', err);
+        alert(`No se pudo generar el reporte: ${err.message}`);
+      } finally {
+        if (btnHeader) {
+          btnHeader.disabled = false;
+          btnHeader.innerHTML = origH;
+        }
+        if (btnView) {
+          btnView.disabled = false;
+          btnView.innerHTML = origV;
+        }
+      }
+    }
+
+    function downloadReportById(id) {
+      const r = GENERATED_REPORTS_LIST.find(x => x.id === id);
+      if (!r) return;
+
+      const params = new URLSearchParams();
+      if (r.start_date) params.set('start_date', r.start_date);
+      if (r.end_date) params.set('end_date', r.end_date);
+      if (r.specialist_filter && r.specialist_filter !== 'Todo el equipo') params.set('specialist', r.specialist_filter);
+
+      if (CURRENT_USER) {
+        if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
+        if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
+        else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
+      }
+
+      const a = document.createElement('a');
+      a.href = `${API_URL}/reports/excel?${params.toString()}`;
+      a.download = `Informe_Ejecutivo_REP_${String(r.id).padStart(4, '0')}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast('Descarga iniciada', `Descargando Excel del reporte #${r.id}...`);
+    }
+
+    function printReportById(id) {
+      const r = GENERATED_REPORTS_LIST.find(x => x.id === id);
+      if (!r) return;
+
+      const params = new URLSearchParams();
+      if (r.start_date) params.set('start_date', r.start_date);
+      if (r.end_date) params.set('end_date', r.end_date);
+      if (r.specialist_filter && r.specialist_filter !== 'Todo el equipo') params.set('specialist', r.specialist_filter);
+
+      if (CURRENT_USER) {
+        if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
+        if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
+        else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
+      }
+
+      const printUrl = `${API_URL}/reports/print-view?${params.toString()}`;
+      window.open(printUrl, '_blank');
+    }
+
+    async function deleteReportHistory(id) {
+      if (!isCoordinator()) {
+        alert('Acceso restringido: Solo el Coordinador puede eliminar reportes.');
+        return;
+      }
+      if (!confirm(`¿Estás seguro de que deseas eliminar el reporte #REP-${String(id).padStart(4, '0')} del historial?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/reports/history/${id}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        });
+        if (!res.ok) {
+          throw new Error(`Error ${res.status}`);
+        }
+        await loadReportsHistory();
+        showToast('Reporte Eliminado', `El reporte #${id} fue eliminado del historial.`);
+      } catch (err) {
+        console.error('Error eliminando reporte:', err);
+        alert(`No se pudo eliminar el reporte: ${err.message}`);
+      }
     }
 
     // Atajos de teclado para Modo TV
