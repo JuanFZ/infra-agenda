@@ -111,7 +111,7 @@ SPECIALISTS_MAP = {
         "name": "Juan Fernández",
         "email": "j.fernandez@sycom.com.ve",
         "glpi_id": 10,
-        "clickup_id": None,
+        "clickup_id": 107105518,
         "telegram": "@Juuan8",
         "role": "Especialista"
     },
@@ -129,7 +129,7 @@ SPECIALISTS_MAP = {
         "name": "Luis Acosta",
         "email": "l.acosta@sycom.com.ve",
         "glpi_id": 9,
-        "clickup_id": None,
+        "clickup_id": 107105519,
         "telegram": "@lapsy0",
         "role": "Especialista"
     }
@@ -165,7 +165,6 @@ DEFAULT_USERS = [
     {"full_name": "Juan Fernández", "username": "j.fernandez", "email": "j.fernandez@sycom.com.ve", "telegram_username": "@Juuan8", "role": "especialista"},
     {"full_name": "Yoxaide Jiménez", "username": "y.jimenez", "email": "y.jimenez@sycom.com.ve", "telegram_username": "@Yjimenezg", "role": "especialista"},
     {"full_name": "Luis Acosta", "username": "l.acosta", "email": "l.acosta@sycom.com.ve", "telegram_username": "@lapsy0", "role": "especialista"},
-    {"full_name": "Analista de Operaciones", "username": "analista", "email": "analista@sycom.com.ve", "telegram_username": None, "role": "analista"},
 ]
 
 def init_users():
@@ -570,7 +569,10 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db),
             success = True
 
     if not success:
-        raise HTTPException(status_code=500, detail=f"No se pudo sincronizar la asignación en {source}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"No se pudo sincronizar la asignación en {source}. Si es ClickUp, asegúrate de que el especialista haya sido añadido al espacio o lista correspondiente."
+        )
 
     # Actualizar estado y responsable en la base de datos operativa
     combined_names = ", ".join(m["name"] for m in matched_list)

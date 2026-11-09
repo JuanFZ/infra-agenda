@@ -144,6 +144,8 @@ class ClickUpClient:
                 }
             }
             res = requests.put(url, headers=self.get_headers(), json=payload, timeout=10)
+            if res.status_code != 200:
+                print(f"[ClickUpClient] Error asignando tarea {task_id}: {res.status_code} - {res.text}")
             return res.status_code == 200
         except Exception as e:
             print(f"[ClickUpClient] Error asignando tarea {task_id} a usuarios {user_ids}: {e}")
