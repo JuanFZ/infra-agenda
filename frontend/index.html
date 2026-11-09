@@ -4043,13 +4043,16 @@
     }
 
     // Navegación de vistas
-    document.querySelectorAll('.nav').forEach(n => {
+    document.querySelectorAll('.nav[data-view]').forEach(n => {
       n.onclick = () => {
+        const viewName = n.dataset.view;
+        if (!viewName) return;
+        const targetView = document.getElementById(`v-${viewName}`);
+        if (!targetView) return;
         document.querySelectorAll('.nav').forEach(x => x.classList.remove('active'));
         document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
         n.classList.add('active');
-        const viewName = n.dataset.view;
-        document.getElementById(`v-${viewName}`).classList.add('active');
+        targetView.classList.add('active');
         const label = n.querySelector('.label')?.textContent || n.textContent.trim();
         document.getElementById('viewTitle').textContent = label;
         if (window.innerWidth <= 768) {

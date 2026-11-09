@@ -14,7 +14,7 @@ from .config import SYNC_INTERVAL_MINUTES
 from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
 from .sync.glpi_client import GLPIClient
 from .sync.clickup_client import ClickUpClient
-from .notifications.telegram_notifier import CARACAS_TZ, format_caracas_time, now_caracas_str
+from .notifications.telegram_notifier import CARACAS_TZ, format_caracas_time, now_caracas_str, test_telegram_connection
 from .reports.report_generator import get_report_data, generate_excel_report, generate_executive_html
 
 # Crear tablas si no existen
@@ -834,6 +834,8 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
         safe_source = html.escape(source)
         safe_desc = f"\n📝 <b>Descripción:</b>\n{html.escape(req.description.strip())}\n" if req.description and req.description.strip() else ""
         prio_icon = "🔥" if priority == "Crítica" else ("⚡" if priority == "Alta" else "📌")
+        safe_url = html.escape(str(url).strip()) if url else ""
+        link_html = f"\n🔗 <a href='{safe_url}'>Abrir en {safe_source}</a>" if safe_url else ""
         msg = (
             f"✨ <b>Nueva Actividad Creada</b>\n\n"
             f"📌 <b>Asunto:</b> {safe_title}\n"
@@ -842,10 +844,19 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
             f"🎯 <b>{plural_label}:</b> {mentions}\n"
             f"⏳ <b>Límite SLA:</b> {due_str}\n"
             f"🕒 <b>Hora registro:</b> {now_str}\n"
-            f"{safe_desc}\n"
-            f"🔗 <a href='{url}'>Abrir en {safe_source}</a>"
+            f"{safe_desc}"
+            f"{link_html}"
         )
-        send_telegram_message(msg, parse_mode="HTML")
+        sent_ok = send_telegram_message(msg, parse_mode="HTML")
+        if sent_ok:
+            try:
+                db.add(AlertLog(item_id=item.id, semaphore="nuevo"))
+                db.commit()
+            except Exception:
+                db.rollback()
+            print(f"[CreateItem] Alerta Telegram enviada con éxito para #{external_id}")
+        else:
+            print(f"[CreateItem] AVISO: Alerta Telegram no pudo entregarse para #{external_id}")
     except Exception as e:
         print(f"[Telegram Create Notification Error] {e}")
 
@@ -908,6 +919,34 @@ def delete_item(item_id: int, db: Session = Depends(get_db), _role: str = Depend
         "message": f"Actividad {source} #{ext_id} eliminada con éxito",
         "deleted_id": item_id
     }
+
+
+# ==============================================================================
+# DIAGNÓSTICO NOTIFICACIONES TELEGRAM
+# ==============================================================================
+
+@app.get("/api/notifications/telegram-status")
+def api_telegram_status():
+    """Verifica si las credenciales del bot de Telegram están cargadas en el entorno."""
+    from . import config
+    token = (config.TELEGRAM_BOT_TOKEN or "").strip()
+    chat_id = (config.TELEGRAM_CHAT_ID or "").strip()
+    masked_token = f"{token[:6]}...{token[-4:]}" if len(token) > 10 else ("Configurado" if token else "NO CONFIGURADO")
+    masked_chat = f"{chat_id[:3]}...{chat_id[-2:]}" if len(chat_id) > 5 else ("Configurado" if chat_id else "NO CONFIGURADO")
+    return {
+        "bot_configured": bool(token),
+        "chat_configured": bool(chat_id),
+        "bot_token_preview": masked_token,
+        "chat_id_preview": masked_chat,
+        "status": "READY" if (token and chat_id) else "MISSING_ENV"
+    }
+
+
+@app.post("/api/notifications/test-telegram")
+def api_test_telegram(_role: str = Depends(verify_coordinator_role)):
+    """Envía un mensaje de prueba al chat de Telegram configurado."""
+    res = test_telegram_connection()
+    return res
 
 
 # ==============================================================================

@@ -44,24 +44,42 @@ def get_report_data(
     """
     query = db.query(Item)
 
-    # Sanitizar filtros de fecha y especialista
+    # Sanitizar filtros de fecha y especialista interpretados en hora Caracas (UTC-4)
     clean_start = None
-    if isinstance(start_date, (datetime.datetime, datetime.date)):
+    if isinstance(start_date, datetime.datetime):
         clean_start = start_date
+    elif isinstance(start_date, datetime.date):
+        clean_start = datetime.datetime(start_date.year, start_date.month, start_date.day, 0, 0, 0)
     elif isinstance(start_date, str) and start_date.strip():
+        s = start_date.strip()
         try:
-            clean_start = datetime.datetime.fromisoformat(start_date.strip())
+            if len(s) == 10 and s.count("-") == 2:
+                y, m, d = [int(p) for p in s.split("-")]
+                dt_c = datetime.datetime(y, m, d, 0, 0, 0, tzinfo=CARACAS_TZ)
+                clean_start = dt_c.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+            else:
+                clean_start = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+                if clean_start.tzinfo:
+                    clean_start = clean_start.astimezone(datetime.timezone.utc).replace(tzinfo=None)
         except Exception:
             clean_start = None
 
     clean_end = None
-    if isinstance(end_date, (datetime.datetime, datetime.date)):
+    if isinstance(end_date, datetime.datetime):
         clean_end = end_date
+    elif isinstance(end_date, datetime.date):
+        clean_end = datetime.datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59)
     elif isinstance(end_date, str) and end_date.strip():
+        s = end_date.strip()
         try:
-            clean_end = datetime.datetime.fromisoformat(end_date.strip())
-            if len(end_date.strip()) == 10:
-                clean_end = clean_end.replace(hour=23, minute=59, second=59)
+            if len(s) == 10 and s.count("-") == 2:
+                y, m, d = [int(p) for p in s.split("-")]
+                dt_c = datetime.datetime(y, m, d, 23, 59, 59, tzinfo=CARACAS_TZ)
+                clean_end = dt_c.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+            else:
+                clean_end = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+                if clean_end.tzinfo:
+                    clean_end = clean_end.astimezone(datetime.timezone.utc).replace(tzinfo=None)
         except Exception:
             clean_end = None
 
@@ -228,14 +246,14 @@ def get_report_data(
 
     # Determinación de etiquetas de fechas
     now_caracas = datetime.datetime.now(CARACAS_TZ)
-    if not start_date and not end_date:
+    if not clean_start and not clean_end:
         period_str = f"Mes en curso ({now_caracas.strftime('%B %Y').capitalize()})"
-    elif start_date and end_date:
-        period_str = f"{format_caracas_time(start_date, '%d-%m-%Y')} al {format_caracas_time(end_date, '%d-%m-%Y')}"
-    elif start_date:
-        period_str = f"Desde {format_caracas_time(start_date, '%d-%m-%Y')}"
+    elif clean_start and clean_end:
+        period_str = f"{format_caracas_time(clean_start, '%d-%m-%Y')} al {format_caracas_time(clean_end, '%d-%m-%Y')}"
+    elif clean_start:
+        period_str = f"Desde {format_caracas_time(clean_start, '%d-%m-%Y')}"
     else:
-        period_str = f"Hasta {format_caracas_time(end_date, '%d-%m-%Y')}"
+        period_str = f"Hasta {format_caracas_time(clean_end, '%d-%m-%Y')}"
 
     return {
         "generated_at": now_caracas.strftime("%d-%m-%Y %I:%M %p"),

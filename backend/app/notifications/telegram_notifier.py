@@ -1,6 +1,6 @@
 import datetime
-import urllib.request
 import json
+import requests
 from sqlalchemy.orm import Session
 from .. import config
 from ..models import Item, AlertLog, User
@@ -8,10 +8,24 @@ from ..models import Item, AlertLog, User
 # Zona Horaria de Venezuela (Caracas: UTC-4)
 CARACAS_TZ = datetime.timezone(datetime.timedelta(hours=-4))
 
-def format_caracas_time(dt: datetime.datetime | None, format_str: str = "%d-%m-%Y %I:%M %p") -> str:
-    """Convierte cualquier fecha UTC o local a la zona horaria oficial de Caracas (UTC-4)."""
+def format_caracas_time(dt: datetime.datetime | datetime.date | str | None, format_str: str = "%d-%m-%Y %I:%M %p") -> str:
+    """Convierte cualquier fecha UTC, local o cadena ISO a la zona horaria oficial de Caracas (UTC-4)."""
     if not dt:
         return "No especificada"
+    if isinstance(dt, str):
+        s = dt.strip().replace("Z", "+00:00")
+        try:
+            if len(s) == 10:
+                parts = s.split("-")
+                dt_obj = datetime.datetime(int(parts[0]), int(parts[1]), int(parts[2]), 0, 0, 0, tzinfo=CARACAS_TZ)
+                return dt_obj.strftime(format_str)
+            dt = datetime.datetime.fromisoformat(s)
+        except Exception:
+            return dt
+    elif isinstance(dt, datetime.date) and not isinstance(dt, datetime.datetime):
+        dt = datetime.datetime(dt.year, dt.month, dt.day, 0, 0, 0, tzinfo=CARACAS_TZ)
+        return dt.strftime(format_str)
+
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=datetime.timezone.utc)
     return dt.astimezone(CARACAS_TZ).strftime(format_str)
@@ -22,10 +36,11 @@ def now_caracas_str(format_str: str = "%d-%m-%Y %I:%M %p") -> str:
     return now_utc.astimezone(CARACAS_TZ).strftime(format_str)
 
 def send_telegram_message(text: str, parse_mode: str | None = None) -> bool:
-    token = config.TELEGRAM_BOT_TOKEN
-    chat_id = config.TELEGRAM_CHAT_ID
+    token = (config.TELEGRAM_BOT_TOKEN or "").strip()
+    chat_id = (config.TELEGRAM_CHAT_ID or "").strip()
 
     if not token or not chat_id:
+        print("[Telegram Notifier] AVISO: TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no están configurados en backend/.env")
         return False
 
     if not parse_mode:
@@ -34,7 +49,7 @@ def send_telegram_message(text: str, parse_mode: str | None = None) -> bool:
         else:
             parse_mode = "Markdown"
 
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    api_url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": text,
@@ -44,22 +59,50 @@ def send_telegram_message(text: str, parse_mode: str | None = None) -> bool:
         payload["parse_mode"] = parse_mode
 
     try:
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.status == 200
-    except Exception as e:
-        print(f"[Telegram Notifier] Error enviando mensaje ({parse_mode}): {e}")
-        # Si falló por formato, reintentar sin parse_mode para asegurar que el mensaje llegue
-        try:
+        res = requests.post(api_url, json=payload, timeout=10)
+        if res.status_code == 200:
+            return True
+        print(f"[Telegram Notifier] Error {res.status_code} enviando mensaje ({parse_mode}): {res.text}")
+        
+        # Si falló por formato de entidades, reintentar en texto plano para asegurar la entrega
+        if res.status_code == 400 and parse_mode:
             payload.pop("parse_mode", None)
-            data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                return resp.status == 200
-        except Exception as retry_err:
-            print(f"[Telegram Notifier] Falló reintento plano: {retry_err}")
-            return False
+            retry_res = requests.post(api_url, json=payload, timeout=10)
+            if retry_res.status_code == 200:
+                print("[Telegram Notifier] Mensaje entregado con éxito en reintento plano.")
+                return True
+            print(f"[Telegram Notifier] Falló reintento plano ({retry_res.status_code}): {retry_res.text}")
+        return False
+    except Exception as e:
+        print(f"[Telegram Notifier] Excepción de conexión con API de Telegram: {e}")
+        return False
+
+def test_telegram_connection() -> dict:
+    """Prueba la conectividad y validez del bot de Telegram configurado."""
+    token = (config.TELEGRAM_BOT_TOKEN or "").strip()
+    chat_id = (config.TELEGRAM_CHAT_ID or "").strip()
+    if not token or not chat_id:
+        return {
+            "status": "ERROR",
+            "message": "TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID vacíos en el archivo .env",
+            "bot_configured": bool(token),
+            "chat_configured": bool(chat_id)
+        }
+
+    now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
+    test_msg = (
+        f"🤖 <b>Diagnóstico de Conexión Sycom</b>\n\n"
+        f"✅ <i>El bot de notificaciones está conectado y operativo en el servidor.</i>\n"
+        f"🕒 <b>Hora Caracas:</b> {now_str}\n"
+        f"📡 <i>Agenda de Infraestructura & Base de Datos</i>"
+    )
+    ok = send_telegram_message(test_msg, parse_mode="HTML")
+    return {
+        "status": "OK" if ok else "ERROR",
+        "message": "Mensaje de prueba enviado exitosamente a Telegram" if ok else "Error al enviar mensaje a Telegram (verifique credenciales y permisos)",
+        "bot_configured": bool(token),
+        "chat_configured": bool(chat_id)
+    }
 
 
 def resolve_assignee_mention(db: Session, assignee_name: str, is_critical: bool = False) -> str:
