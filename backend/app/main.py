@@ -5,7 +5,7 @@ import base64
 import datetime
 import hashlib
 from fastapi import FastAPI, Depends, Query, HTTPException, Header, Response
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import or_, and_
@@ -54,6 +54,12 @@ def ensure_db_schema():
                 cursor.execute("ALTER TABLE users ADD COLUMN password_hash VARCHAR(200)")
             if "last_login" not in u_cols:
                 cursor.execute("ALTER TABLE users ADD COLUMN last_login DATETIME")
+
+            cursor.execute("PRAGMA table_info(escalation_documents)")
+            esc_cols = [row[1] for row in cursor.fetchall()]
+            if esc_cols and "doc_url" not in esc_cols:
+                cursor.execute("ALTER TABLE escalation_documents ADD COLUMN doc_url VARCHAR(1000)")
+
             conn.connection.commit()
     except Exception as e:
         print(f"[DB Schema Check] {e}")
@@ -1264,6 +1270,12 @@ def format_file_size(num_bytes: int) -> str:
         return f"{num_bytes / (1024 * 1024):.2f} MB"
 
 
+class CreateEscalationRequest(BaseModel):
+    title: str
+    doc_url: str
+    notes: str | None = None
+
+
 class UploadEscalationRequest(BaseModel):
     title: str | None = None
     filename: str
@@ -1277,22 +1289,82 @@ def api_get_escalations(db: Session = Depends(get_db)):
     docs = db.query(EscalationDocument).order_by(EscalationDocument.created_at.desc()).all()
     result = []
     for d in docs:
+        is_gdoc = bool(d.doc_url) or not d.stored_filename
         result.append({
             "id": d.id,
             "title": d.title,
-            "original_filename": d.original_filename,
+            "doc_url": d.doc_url or (f"/api/escalations/{d.id}/view" if d.stored_filename else "#"),
+            "doc_type": "google_docs" if is_gdoc else "pdf",
+            "original_filename": d.original_filename or "Documento Google Docs",
             "stored_filename": d.stored_filename,
             "file_size_bytes": d.file_size_bytes,
-            "file_size_formatted": d.file_size_formatted,
+            "file_size_formatted": d.file_size_formatted if not is_gdoc else "Google Docs",
             "uploaded_by": d.uploaded_by,
             "uploaded_by_role": d.uploaded_by_role,
             "notes": d.notes or "",
             "created_at": d.created_at.isoformat() if d.created_at else None,
             "created_at_caracas": format_caracas_time(d.created_at, "%d-%m-%Y %I:%M %p") if d.created_at else "—",
-            "view_url": f"/api/escalations/{d.id}/view",
-            "download_url": f"/api/escalations/{d.id}/download"
+            "view_url": d.doc_url or f"/api/escalations/{d.id}/view",
+            "download_url": f"/api/escalations/{d.id}/download" if d.stored_filename else None
         })
     return result
+
+
+@app.post("/api/escalations")
+def api_create_escalation(
+    req: CreateEscalationRequest,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    role_param: str = Query(None, alias="role"),
+    user_param: str = Query(None, alias="user")
+):
+    """Registra un nuevo documento de escalamiento mediante enlace oficial a Google Docs o Drive."""
+    title = (req.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Debe indicar el código o título del escalamiento.")
+
+    doc_url = (req.doc_url or "").strip()
+    if not doc_url:
+        raise HTTPException(status_code=400, detail="Debe indicar el enlace (URL) de Google Docs.")
+
+    if not (doc_url.startswith("http://") or doc_url.startswith("https://")):
+        doc_url = "https://" + doc_url
+
+    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "Coordinador")).strip().capitalize()
+    user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "Adonis Lozada Figueroa")).strip() or "Adonis Lozada Figueroa"
+
+    doc = EscalationDocument(
+        title=title,
+        doc_url=doc_url,
+        original_filename=f"{title} (Google Docs)",
+        stored_filename="",
+        file_size_bytes=0,
+        file_size_formatted="Google Docs",
+        uploaded_by=user_name,
+        uploaded_by_role=role,
+        notes=(req.notes or "").strip() or None,
+        created_at=datetime.datetime.utcnow()
+    )
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+
+    return {
+        "status": "OK",
+        "message": "Documento de escalamiento registrado exitosamente.",
+        "document": {
+            "id": doc.id,
+            "title": doc.title,
+            "doc_url": doc.doc_url,
+            "doc_type": "google_docs",
+            "file_size_formatted": "Google Docs",
+            "uploaded_by": doc.uploaded_by,
+            "uploaded_by_role": doc.uploaded_by_role,
+            "notes": doc.notes or "",
+            "created_at_caracas": format_caracas_time(doc.created_at, "%d-%m-%Y %I:%M %p")
+        }
+    }
 
 
 @app.post("/api/escalations/upload")
@@ -1387,13 +1459,19 @@ def api_upload_escalation(
 
 @app.get("/api/escalations/{doc_id}/view")
 def api_view_escalation(doc_id: int, db: Session = Depends(get_db)):
-    """Abre el PDF en el visor integrado del navegador (inline)."""
+    """Abre el documento de escalamiento: redirige si es Google Docs o muestra PDF inline."""
     doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Documento de escalamiento no encontrado.")
 
+    if doc.doc_url:
+        return RedirectResponse(url=doc.doc_url)
+
+    if not doc.stored_filename:
+        raise HTTPException(status_code=404, detail="El documento no posee un archivo físico asociado.")
+
     file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, doc.stored_filename)
-    if not os.path.exists(file_path):
+    if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="El archivo físico del documento no se encuentra en el servidor.")
 
     return FileResponse(
@@ -1406,13 +1484,19 @@ def api_view_escalation(doc_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/escalations/{doc_id}/download")
 def api_download_escalation(doc_id: int, db: Session = Depends(get_db)):
-    """Fuerza la descarga del PDF con su nombre original."""
+    """Fuerza la descarga del PDF o redirige al documento si es Google Docs."""
     doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Documento de escalamiento no encontrado.")
 
+    if doc.doc_url:
+        return RedirectResponse(url=doc.doc_url)
+
+    if not doc.stored_filename:
+        raise HTTPException(status_code=404, detail="El documento no posee un archivo descargable.")
+
     file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, doc.stored_filename)
-    if not os.path.exists(file_path):
+    if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="El archivo físico del documento no se encuentra en el servidor.")
 
     return FileResponse(
@@ -1446,12 +1530,13 @@ def api_delete_escalation(
             detail="Permiso denegado: Solo el Coordinador o el autor del documento pueden eliminarlo."
         )
 
-    file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, doc.stored_filename)
-    if os.path.exists(file_path):
-        try:
-            os.remove(file_path)
-        except Exception as e:
-            print(f"[Delete Escalation File Error] {e}")
+    if doc.stored_filename:
+        file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, doc.stored_filename)
+        if os.path.isfile(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print(f"[Delete Escalation File Error] {e}")
 
     db.delete(doc)
     db.commit()

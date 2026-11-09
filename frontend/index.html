@@ -2612,7 +2612,7 @@
       </div>
     </div>
 
-    <!-- Vista de Repositorio de Escalamientos (BD Documental de PDFs) -->
+    <!-- Vista de Repositorio de Escalamientos (BD Documental y Enlaces Google Docs) -->
     <div class="view" id="v-escalamientos">
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
@@ -2621,35 +2621,34 @@
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
-                <line x1="12" y1="18" x2="12" y2="12" />
-                <line x1="9" y1="15" x2="12" y2="12" />
-                <line x1="15" y1="15" x2="12" y2="12" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
               </svg>
               <span>Repositorio de Escalamientos</span>
-              <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px" id="lblEscalationsCount">0 documentos</span>
+              <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px" id="lblEscalationsCount">0 escalamientos</span>
             </h3>
-            <span class="muted" style="font-size:12px;margin-top:3px;display:block">Expedientes, cartas y actas de escalamiento en formato PDF con control de autoría y descargas</span>
+            <span class="muted" style="font-size:12px;margin-top:3px;display:block">Expedientes, actas y enlaces de escalamiento en Google Docs / Drive con control de autoría y acceso directo</span>
           </div>
 
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <div style="position:relative">
-              <input type="text" id="fSearchEscalations" placeholder="Buscar por código, nombre o autor..." oninput="filterEscalationsTable(this.value)"
-                style="font-size:12px;padding:7px 12px 7px 30px;width:260px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none"
-                title="Filtrar por código (ej: SIMF-ES-5260), cliente o especialista">
+              <input type="text" id="fSearchEscalations" placeholder="Buscar por código, título, autor o enlace..." oninput="filterEscalationsTable(this.value)"
+                style="font-size:12px;padding:7px 12px 7px 30px;width:280px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none"
+                title="Filtrar por código (ej: SIMF-ES-5260 88920 Venezolano), notas o autor">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                 style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
             </div>
-            <button class="btn primary" id="btnUploadEscalationModal" onclick="openEscalationUploadModal()"
+            <button class="btn primary" id="btnUploadEscalationModal" onclick="openEscalationModal()"
               style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;border-color:rgba(79,140,255,.4);font-weight:700;display:inline-flex;align-items:center;gap:7px"
-              title="Subir un nuevo documento PDF de escalamiento">
+              title="Registrar un nuevo escalamiento en Google Docs">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
-              <span>+ Subir Documento</span>
+              <span>+ Registrar Escalamiento</span>
             </button>
           </div>
         </div>
@@ -2658,12 +2657,12 @@
           <table id="tblEscalations">
             <thead>
               <tr>
-                <th>Código / Título del Escalamiento</th>
-                <th>Archivo / Tamaño</th>
-                <th>Subido Por</th>
-                <th>Fecha de Carga</th>
-                <th>Observaciones</th>
-                <th style="text-align:center">Acciones</th>
+                <th style="min-width:240px">Código / Título del Escalamiento</th>
+                <th style="min-width:160px">Documento / Enlace</th>
+                <th>Registrado Por</th>
+                <th>Fecha de Registro</th>
+                <th style="min-width:180px">Observaciones</th>
+                <th style="text-align:center;min-width:150px">Acciones</th>
               </tr>
             </thead>
             <tbody id="tblEscalationsBody">
@@ -4228,7 +4227,7 @@
         if (subTitleEl) {
           subTitleEl.textContent = (viewName === 'reportes')
             ? 'Historial y generación de informes ejecutivos consolidados'
-            : 'Base documental de expedientes y cartas de escalamiento';
+            : 'Base documental y enlaces directos de escalamiento (Google Docs)';
         }
         if (viewName === 'reportes') loadReportsHistory();
         if (viewName === 'escalamientos') loadEscalations();
@@ -5593,10 +5592,11 @@
     }
 
     // =========================================================================
-    // MÓDULO DE ESCALAMIENTOS - REPOSITORIO DOCUMENTAL DE PDFs
+    // MÓDULO DE ESCALAMIENTOS - REPOSITORIO DOCUMENTAL Y ENLACES (GOOGLE DOCS)
     // =========================================================================
     let ESCALATIONS_LIST = [];
     let SELECTED_ESCALATION_FILE = null;
+    let ESCALATION_ACTIVE_TAB = 'url'; // 'url' | 'file'
 
     async function loadEscalations() {
       const tbody = document.getElementById('tblEscalationsBody');
@@ -5614,7 +5614,7 @@
         ESCALATIONS_LIST = list;
 
         if (countBadge) {
-          countBadge.textContent = `${list.length} documento${list.length === 1 ? '' : 's'}`;
+          countBadge.textContent = `${list.length} escalamiento${list.length === 1 ? '' : 's'}`;
         }
 
         const sInput = document.getElementById('fSearchEscalations');
@@ -5629,7 +5629,7 @@
         tbody.innerHTML = `
           <tr>
             <td colspan="6" style="text-align:center;padding:24px;color:var(--red)">
-              Error al cargar documentos: ${escapeHtml(err.message)}
+              Error al cargar repositorio de escalamientos: ${escapeHtml(err.message)}
             </td>
           </tr>
         `;
@@ -5644,10 +5644,11 @@
       }
       const filtered = ESCALATIONS_LIST.filter(d => {
         const title = (d.title || '').toLowerCase();
+        const docUrl = (d.doc_url || '').toLowerCase();
         const orig = (d.original_filename || '').toLowerCase();
         const user = (d.uploaded_by || '').toLowerCase();
         const notes = (d.notes || '').toLowerCase();
-        return title.includes(q) || orig.includes(q) || user.includes(q) || notes.includes(q);
+        return title.includes(q) || docUrl.includes(q) || orig.includes(q) || user.includes(q) || notes.includes(q);
       });
       renderEscalationsTable(filtered);
     }
@@ -5663,12 +5664,12 @@
               <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4;display:block;margin:0 auto 10px auto">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
-                <line x1="12" y1="18" x2="12" y2="12"/>
-                <line x1="9" y1="15" x2="12" y2="12"/>
-                <line x1="15" y1="15" x2="12" y2="12"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
               </svg>
-              No se encontraron documentos de escalamiento registrados.<br>
-              <small style="margin-top:4px;display:inline-block">Haz clic en <strong>"+ Subir Documento"</strong> para registrar el primer expediente en PDF.</small>
+              No se encontraron escalamientos registrados.<br>
+              <small style="margin-top:4px;display:inline-block">Haz clic en <strong>"+ Registrar Escalamiento"</strong> para vincular el primer documento de Google Docs.</small>
             </td>
           </tr>
         `;
@@ -5676,51 +5677,85 @@
       }
 
       tbody.innerHTML = list.map(d => {
+        const isGoogleDoc = !!d.doc_url || d.doc_type === 'google_docs';
+        const targetUrl = d.doc_url || `${API_URL}/escalations/${d.id}/view`;
+
+        const typeBadge = isGoogleDoc
+          ? `<a href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer" 
+              style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:rgba(66,133,244,0.12);border:1px solid rgba(66,133,244,0.3);color:#60a5fa;text-decoration:none;font-size:11px;font-weight:600"
+              title="Abrir enlace de Google Docs en pestaña nueva">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              <span>Google Docs</span>
+            </a>`
+          : `<span class="badge" style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.25);font-size:11px;font-family:monospace">
+              PDF · ${escapeHtml(d.file_size_formatted || '—')}
+            </span>`;
+
+        const docIconSvg = isGoogleDoc
+          ? `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>`
+          : `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>`;
+
         return `
           <tr>
             <td>
-              <div style="display:flex;align-items:flex-start;gap:9px">
-                <div style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.25);border-radius:6px;padding:5px 6px;display:flex;align-items:center;justify-content:center;margin-top:2px;flex-shrink:0" title="Documento PDF">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <div style="display:flex;align-items:flex-start;gap:10px">
+                <div style="background:${isGoogleDoc ? 'rgba(66,133,244,0.12)' : 'rgba(239,68,68,0.12)'};border:1px solid ${isGoogleDoc ? 'rgba(66,133,244,0.25)' : 'rgba(239,68,68,0.25)'};border-radius:6px;padding:6px;display:flex;align-items:center;justify-content:center;margin-top:2px;flex-shrink:0" title="${isGoogleDoc ? 'Documento de Google Docs' : 'Documento PDF'}">
+                  ${docIconSvg}
                 </div>
                 <div>
-                  <strong style="color:var(--text);font-size:13px;display:block">${escapeHtml(d.title)}</strong>
-                  <span class="muted" style="font-size:11px;font-family:monospace">${escapeHtml(d.original_filename)}</span>
+                  <a href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer" 
+                    style="font-size:13px;font-weight:700;color:var(--text);text-decoration:none;display:inline-flex;align-items:center;gap:5px" 
+                    title="Abrir ${escapeHtml(d.title)} en una pestaña nueva">
+                    <span>${escapeHtml(d.title)}</span>
+                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  </a>
+                  <span class="muted" style="font-size:11px;display:block;margin-top:2px;font-family:monospace">
+                    ${isGoogleDoc ? (d.doc_url ? escapeHtml(d.doc_url.replace(/https?:\/\//, '').slice(0, 48) + '...') : 'Google Docs') : escapeHtml(d.original_filename || 'PDF')}
+                  </span>
                 </div>
               </div>
             </td>
             <td>
-              <span class="badge" style="background:rgba(255,255,255,0.06);font-size:11px;font-family:monospace;font-weight:600">${escapeHtml(d.file_size_formatted || '—')}</span>
+              ${typeBadge}
             </td>
             <td>
               <div style="font-weight:600;font-size:12px">${escapeHtml(d.uploaded_by || 'Usuario')}</div>
               <small class="muted" style="font-size:10.5px">${escapeHtml(d.uploaded_by_role || 'Coordinador')}</small>
             </td>
             <td>
-              <div style="font-size:12px;color:var(--text)">${escapeHtml(d.created_at_caracas || '—')}</div>
+              <div style="font-size:12px;color:var(--text);white-space:nowrap">${escapeHtml(d.created_at_caracas || '—')}</div>
             </td>
             <td>
-              <div style="font-size:11.5px;color:var(--muted);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(d.notes || '')}">
+              <div style="font-size:11.5px;color:var(--muted);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(d.notes || '')}">
                 ${escapeHtml(d.notes || '—')}
               </div>
             </td>
             <td style="text-align:center">
               <div style="display:inline-flex;align-items:center;gap:6px">
-                <button type="button" class="btn" onclick="viewEscalation(${d.id})"
+                <button type="button" class="btn" onclick="openEscalationLink('${escapeHtml(targetUrl)}')"
                   style="padding:5px 9px;font-size:11px;background:rgba(79,140,255,0.15);color:var(--accent);border-color:rgba(79,140,255,0.3);display:inline-flex;align-items:center;gap:5px"
-                  title="Abrir y visualizar PDF en una nueva pestaña">
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  <span>Ver</span>
+                  title="Abrir documento en una nueva pestaña">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  <span>Abrir Doc</span>
                 </button>
-                <button type="button" class="btn" onclick="downloadEscalation(${d.id}, '${escapeHtml(d.original_filename)}')"
-                  style="padding:5px 9px;font-size:11px;background:rgba(16,185,129,0.15);color:#34d399;border-color:rgba(16,185,129,0.3);display:inline-flex;align-items:center;gap:5px"
-                  title="Descargar archivo PDF oficial">
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  <span>Descargar</span>
+                <button type="button" class="btn" onclick="copyEscalationLink('${escapeHtml(targetUrl)}')"
+                  style="padding:5px 8px;font-size:11px;background:rgba(255,255,255,0.05);color:var(--text);border-color:rgba(255,255,255,0.14);display:inline-flex;align-items:center;gap:4px"
+                  title="Copiar enlace directo al portapapeles">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span>Copiar</span>
                 </button>
                 <button type="button" class="btn" onclick="deleteEscalation(${d.id}, '${escapeHtml(d.title)}')"
                   style="padding:5px 7px;font-size:11px;color:#f87171;background:rgba(255,93,93,0.1);border-color:rgba(255,93,93,0.25)"
-                  title="Eliminar este documento del repositorio">
+                  title="Eliminar este escalamiento del repositorio">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                 </button>
               </div>
@@ -5730,8 +5765,41 @@
       }).join('');
     }
 
-    function openEscalationUploadModal() {
+    function openEscalationLink(url) {
+      if (!url) return;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    function copyEscalationLink(url) {
+      if (!url) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+          showToast('¡Enlace Copiado!', 'El enlace del documento fue copiado al portapapeles.');
+        }).catch(() => fallbackCopy(url));
+      } else {
+        fallbackCopy(url);
+      }
+    }
+
+    function fallbackCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('¡Enlace Copiado!', 'El enlace del documento fue copiado al portapapeles.');
+      } catch (e) {
+        prompt('Copia manualmente este enlace:', text);
+      }
+      document.body.removeChild(ta);
+    }
+
+    function openEscalationModal() {
       SELECTED_ESCALATION_FILE = null;
+      ESCALATION_ACTIVE_TAB = 'url';
       const modal = document.getElementById('modalContent');
       const authorName = CURRENT_USER ? (CURRENT_USER.full_name || CURRENT_USER.username) : 'Adonis Lozada Figueroa';
       const authorRole = CURRENT_USER ? (CURRENT_USER.role || 'Coordinador') : 'Coordinador';
@@ -5741,36 +5809,31 @@
           <div>
             <h3 style="margin:0;font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
               </svg>
-              <span>Subir Documento de Escalamiento</span>
+              <span>Registrar Escalamiento</span>
             </h3>
-            <span class="muted" style="font-size:12px;margin-top:2px;display:block">Registra un expediente o carta oficial en PDF en el repositorio central</span>
+            <span class="muted" style="font-size:12px;margin-top:2px;display:block">Vincula el enlace del documento de Google Docs o expediente para consulta del equipo</span>
           </div>
           <button class="btn" onclick="closeModal()" style="padding:4px 8px;font-size:13px">&times;</button>
         </div>
 
-        <!-- Zona de Carga de Archivo (Drag & Drop / Selector) -->
-        <input type="file" id="escalationFileInput" accept=".pdf" onchange="onEscalationFileSelected(this)" style="display:none">
-        
-        <div id="escalationDropZone" onclick="document.getElementById('escalationFileInput').click()"
-          style="border:2px dashed rgba(79,140,255,0.35);border-radius:12px;padding:26px 20px;text-align:center;background:rgba(79,140,255,0.03);cursor:pointer;transition:all .2s ease;margin-bottom:16px">
-          <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);margin-bottom:8px">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="12" y1="18" x2="12" y2="12"/>
-            <line x1="9" y1="15" x2="12" y2="12"/>
-            <line x1="15" y1="15" x2="12" y2="12"/>
-          </svg>
-          <div id="escalationDropText">
-            <strong style="color:var(--text);font-size:13px;display:block">Haz clic aquí o arrastra tu archivo PDF</strong>
-            <span class="muted" style="font-size:11.5px;margin-top:3px;display:block">Solo formato PDF (.pdf) · Máx. 50 MB</span>
-          </div>
+        <!-- Pestañas para Tipo de Escalamiento -->
+        <div style="display:flex;gap:6px;margin-bottom:16px;background:rgba(255,255,255,0.03);padding:4px;border-radius:8px;border:1px solid rgba(255,255,255,0.06)">
+          <button type="button" id="tabEscalationUrl" onclick="switchEscalationTab('url')"
+            style="flex:1;padding:8px 12px;font-size:12px;font-weight:700;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all .2s ease">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            <span>Enlace Google Docs</span>
+          </button>
+          <button type="button" id="tabEscalationFile" onclick="switchEscalationTab('file')"
+            style="flex:1;padding:8px 12px;font-size:12px;font-weight:600;border-radius:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all .2s ease">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span>Subir Archivo PDF</span>
+          </button>
         </div>
 
-        <!-- Campos de Información -->
+        <!-- Campo Común: Código / Título -->
         <div style="margin-bottom:14px">
           <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
             Código / Título del Escalamiento <span style="color:var(--red)">*</span>
@@ -5778,38 +5841,110 @@
           <input type="text" id="escalationTitleInput" class="form-input" 
             placeholder="ej: SIMF-ES-5260 88920 Venezolano" 
             style="width:100%;font-size:13px;font-weight:600">
-          <small class="muted" style="font-size:11px;margin-top:3px;display:block">Identificador formal para búsqueda y auditoría</small>
+          <small class="muted" style="font-size:11px;margin-top:3px;display:block">Identificador formal para búsqueda y auditoría (ej: SIMF-ES-5260 88920 Venezolano)</small>
         </div>
 
-        <div style="margin-bottom:16px">
+        <!-- Sección Google Docs (URL) -->
+        <div id="escalationUrlSection" style="margin-bottom:14px">
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
+            Enlace de Google Docs <span style="color:var(--red)">*</span>
+          </label>
+          <input type="url" id="escalationUrlInput" class="form-input"
+            placeholder="https://docs.google.com/document/d/..."
+            style="width:100%;font-size:12px;font-family:monospace">
+          <small class="muted" style="font-size:11px;margin-top:3px;display:block">Pega la URL del documento compartido en Google Drive / Docs</small>
+        </div>
+
+        <!-- Sección Archivo PDF -->
+        <div id="escalationFileSection" style="display:none;margin-bottom:14px">
+          <input type="file" id="escalationFileInput" accept=".pdf" onchange="onEscalationFileSelected(this)" style="display:none">
+          <div id="escalationDropZone" onclick="document.getElementById('escalationFileInput').click()"
+            style="border:2px dashed rgba(79,140,255,0.35);border-radius:10px;padding:20px 16px;text-align:center;background:rgba(79,140,255,0.03);cursor:pointer;transition:all .2s ease">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);margin-bottom:6px">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <div id="escalationDropText">
+              <strong style="color:var(--text);font-size:12.5px;display:block">Haz clic aquí o arrastra tu archivo PDF</strong>
+              <span class="muted" style="font-size:11px;margin-top:2px;display:block">Solo formato PDF (.pdf) · Máx. 50 MB</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Observaciones -->
+        <div style="margin-bottom:14px">
           <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
             Observaciones o Notas del Caso <span class="muted" style="font-weight:400">(Opcional)</span>
           </label>
           <textarea id="escalationNotesInput" class="form-input" rows="2" 
-            placeholder="Detalles del caso o cliente..." 
+            placeholder="Detalles del cliente, motivo del escalamiento, estado actual..." 
             style="width:100%;font-size:12px;resize:vertical"></textarea>
         </div>
 
+        <!-- Autor info -->
         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;margin-bottom:18px;font-size:11.5px">
-          <span class="muted">Autor registrado:</span>
+          <span class="muted">Registrado por:</span>
           <span style="font-weight:600;color:var(--text)">${escapeHtml(authorName)} <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:10px">${escapeHtml(authorRole)}</span></span>
         </div>
 
+        <!-- Botones de Acción -->
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
           <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
-          <button type="button" class="btn primary" id="btnSubmitEscalation" onclick="submitEscalationUpload()"
+          <button type="button" class="btn primary" id="btnSubmitEscalation" onclick="submitEscalationForm()"
             style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
+              <polyline points="20 6 9 17 4 12"/>
             </svg>
-            <span>Subir Documento PDF</span>
+            <span id="btnSubmitEscalationText">Guardar Escalamiento</span>
           </button>
         </div>
       `;
 
       document.getElementById('modalBg').classList.add('show');
+    }
+
+    // Alias retrocompatible
+    function openEscalationUploadModal() {
+      openEscalationModal();
+    }
+
+    function switchEscalationTab(tab) {
+      ESCALATION_ACTIVE_TAB = tab;
+      const tabUrl = document.getElementById('tabEscalationUrl');
+      const tabFile = document.getElementById('tabEscalationFile');
+      const secUrl = document.getElementById('escalationUrlSection');
+      const secFile = document.getElementById('escalationFileSection');
+      const btnText = document.getElementById('btnSubmitEscalationText');
+
+      if (tab === 'url') {
+        if (tabUrl) {
+          tabUrl.style.background = 'var(--accent)';
+          tabUrl.style.color = '#fff';
+          tabUrl.style.fontWeight = '700';
+        }
+        if (tabFile) {
+          tabFile.style.background = 'transparent';
+          tabFile.style.color = 'var(--muted)';
+          tabFile.style.fontWeight = '600';
+        }
+        if (secUrl) secUrl.style.display = 'block';
+        if (secFile) secFile.style.display = 'none';
+        if (btnText) btnText.textContent = 'Guardar Escalamiento';
+      } else {
+        if (tabFile) {
+          tabFile.style.background = 'var(--accent)';
+          tabFile.style.color = '#fff';
+          tabFile.style.fontWeight = '700';
+        }
+        if (tabUrl) {
+          tabUrl.style.background = 'transparent';
+          tabUrl.style.color = 'var(--muted)';
+          tabUrl.style.fontWeight = '600';
+        }
+        if (secUrl) secUrl.style.display = 'none';
+        if (secFile) secFile.style.display = 'block';
+        if (btnText) btnText.textContent = 'Subir Archivo PDF';
+      }
     }
 
     function onEscalationFileSelected(input) {
@@ -5844,20 +5979,78 @@
       }
     }
 
-    async function submitEscalationUpload() {
-      if (!SELECTED_ESCALATION_FILE) {
-        alert('Por favor selecciona primero un archivo PDF para subir.');
-        return;
-      }
-
+    async function submitEscalationForm() {
       const titleInput = document.getElementById('escalationTitleInput');
       const notesInput = document.getElementById('escalationNotesInput');
       const btn = document.getElementById('btnSubmitEscalation');
 
       const title = titleInput ? titleInput.value.trim() : '';
       if (!title) {
-        alert('Debes indicar un código o título para el documento (ej: SIMF-ES-5260 88920 Venezolano).');
+        alert('Debes indicar un código o título para el escalamiento (ej: SIMF-ES-5260 88920 Venezolano).');
         if (titleInput) titleInput.focus();
+        return;
+      }
+
+      // Si es pestaña de Enlace Google Docs
+      if (ESCALATION_ACTIVE_TAB === 'url') {
+        const urlInput = document.getElementById('escalationUrlInput');
+        const docUrl = urlInput ? urlInput.value.trim() : '';
+        if (!docUrl) {
+          alert('Por favor pega el enlace de Google Docs correspondiente al escalamiento.');
+          if (urlInput) urlInput.focus();
+          return;
+        }
+        if (!docUrl.startsWith('http://') && !docUrl.startsWith('https://')) {
+          alert('El enlace debe ser una URL válida que inicie con https:// o http://');
+          if (urlInput) urlInput.focus();
+          return;
+        }
+
+        const origBtnHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = `<svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>Guardando...</span>`;
+        }
+
+        try {
+          const payload = {
+            title: title,
+            doc_url: docUrl,
+            notes: notesInput ? notesInput.value.trim() : ''
+          };
+
+          const res = await fetch(`${API_URL}/escalations`, {
+            method: 'POST',
+            headers: {
+              ...getAuthHeaders(),
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Error ${res.status}`);
+          }
+
+          closeModal();
+          await loadEscalations();
+          showToast('¡Escalamiento Registrado!', `El escalamiento "${title}" fue vinculado con éxito.`);
+        } catch (err) {
+          console.error('Error guardando escalamiento:', err);
+          alert(`No se pudo registrar el escalamiento: ${err.message}`);
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origBtnHtml;
+          }
+        }
+        return;
+      }
+
+      // Si es pestaña de Archivo PDF
+      if (!SELECTED_ESCALATION_FILE) {
+        alert('Por favor selecciona primero un archivo PDF para subir.');
         return;
       }
 
@@ -5895,10 +6088,9 @@
               throw new Error(err.detail || `Error ${res.status}`);
             }
 
-            const data = await res.json();
             closeModal();
             await loadEscalations();
-            showToast('¡Documento Cargado!', `El escalamiento "${title}" fue guardado con éxito.`);
+            showToast('¡Documento Cargado!', `El documento "${title}" fue guardado con éxito.`);
           } catch (err) {
             console.error('Error subiendo escalamiento:', err);
             alert(`No se pudo subir el documento: ${err.message}`);
@@ -5929,6 +6121,11 @@
       }
     }
 
+    // Alias retrocompatible
+    function submitEscalationUpload() {
+      submitEscalationForm();
+    }
+
     function viewEscalation(id) {
       const url = `${API_URL}/escalations/${id}/view`;
       window.open(url, '_blank');
@@ -5945,7 +6142,7 @@
     }
 
     async function deleteEscalation(id, title) {
-      if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente el documento "${title}" del repositorio?`)) {
+      if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente el escalamiento "${title}" del repositorio?`)) {
         return;
       }
 
@@ -5959,10 +6156,10 @@
           throw new Error(err.detail || `Error ${res.status}`);
         }
         await loadEscalations();
-        showToast('Documento Eliminado', `El documento "${title}" fue eliminado del repositorio.`);
+        showToast('Escalamiento Eliminado', `El escalamiento "${title}" fue eliminado del repositorio.`);
       } catch (err) {
         console.error('Error eliminando escalamiento:', err);
-        alert(`No se pudo eliminar el documento: ${err.message}`);
+        alert(`No se pudo eliminar el escalamiento: ${err.message}`);
       }
     }
 

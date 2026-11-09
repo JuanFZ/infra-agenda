@@ -168,10 +168,11 @@ class EscalationDocument(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     title = Column(String(250), nullable=False)               # ej. "SIMF-ES-5260 88920 Venezolano"
-    original_filename = Column(String(250), nullable=False)
-    stored_filename = Column(String(250), nullable=False)
+    doc_url = Column(String(1000), nullable=True)             # Enlace a Google Docs o Drive
+    original_filename = Column(String(250), nullable=True)
+    stored_filename = Column(String(250), nullable=True)
     file_size_bytes = Column(Integer, default=0)
-    file_size_formatted = Column(String(50), default="0 KB")
+    file_size_formatted = Column(String(50), default="Google Docs")
     uploaded_by = Column(String(150), default="Adonis Lozada")
     uploaded_by_role = Column(String(50), default="Coordinador")
     notes = Column(Text, nullable=True)
