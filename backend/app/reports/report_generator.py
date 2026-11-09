@@ -158,7 +158,7 @@ def get_report_data(
         {"name": "Juan Fernández", "role": "Especialista Infra & BD", "keys": ["juan"]},
         {"name": "Yoxaide Jiménez", "role": "Especialista Infra & BD", "keys": ["yoxaide"]},
         {"name": "Luis Acosta", "role": "Especialista Infra & BD", "keys": ["luis"]},
-        {"name": "Sin asignar / Mesa TI", "role": "Bolsa Disponible", "keys": ["sin asignar", "técnico glpi"]}
+        {"name": "Sin asignar", "role": "Sin asignar", "keys": ["sin asignar", "técnico glpi"]}
     ]
 
     por_especialista = []

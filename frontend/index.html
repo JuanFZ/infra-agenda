@@ -413,6 +413,12 @@
       padding: 6px 14px;
       border-radius: 10px;
       border: 1px solid var(--border);
+      min-width: 82px;
+      text-align: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: 0.5px;
     }
 
     body.light .clock {
@@ -2333,13 +2339,13 @@
       </svg>
       <span class="label">Tablero Kanban</span>
     </div>
-    <div class="nav" data-view="atrasados" title="Atrasados">
+    <div class="nav" data-view="atrasados" title="Atrasadas">
       <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10" />
         <polyline points="12 6 12 12 16 14" />
       </svg>
-      <span class="label">Atrasados</span>
+      <span class="label">Atrasadas</span>
       <span class="count" id="navOver">0</span>
     </div>
     <div class="nav" data-view="clientes" title="Clientes">
@@ -2601,7 +2607,7 @@
               <tr>
                 <th>Cliente</th>
                 <th>Abiertos</th>
-                <th>Atrasados</th>
+                <th>Atrasadas</th>
                 <th>Cerrados</th>
                 <th>Cumplimiento SLA</th>
               </tr>
@@ -3238,7 +3244,7 @@
         { key: 'pendiente', lbl: 'Pendientes', val: k.pendientes, hint: isFiltered ? 'Filtrados' : 'Por iniciar', c: 'var(--accent)' },
         { key: 'curso', lbl: 'En Curso', val: k.en_curso, hint: isFiltered ? 'Filtrados' : 'En atención', c: 'var(--cyan)' },
         { key: 'espera', lbl: 'En Espera', val: k.en_espera, hint: isFiltered ? 'Filtrados' : 'Cliente / Proveedor', c: 'var(--purple)' },
-        { key: 'atrasados', lbl: 'Atrasados', val: k.atrasados, hint: isFiltered ? 'Con SLA vencido' : 'SLA vencido', c: 'var(--red)' },
+        { key: 'atrasados', lbl: 'Atrasadas', val: k.atrasados, hint: isFiltered ? 'Con SLA vencido' : 'SLA vencido', c: 'var(--red)' },
         { key: 'cumplimiento', lbl: 'Cumplimiento SLA', val: `${k.cumplimiento_sla}%`, hint: 'Meta: 90%', c: k.cumplimiento_sla >= 90 ? 'var(--green)' : 'var(--yellow)' },
         { key: 'total', lbl: isFiltered ? 'Total Filtrado' : 'Total Registrados', val: k.total_registrados, hint: isFiltered ? 'Coincidentes' : 'En base de datos', c: 'var(--accent)' }
       ];
@@ -4484,11 +4490,18 @@
       if (e.target.id === 'modalBg') document.getElementById('modalBg').classList.remove('show');
     };
 
-    // Reloj
-    setInterval(() => {
+    // Reloj en formato estricto 24 horas (HH:mm:ss) sin fluctuaciones
+    function updateClock() {
       const clk = document.getElementById('clock');
-      if (clk) clk.textContent = new Date().toLocaleTimeString();
-    }, 1000);
+      if (!clk) return;
+      const d = new Date();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      const ss = String(d.getSeconds()).padStart(2, '0');
+      clk.textContent = `${hh}:${mm}:${ss}`;
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
 
     // ==========================================
     // MODO TV / PRESENTACIÓN SALA DE OPERACIONES
@@ -4638,7 +4651,7 @@
           <div class="num">${enCurso}</div>
         </div>
         <div class="tv-stat-box" style="border-left:4px solid var(--red)">
-          <span class="muted" style="font-size:12px;text-transform:uppercase">Atrasados / Fuera SLA</span>
+          <span class="muted" style="font-size:12px;text-transform:uppercase">Atrasadas / Fuera SLA</span>
           <div class="num" style="color:var(--red)">${atrasados}</div>
         </div>
         <div class="tv-stat-box" style="border-left:4px solid var(--yellow)">
@@ -5203,7 +5216,7 @@
         <option value="Juan" ${REPORT_FILTER_STATE.specialist.includes('Juan') ? 'selected' : ''}>Juan Fernández</option>
         <option value="Yoxaide" ${REPORT_FILTER_STATE.specialist.includes('Yoxaide') ? 'selected' : ''}>Yoxaide Jiménez</option>
         <option value="Luis" ${REPORT_FILTER_STATE.specialist.includes('Luis') ? 'selected' : ''}>Luis Acosta</option>
-        <option value="Sin asignar" ${REPORT_FILTER_STATE.specialist === 'Sin asignar' ? 'selected' : ''}>Sin asignar (Bolsa común)</option>
+        <option value="Sin asignar" ${REPORT_FILTER_STATE.specialist === 'Sin asignar' ? 'selected' : ''}>Sin asignar</option>
       `;
 
       modal.innerHTML = `
@@ -6217,10 +6230,10 @@
 
         const roleBadge = isCoord 
           ? `<span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:9.5px">Coord</span>`
-          : (isBolsa ? `<span class="badge" style="background:rgba(243,156,18,0.15);color:#f39c12;font-size:9.5px">Bolsa</span>`
+          : (isBolsa ? `<span class="badge" style="visibility:hidden;font-size:9.5px">-</span>`
                      : `<span class="badge" style="background:rgba(167,139,250,0.15);color:#a78bfa;font-size:9.5px">Espec</span>`);
 
-        const shortName = isBolsa ? 'Sin Asignar' : s.name.split(' ')[0];
+        const shortName = isBolsa ? 'Sin asignar' : s.name.split(' ')[0];
 
         return `
           <div style="flex:1;min-width:46px;max-width:80px;text-align:center">
@@ -6237,11 +6250,15 @@
       const detailsHtml = list.map(s => {
         const sla = Number(s.cumplimiento_pct) || 0;
         const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
+        const isUnassigned = (s.name || '').toLowerCase().includes('sin asignar');
+        const displayName = isUnassigned ? 'Sin asignar' : escapeHtml(s.name);
+        const displayRole = (isUnassigned || !s.role || s.role.toLowerCase().includes('sin asignar') || s.role.toLowerCase().includes('bolsa')) ? '' : `(${escapeHtml(s.role)})`;
+
         return `
           <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(255,255,255,0.02);border-radius:6px;border:1px solid rgba(255,255,255,0.04);font-size:11px">
             <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-weight:700;color:var(--text)">${escapeHtml(s.name)}</span>
-              <span class="muted">(${escapeHtml(s.role)})</span>
+              <span style="font-weight:700;color:var(--text)">${displayName}</span>
+              ${displayRole ? `<span class="muted">${displayRole}</span>` : ''}
             </div>
             <div style="display:flex;align-items:center;gap:10px">
               <span><strong>${s.total}</strong> casos (<span style="color:#10b981">${s.cerrados} c.</span> / <span style="color:#4f8cff">${s.en_curso} act.</span>${s.fuera_sla > 0 ? ` / <span style="color:#ef4444">${s.fuera_sla} atr.</span>` : ''})</span>
