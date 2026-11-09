@@ -682,11 +682,11 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Informe Ejecutivo Sycom - {data['period_label']}</title>
+    <title>Informe Ejecutivo - Soluciones SYCOM</title>
     <style>
         @page {{
             size: letter portrait;
-            margin: 12mm 15mm;
+            margin: 0mm !important;
         }}
         * {{ box-sizing: border-box; }}
         body {{
@@ -845,16 +845,43 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             border-bottom: 1.5px solid #0f172a;
         }}
         @media print {{
-            body {{ background: #fff; padding: 0; }}
-            .report-page {{ border: none; box-shadow: none; padding: 0; max-width: 100%; }}
-            .no-print-bar {{ display: none !important; }}
+            @page {{
+                size: letter portrait;
+                margin: 0mm !important;
+            }}
+            html, body {{
+                background: #ffffff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }}
+            .report-page {{
+                border: none !important;
+                box-shadow: none !important;
+                margin: 0 auto !important;
+                padding: 12mm 15mm 12mm 15mm !important;
+                max-width: 100% !important;
+                border-radius: 0 !important;
+                box-sizing: border-box !important;
+            }}
+            .no-print-bar {{
+                display: none !important;
+            }}
+            .kpi-grid, .breakdown-grid, .footer-signatures, table tr {{
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }}
         }}
     </style>
 </head>
 <body>
     <div class="no-print-bar">
         <div>
-            <strong>Reporte Ejecutivo Generado</strong> · Listo para imprimir o guardar como PDF oficial.
+            <strong>Reporte Ejecutivo Oficial</strong> · Listo para imprimir o guardar como PDF.
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px">
+                Nota: En la ventana de impresión, desactiva la casilla <em>"Encabezados y pies de página"</em> para eliminar cualquier URL residual del navegador.
+            </div>
         </div>
         <div style="display:flex;gap:10px">
             <button class="btn-print" onclick="window.print()">
@@ -953,6 +980,11 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 <strong>Adonis Lozada Figueroa</strong><br>
                 <small style="color:#64748b">Coordinador de Infraestructura y BD<br>Soluciones SYCOM</small>
             </div>
+        </div>
+
+        <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:9.5px;color:#94a3b8">
+            <span>Soluciones SYCOM · Gestión de Infraestructura y Base de Datos</span>
+            <span>Documento Confidencial · Cumplimiento de SLA</span>
         </div>
     </div>
 </body>
