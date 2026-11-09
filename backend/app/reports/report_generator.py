@@ -122,6 +122,15 @@ def get_report_data(
     dentro_sla = [it for it in items if not (it.is_overdue or it.semaphore == "rojo")]
     fuera_sla = [it for it in items if it.is_overdue or it.semaphore == "rojo"]
 
+    cerrados_ok = [it for it in cerrados if not (it.is_overdue or it.semaphore == "rojo")]
+    cerrados_fuera = [it for it in cerrados if (it.is_overdue or it.semaphore == "rojo")]
+    en_curso_ok = [it for it in en_curso if not (it.is_overdue or it.semaphore == "rojo")]
+    en_curso_fuera = [it for it in en_curso if (it.is_overdue or it.semaphore == "rojo")]
+    pendientes_ok = [it for it in pendientes if not (it.is_overdue or it.semaphore == "rojo")]
+    pendientes_fuera = [it for it in pendientes if (it.is_overdue or it.semaphore == "rojo")]
+    en_espera_ok = [it for it in en_espera if not (it.is_overdue or it.semaphore == "rojo")]
+    en_espera_fuera = [it for it in en_espera if (it.is_overdue or it.semaphore == "rojo")]
+
     cumplimiento_general = 100.0
     if cerrados:
         cerrados_ok = [it for it in cerrados if not (it.is_overdue or it.semaphore == "rojo")]
@@ -261,9 +270,14 @@ def get_report_data(
         "kpis": {
             "total_items": total_items,
             "total_cerrados": len(cerrados),
+            "total_cerrados_ok": len(cerrados_ok),
+            "total_cerrados_fuera": len(cerrados_fuera),
             "total_en_curso": len(en_curso),
+            "total_en_curso_ok": len(en_curso_ok),
             "total_pendientes": len(pendientes),
+            "total_pendientes_ok": len(pendientes_ok),
             "total_en_espera": len(en_espera),
+            "total_en_espera_ok": len(en_espera_ok),
             "total_dentro_sla": len(dentro_sla),
             "total_fuera_sla": len(fuera_sla),
             "cumplimiento_general": cumplimiento_general,

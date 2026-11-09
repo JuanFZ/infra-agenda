@@ -2885,9 +2885,9 @@
                   <div>
                     <h4 style="margin:0;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-                      <span>Cumplimiento de SLA &amp; Estados (Gráfico de Torta)</span>
+                      <span>Distribución de Estados &amp; Cumplimiento SLA (Torta)</span>
                     </h4>
-                    <span class="muted" style="font-size:11.5px">Distribución porcentual sobre el total de actividades</span>
+                    <span class="muted" style="font-size:11.5px">Cerradas, en curso, pendientes y casos fuera de SLA</span>
                   </div>
                   <span class="badge" id="lblSlaBadgePct" style="background:rgba(16,185,129,0.15);color:#34d399;font-weight:700">—</span>
                 </div>
@@ -6043,11 +6043,14 @@
         badgePct.style.border = `1px solid ${slaColor}44`;
       }
 
-      const dentro = kpis.total_dentro_sla || 0;
-      const fuera = kpis.total_fuera_sla || 0;
-      const enCurso = kpis.total_en_curso || 0;
-      const enEspera = kpis.total_en_espera || 0;
-      const total = dentro + fuera + enCurso + enEspera;
+      // Conteo de Estados mutuamente excluyentes (Cerradas, En Curso, Pendientes, En Espera y Fuera de SLA)
+      const cerradosOk = kpis.total_cerrados_ok != null ? kpis.total_cerrados_ok : (kpis.total_cerrados || 0);
+      const enCursoOk = kpis.total_en_curso_ok != null ? kpis.total_en_curso_ok : (kpis.total_en_curso || 0);
+      const pendientesOk = kpis.total_pendientes_ok != null ? kpis.total_pendientes_ok : (kpis.total_pendientes || 0);
+      const esperaOk = kpis.total_en_espera_ok != null ? kpis.total_en_espera_ok : (kpis.total_en_espera || 0);
+      const fueraSla = kpis.total_fuera_sla || 0;
+      
+      const total = cerradosOk + enCursoOk + pendientesOk + esperaOk + fueraSla;
 
       if (total === 0) {
         container.innerHTML = `
@@ -6066,10 +6069,11 @@
       const r = 95;
 
       const segments = [
-        { label: 'Dentro de SLA', count: dentro, color: '#10b981', desc: 'Resueltas a tiempo' },
-        { label: 'Fuera de SLA / Atrasadas', count: fuera, color: '#ef4444', desc: 'Excedieron el SLA' },
-        { label: 'En Curso / Atención', count: enCurso, color: '#3b82f6', desc: 'Actividades activas' },
-        { label: 'En Espera', count: enEspera, color: '#f59e0b', desc: 'Pausadas por tercero' }
+        { label: 'Cerradas / Resueltas', count: cerradosOk, color: '#10b981', desc: 'Finalizadas dentro de SLA' },
+        { label: 'En Curso / Atención', count: enCursoOk, color: '#3b82f6', desc: 'Activas dentro de plazo' },
+        { label: 'Pendientes / Por Iniciar', count: pendientesOk, color: '#06b6d4', desc: 'En cola dentro de plazo' },
+        { label: 'En Espera', count: esperaOk, color: '#f59e0b', desc: 'Pausadas por tercero' },
+        { label: 'Fuera de SLA / Atrasadas', count: fueraSla, color: '#ef4444', desc: 'Excedieron el tiempo límite' }
       ].filter(s => s.count > 0);
 
       let pieSvg = '';
@@ -6115,33 +6119,34 @@
       }
 
       const allItems = [
-        { label: 'Dentro de SLA', count: dentro, color: '#10b981', desc: 'Resueltas a tiempo' },
-        { label: 'Fuera de SLA / Atrasadas', count: fuera, color: '#ef4444', desc: 'Excedieron el SLA' },
-        { label: 'En Curso / Atención', count: enCurso, color: '#3b82f6', desc: 'Actividades activas' },
-        { label: 'En Espera', count: enEspera, color: '#f59e0b', desc: 'Pausadas por tercero' }
+        { label: 'Cerradas / Resueltas', count: cerradosOk, color: '#10b981', desc: 'Finalizadas dentro de SLA' },
+        { label: 'En Curso / Atención', count: enCursoOk, color: '#3b82f6', desc: 'Activas dentro de plazo' },
+        { label: 'Pendientes / Por Iniciar', count: pendientesOk, color: '#06b6d4', desc: 'En cola dentro de plazo' },
+        { label: 'En Espera', count: esperaOk, color: '#f59e0b', desc: 'Pausadas por cliente/proveedor' },
+        { label: 'Fuera de SLA / Atrasadas', count: fueraSla, color: '#ef4444', desc: 'Excedieron el tiempo límite' }
       ];
 
       const legendsHtml = allItems.map(item => {
         const pct = total > 0 ? ((item.count / total) * 100).toFixed(1) : '0.0';
         return `
-          <div style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px">
             <div style="display:flex;align-items:center;gap:10px">
-              <span style="width:12px;height:12px;border-radius:3px;background:${item.color};display:inline-block;flex-shrink:0;box-shadow:0 0 8px ${item.color}66"></span>
+              <span style="width:11px;height:11px;border-radius:3px;background:${item.color};display:inline-block;flex-shrink:0;box-shadow:0 0 8px ${item.color}66"></span>
               <div>
-                <span style="color:var(--text);font-size:13px;font-weight:700;display:block">${item.label}</span>
+                <span style="color:var(--text);font-size:12.5px;font-weight:700;display:block">${item.label}</span>
                 <small class="muted" style="font-size:10.5px">${item.desc}</small>
               </div>
             </div>
             <div style="text-align:right">
-              <span style="font-weight:800;font-size:15px;color:var(--text)">${item.count}</span>
-              <span class="muted" style="font-size:11px;font-weight:600;display:block">(${pct}%)</span>
+              <span style="font-weight:800;font-size:14.5px;color:var(--text)">${item.count}</span>
+              <span class="muted" style="font-size:10.5px;font-weight:600;display:block">(${pct}%)</span>
             </div>
           </div>
         `;
       }).join('');
 
       container.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:24px;width:100%;padding:14px 0">
+        <div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:20px;width:100%;padding:10px 0">
           <!-- Gráfico de Torta SVG (Gran tamaño) -->
           <div style="position:relative;width:230px;height:230px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <svg viewBox="0 0 230 230" width="230" height="230" style="filter:drop-shadow(0 6px 18px rgba(0,0,0,0.4))">
@@ -6150,11 +6155,11 @@
           </div>
 
           <!-- Leyenda Completa y Detalle -->
-          <div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:8px">
+          <div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:7px">
             ${legendsHtml}
-            <div style="padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:space-between;margin-top:2px">
-              <span class="muted" style="font-size:12px">Total evaluadas en este período:</span>
-              <strong style="color:var(--text);font-size:13.5px">${total} actividades</strong>
+            <div style="padding:9px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:space-between;margin-top:2px">
+              <span class="muted" style="font-size:11.5px">Total evaluadas en este período:</span>
+              <strong style="color:var(--text);font-size:13px">${total} actividades (${kpis.total_dentro_sla != null ? kpis.total_dentro_sla : (total - fueraSla)} dentro de SLA)</strong>
             </div>
           </div>
         </div>
