@@ -6174,9 +6174,37 @@
       if (countEl) countEl.textContent = `${list.length} perfiles evaluados`;
 
       const maxTotal = Math.max(...list.map(x => x.total), 1);
+      const MAX_BAR_H = 80; // Altura máxima estricta para garantizar 0 desbordamiento
 
-      // 1. Columnas Verticales del Gráfico de Barras
-      const barsHtml = list.map(s => {
+      // 1. Plot de las Barras (solo números y barras verticales sobre la línea base)
+      const barsPlotHtml = list.map(s => {
+        const isBolsa = (s.name || '').toLowerCase().includes('sin asignar');
+        // Altura proporcional calculada con tope estricto de 80px
+        const barH = s.total > 0 ? Math.max(Math.round((s.total / maxTotal) * MAX_BAR_H), 16) : 4;
+        const closedH = s.total > 0 ? Math.round((s.cerrados / s.total) * barH) : 0;
+        const activeH = s.total > 0 ? Math.round((s.en_curso / s.total) * barH) : 0;
+        const overdueH = s.total > 0 ? Math.max(barH - closedH - activeH, (s.fuera_sla > 0 ? 4 : 0)) : 0;
+
+        return `
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:46px;max-width:80px">
+            <!-- Valor numérico superior con espaciado controlado -->
+            <div style="font-size:12px;font-weight:800;color:${s.total > 0 ? '#ffffff' : 'var(--muted)'};margin-bottom:6px;line-height:1">
+              ${s.total}
+            </div>
+
+            <!-- Barra vertical -->
+            <div style="width:30px;height:${barH}px;background:${s.total > 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)'};border-radius:5px 5px 0 0;overflow:hidden;display:flex;flex-direction:column-reverse;box-shadow:0 2px 8px rgba(0,0,0,0.3)"
+              title="${escapeHtml(s.name)}: ${s.total} asignadas (${s.cerrados} cerradas, ${s.en_curso} en curso, ${s.fuera_sla} fuera SLA)">
+              <div style="height:${closedH}px;background:#10b981;width:100%" title="${s.cerrados} cerradas"></div>
+              <div style="height:${activeH}px;background:#4f8cff;width:100%" title="${s.en_curso} en curso"></div>
+              <div style="height:${overdueH}px;background:#ef4444;width:100%" title="${s.fuera_sla} atrasadas"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // 2. Eje X independiente (Nombres, roles y porcentaje de SLA alineados bajo la línea base)
+      const barsAxisHtml = list.map(s => {
         const sla = Number(s.cumplimiento_pct) || 0;
         const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
         const isCoord = (s.role || '').toLowerCase().includes('coordinador');
@@ -6189,40 +6217,18 @@
 
         const shortName = isBolsa ? 'Sin Asignar' : s.name.split(' ')[0];
 
-        // Altura proporcional (máx 130px, mín 6px)
-        const barH = s.total > 0 ? Math.max(Math.round((s.total / maxTotal) * 130), 18) : 6;
-        const closedH = s.total > 0 ? Math.round((s.cerrados / s.total) * barH) : 0;
-        const activeH = s.total > 0 ? Math.round((s.en_curso / s.total) * barH) : 0;
-        const overdueH = s.total > 0 ? Math.max(barH - closedH - activeH, (s.fuera_sla > 0 ? 4 : 0)) : 0;
-
         return `
-          <div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:54px;max-width:90px">
-            <!-- Valor numérico superior -->
-            <div style="font-size:13px;font-weight:800;color:${s.total > 0 ? 'var(--text)' : 'var(--muted)'};margin-bottom:6px;min-height:18px">
-              ${s.total}
-            </div>
-
-            <!-- Barra vertical -->
-            <div style="width:34px;height:${barH}px;background:${s.total > 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)'};border-radius:6px 6px 0 0;overflow:hidden;display:flex;flex-direction:column-reverse;transition:all .3s ease"
-              title="${escapeHtml(s.name)}: ${s.total} asignadas (${s.cerrados} cerradas, ${s.en_curso} en curso, ${s.fuera_sla} fuera SLA)">
-              <div style="height:${closedH}px;background:#10b981;width:100%" title="${s.cerrados} cerradas"></div>
-              <div style="height:${activeH}px;background:#4f8cff;width:100%" title="${s.en_curso} en curso"></div>
-              <div style="height:${overdueH}px;background:#ef4444;width:100%" title="${s.fuera_sla} atrasadas"></div>
-            </div>
-
-            <!-- Eje y Etiquetas del Especialista -->
-            <div style="width:100%;border-top:2px solid rgba(255,255,255,0.12);padding-top:8px;text-align:center">
-              <strong style="font-size:11.5px;color:var(--text);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(s.name)}">
-                ${escapeHtml(shortName)}
-              </strong>
-              <div style="margin-top:3px">${roleBadge}</div>
-              <div style="font-size:10px;font-weight:700;color:${slaColor};margin-top:3px">${sla.toFixed(0)}% SLA</div>
-            </div>
+          <div style="flex:1;min-width:46px;max-width:80px;text-align:center">
+            <strong style="font-size:11.5px;color:var(--text);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(s.name)}">
+              ${escapeHtml(shortName)}
+            </strong>
+            <div style="margin-top:3px">${roleBadge}</div>
+            <div style="font-size:10px;font-weight:700;color:${slaColor};margin-top:3px">${sla.toFixed(0)}% SLA</div>
           </div>
         `;
       }).join('');
 
-      // 2. Leyenda y Resumen Compacto
+      // 3. Resumen numérico inferior por especialista
       const detailsHtml = list.map(s => {
         const sla = Number(s.cumplimiento_pct) || 0;
         const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
@@ -6233,7 +6239,7 @@
               <span class="muted">(${escapeHtml(s.role)})</span>
             </div>
             <div style="display:flex;align-items:center;gap:10px">
-              <span><strong>${s.total}</strong> casos (<span style="color:#10b981">${s.cerrados} c.</span> / <span style="color:#4f8cff">${s.en_curso} act.</span>)</span>
+              <span><strong>${s.total}</strong> casos (<span style="color:#10b981">${s.cerrados} c.</span> / <span style="color:#4f8cff">${s.en_curso} act.</span>${s.fuera_sla > 0 ? ` / <span style="color:#ef4444">${s.fuera_sla} atr.</span>` : ''})</span>
               <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:9.5px;font-weight:700">${sla.toFixed(0)}% SLA</span>
             </div>
           </div>
@@ -6241,10 +6247,17 @@
       }).join('');
 
       container.innerHTML = `
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <!-- Gráfico de Barras Columnar -->
-          <div style="display:flex;align-items:flex-end;justify-content:space-around;gap:8px;height:190px;padding:10px 6px 0 6px;background:rgba(255,255,255,0.015);border-radius:10px;border:1px solid rgba(255,255,255,0.04)">
-            ${barsHtml}
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <!-- Gráfico de Barras Columnar con Eje Separado -->
+          <div style="background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.05);border-radius:10px;overflow:hidden">
+            <!-- Zona de Trazado de Barras (Altura fija controlada con 0 desbordamiento) -->
+            <div style="height:125px;padding:12px 6px 0 6px;display:flex;align-items:flex-end;justify-content:space-around;gap:8px;border-bottom:1.5px solid rgba(255,255,255,0.12)">
+              ${barsPlotHtml}
+            </div>
+            <!-- Zona de Etiquetas de Eje X (Nombres y Roles) -->
+            <div style="display:flex;justify-content:space-around;gap:8px;padding:8px 6px 10px 6px;background:rgba(255,255,255,0.01)">
+              ${barsAxisHtml}
+            </div>
           </div>
 
           <!-- Leyenda de colores de las barras -->
