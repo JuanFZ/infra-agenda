@@ -1154,6 +1154,10 @@
       }
     }
 
+    .spin-icon {
+      animation: spin 1s linear infinite;
+    }
+
     /* Formulario Nueva Actividad */
     .form-group {
       margin-bottom: 14px;
@@ -2333,6 +2337,18 @@
       <span class="label">Clientes</span>
     </div>
 
+    <div class="nav" onclick="openReportsModal()" title="Reportes Ejecutivos (M9)" style="cursor:pointer">
+      <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <polyline points="10 9 9 9 8 9" />
+      </svg>
+      <span class="label">Reportes</span>
+    </div>
+
     <!-- Perfil de Usuario Activo en Sidebar -->
     <div class="sidebar-user" id="sidebarUserBox">
       <div class="sidebar-user-info">
@@ -2392,6 +2408,19 @@
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           <span class="btn-text">Nueva Actividad</span>
+        </button>
+        <button class="btn" id="btnReports" onclick="openReportsModal()"
+          style="background:rgba(79,140,255,0.12);color:var(--accent);border-color:rgba(79,140,255,0.3);font-weight:600"
+          title="Generar informe ejecutivo en Excel (.xlsx) o PDF">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
+          <span class="btn-text">Reportes</span>
         </button>
         <button class="btn" id="btnSync" onclick="forceSync()">
           <svg id="syncIcon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
@@ -3312,6 +3341,8 @@
     function closeModal() {
       const modalBg = document.getElementById('modalBg');
       if (modalBg) modalBg.classList.remove('show');
+      const modalContent = document.getElementById('modalContent');
+      if (modalContent) modalContent.style.maxWidth = '';
       if (TV_MODE_ACTIVE && TV_PAUSED_BY_MODAL && TV_IS_PAUSED) {
         TV_PAUSED_BY_MODAL = false;
         tvTogglePause();
@@ -4658,6 +4689,414 @@
         if (overlay) overlay.style.display = 'none';
         applyRolePermissions();
       }
+    }
+
+    // =========================================================================
+    // MODAL DE REPORTES EJECUTIVOS (M9) - EXCEL Y PDF
+    // =========================================================================
+    let REPORT_FILTER_STATE = {
+      period: 'month',
+      startDate: '',
+      endDate: '',
+      specialist: ''
+    };
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function getMonthName(monthIndex) {
+      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      return months[monthIndex] || '';
+    }
+
+    function initReportDates() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+
+      if (REPORT_FILTER_STATE.period === 'month') {
+        REPORT_FILTER_STATE.startDate = `${yyyy}-${mm}-01`;
+        REPORT_FILTER_STATE.endDate = `${yyyy}-${mm}-${dd}`;
+      } else if (REPORT_FILTER_STATE.period === '30days') {
+        const past = new Date();
+        past.setDate(past.getDate() - 30);
+        const pY = past.getFullYear();
+        const pM = String(past.getMonth() + 1).padStart(2, '0');
+        const pD = String(past.getDate()).padStart(2, '0');
+        REPORT_FILTER_STATE.startDate = `${pY}-${pM}-${pD}`;
+        REPORT_FILTER_STATE.endDate = `${yyyy}-${mm}-${dd}`;
+      } else if (REPORT_FILTER_STATE.period === 'all') {
+        REPORT_FILTER_STATE.startDate = '';
+        REPORT_FILTER_STATE.endDate = '';
+      }
+    }
+
+    async function openReportsModal() {
+      if (TV_MODE_ACTIVE && !TV_IS_PAUSED) {
+        TV_PAUSED_BY_MODAL = true;
+        tvTogglePause();
+      }
+
+      initReportDates();
+
+      // Restricción por rol: Coordinador/Admin ve todo; Especialista/Analista solo el suyo
+      if (!isCoordinator() && CURRENT_USER) {
+        REPORT_FILTER_STATE.specialist = CURRENT_USER.full_name || CURRENT_USER.username;
+      } else if (!REPORT_FILTER_STATE.specialist) {
+        REPORT_FILTER_STATE.specialist = '';
+      }
+
+      const modal = document.getElementById('modalContent');
+      if (modal) modal.style.maxWidth = '780px';
+
+      renderReportsModalContent();
+      const modalBg = document.getElementById('modalBg');
+      if (modalBg) modalBg.classList.add('show');
+
+      await loadReportsPreview();
+    }
+
+    function renderReportsModalContent() {
+      const modal = document.getElementById('modalContent');
+      if (!modal) return;
+
+      const now = new Date();
+      const monthLabel = `${getMonthName(now.getMonth())} ${now.getFullYear()}`;
+
+      let specOptions = '';
+      if (isCoordinator()) {
+        specOptions = `
+          <option value="" ${REPORT_FILTER_STATE.specialist === '' ? 'selected' : ''}>Todo el equipo Sycom</option>
+          <option value="Adonis" ${REPORT_FILTER_STATE.specialist.includes('Adonis') ? 'selected' : ''}>Adonis Lozada</option>
+          <option value="Juan" ${REPORT_FILTER_STATE.specialist.includes('Juan') ? 'selected' : ''}>Juan Fernández</option>
+          <option value="Yoxaide" ${REPORT_FILTER_STATE.specialist.includes('Yoxaide') ? 'selected' : ''}>Yoxaide Jiménez</option>
+          <option value="Luis" ${REPORT_FILTER_STATE.specialist.includes('Luis') ? 'selected' : ''}>Luis Acosta</option>
+          <option value="Sin asignar" ${REPORT_FILTER_STATE.specialist === 'Sin asignar' ? 'selected' : ''}>Sin asignar (Bolsa común)</option>
+        `;
+      } else {
+        const myName = CURRENT_USER ? (CURRENT_USER.full_name || CURRENT_USER.username) : 'Mi Desempeño';
+        specOptions = `<option value="${escapeHtml(myName)}" selected>${escapeHtml(myName)} (Mi Perfil)</option>`;
+      }
+
+      modal.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(79,140,255,0.15);border:1px solid rgba(79,140,255,0.3);display:flex;align-items:center;justify-content:center;color:var(--accent);flex-shrink:0">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+            </div>
+            <div>
+              <h2 style="font-size:18px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px">
+                <span>Centro de Reportes Ejecutivos</span>
+                <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px">M9</span>
+              </h2>
+              <div class="muted" style="font-size:12px;margin-top:2px">Exportación oficial en Excel (.xlsx) y vista de impresión PDF con métricas y SLA</div>
+            </div>
+          </div>
+          <button type="button" class="btn" onclick="closeModal()" style="padding:4px 9px;font-size:16px;line-height:1" title="Cerrar">&times;</button>
+        </div>
+
+        <!-- Filtros de Reporte -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:12px;align-items:end">
+            <div>
+              <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Período de Análisis:</label>
+              <select id="reportPeriodSelect" class="form-input" onchange="onReportPeriodChange(this.value)" style="width:100%">
+                <option value="month" ${REPORT_FILTER_STATE.period === 'month' ? 'selected' : ''}>Mes en Curso (${monthLabel})</option>
+                <option value="30days" ${REPORT_FILTER_STATE.period === '30days' ? 'selected' : ''}>Últimos 30 días</option>
+                <option value="all" ${REPORT_FILTER_STATE.period === 'all' ? 'selected' : ''}>Histórico completo</option>
+                <option value="custom" ${REPORT_FILTER_STATE.period === 'custom' ? 'selected' : ''}>Rango personalizado...</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Alcance / Especialista:</label>
+              <select id="reportSpecialistSelect" class="form-input" ${!isCoordinator() ? 'disabled' : ''} onchange="onReportSpecialistChange(this.value)" style="width:100%">
+                ${specOptions}
+              </select>
+            </div>
+          </div>
+
+          <div id="reportCustomDates" style="display:${REPORT_FILTER_STATE.period === 'custom' ? 'grid' : 'none'};grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,255,255,.08)">
+            <div>
+              <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px">Fecha Inicio:</label>
+              <input type="date" id="reportStartDate" class="form-input" value="${REPORT_FILTER_STATE.startDate || ''}" onchange="onReportCustomDateChange()">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px">Fecha Fin:</label>
+              <input type="date" id="reportEndDate" class="form-input" value="${REPORT_FILTER_STATE.endDate || ''}" onchange="onReportCustomDateChange()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Preview Box -->
+        <div id="reportPreviewContainer" style="margin-bottom:16px;min-height:160px">
+          <div style="display:flex;align-items:center;justify-content:center;padding:36px;color:var(--muted);gap:10px">
+            <svg class="spin-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            <span style="font-size:13px">Cargando métricas consolidadas del reporte...</span>
+          </div>
+        </div>
+
+        <!-- Acciones de Descarga / Exportación -->
+        <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;flex-wrap:wrap;gap:10px">
+          <button type="button" class="btn" onclick="closeModal()">Cerrar</button>
+          
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button type="button" class="btn" id="btnDownloadExcel" onclick="downloadExecutiveExcel()"
+              style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700;display:inline-flex;align-items:center;gap:8px;padding:9px 16px"
+              title="Descargar libro Excel multi-pestaña con fórmulas y estilo corporativo">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>Descargar Excel (.xlsx)</span>
+            </button>
+
+            <button type="button" class="btn" id="btnPrintPdf" onclick="openExecutivePrintView()"
+              style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;border-color:rgba(79,140,255,.4);font-weight:700;display:inline-flex;align-items:center;gap:8px;padding:9px 16px"
+              title="Abrir vista ejecutiva membretada optimizada para impresión en PDF">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"/>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                <rect x="6" y="14" width="12" height="8"/>
+              </svg>
+              <span>Ver / Imprimir PDF</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    async function onReportPeriodChange(val) {
+      REPORT_FILTER_STATE.period = val;
+      const customWrap = document.getElementById('reportCustomDates');
+      if (val === 'custom') {
+        if (customWrap) customWrap.style.display = 'grid';
+      } else {
+        if (customWrap) customWrap.style.display = 'none';
+        initReportDates();
+        await loadReportsPreview();
+      }
+    }
+
+    async function onReportCustomDateChange() {
+      const s = document.getElementById('reportStartDate');
+      const e = document.getElementById('reportEndDate');
+      if (s) REPORT_FILTER_STATE.startDate = s.value;
+      if (e) REPORT_FILTER_STATE.endDate = e.value;
+      await loadReportsPreview();
+    }
+
+    async function onReportSpecialistChange(val) {
+      REPORT_FILTER_STATE.specialist = val;
+      await loadReportsPreview();
+    }
+
+    async function loadReportsPreview() {
+      const preview = document.getElementById('reportPreviewContainer');
+      if (!preview) return;
+
+      preview.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;padding:32px;color:var(--muted);gap:10px">
+          <svg class="spin-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+          <span style="font-size:13px">Actualizando métricas...</span>
+        </div>
+      `;
+
+      try {
+        const params = new URLSearchParams();
+        if (REPORT_FILTER_STATE.startDate) params.set('start_date', REPORT_FILTER_STATE.startDate);
+        if (REPORT_FILTER_STATE.endDate) params.set('end_date', REPORT_FILTER_STATE.endDate);
+        if (REPORT_FILTER_STATE.specialist) params.set('specialist', REPORT_FILTER_STATE.specialist);
+
+        if (CURRENT_USER) {
+          if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
+          if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
+          else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
+        }
+
+        const res = await fetch(`${API_URL}/reports/data?${params.toString()}`, {
+          headers: getAuthHeaders()
+        });
+
+        if (!res.ok) {
+          throw new Error(`Error ${res.status}: ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        const k = data.kpis || {};
+        const slaVal = Number(k.cumplimiento_general) || 0;
+        const slaColor = (slaVal >= 90) ? '#10b981' : ((slaVal >= 75) ? '#f59e0b' : '#ef4444');
+
+        let specRows = '';
+        if (data.por_especialista && data.por_especialista.length > 0) {
+          specRows = data.por_especialista.map(s => {
+            const p = Number(s.cumplimiento_pct) || 0;
+            const barC = (p >= 90) ? '#10b981' : ((p >= 75) ? '#f59e0b' : '#ef4444');
+            return `
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px">
+                <td style="padding:7px 8px"><strong>${escapeHtml(s.name)}</strong></td>
+                <td style="padding:7px 8px;text-align:center">${s.total}</td>
+                <td style="padding:7px 8px;text-align:center;color:#10b981;font-weight:600">${s.cerrados}</td>
+                <td style="padding:7px 8px;text-align:center;color:#0ea5e9;font-weight:600">${s.en_curso}</td>
+                <td style="padding:7px 8px;text-align:center">
+                  <span style="color:${barC};font-weight:700">${p.toFixed(1)}%</span>
+                </td>
+                <td style="padding:7px 8px;text-align:center;color:var(--muted)">${escapeHtml(s.avg_time_str)}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+        preview.innerHTML = `
+          <!-- Indicador de período -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:12px;color:var(--muted)">
+            <span>${escapeHtml(data.period_label || 'Período seleccionado')}</span>
+            <span>${data.items ? data.items.length : 0} actividades en alcance</span>
+          </div>
+
+          <!-- Tarjetas KPI -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;margin-bottom:14px">
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
+              <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Total Casos</div>
+              <div style="font-size:22px;font-weight:800;color:var(--text);margin-top:2px">${k.total_items || 0}</div>
+              <div class="muted" style="font-size:10px;margin-top:2px">${k.total_en_curso || 0} en curso</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
+              <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Cerrados</div>
+              <div style="font-size:22px;font-weight:800;color:#10b981;margin-top:2px">${k.total_cerrados || 0}</div>
+              <div class="muted" style="font-size:10px;margin-top:2px">${k.total_dentro_sla || 0} a tiempo</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
+              <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Cumplimiento SLA</div>
+              <div style="font-size:22px;font-weight:800;color:${slaColor};margin-top:2px">${slaVal.toFixed(1)}%</div>
+              <div class="muted" style="font-size:10px;margin-top:2px">Meta: 90.0%</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
+              <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Resolución Prom.</div>
+              <div style="font-size:18px;font-weight:800;color:#38bdf8;margin-top:4px">${escapeHtml(k.avg_resolution_str || '0m')}</div>
+              <div class="muted" style="font-size:10px;margin-top:2px">Promedio general</div>
+            </div>
+          </div>
+
+          <!-- Tabla Resumen Especialistas -->
+          ${specRows ? `
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;overflow:hidden">
+              <div style="padding:8px 12px;background:rgba(255,255,255,0.04);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between">
+                <span>Rendimiento por Especialista</span>
+                <span>SLA %</span>
+              </div>
+              <div style="max-height:140px;overflow-y:auto">
+                <table style="width:100%;border-collapse:collapse">
+                  <thead>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);font-size:11px;color:var(--muted);text-align:center">
+                      <th style="padding:6px 8px;text-align:left">Especialista</th>
+                      <th style="padding:6px 8px">Total</th>
+                      <th style="padding:6px 8px">Cerradas</th>
+                      <th style="padding:6px 8px">En curso</th>
+                      <th style="padding:6px 8px">SLA %</th>
+                      <th style="padding:6px 8px">T. Promedio</th>
+                    </tr>
+                  </thead>
+                  <tbody>${specRows}</tbody>
+                </table>
+              </div>
+            </div>
+          ` : ''}
+        `;
+      } catch (err) {
+        console.error('Error cargando preview de reportes:', err);
+        preview.innerHTML = `
+          <div style="padding:20px;text-align:center;color:var(--red);font-size:12px">
+            No se pudieron calcular las métricas: ${escapeHtml(err.message)}
+          </div>
+        `;
+      }
+    }
+
+    async function downloadExecutiveExcel() {
+      const btn = document.getElementById('btnDownloadExcel');
+      if (!btn) return;
+      const oldHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<svg class="spin-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>Generando Excel...</span>`;
+
+      try {
+        const params = new URLSearchParams();
+        if (REPORT_FILTER_STATE.startDate) params.set('start_date', REPORT_FILTER_STATE.startDate);
+        if (REPORT_FILTER_STATE.endDate) params.set('end_date', REPORT_FILTER_STATE.endDate);
+        if (REPORT_FILTER_STATE.specialist) params.set('specialist', REPORT_FILTER_STATE.specialist);
+
+        if (CURRENT_USER) {
+          if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
+          if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
+          else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
+        }
+
+        const res = await fetch(`${API_URL}/reports/excel?${params.toString()}`, {
+          headers: getAuthHeaders()
+        });
+
+        if (!res.ok) {
+          throw new Error(`Error ${res.status}: ${res.statusText}`);
+        }
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+
+        let filename = 'Informe_Ejecutivo_Sycom.xlsx';
+        const disposition = res.headers.get('Content-Disposition');
+        if (disposition && disposition.includes('filename=')) {
+          const match = disposition.match(/filename="?([^"]+)"?/);
+          if (match && match[1]) filename = match[1];
+        }
+
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+
+        showToast('¡Descarga Exitosa!', `Se ha generado ${filename}`);
+      } catch (err) {
+        console.error('Error al descargar reporte Excel:', err);
+        alert(`No se pudo generar el reporte Excel: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
+      }
+    }
+
+    function openExecutivePrintView() {
+      const params = new URLSearchParams();
+      if (REPORT_FILTER_STATE.startDate) params.set('start_date', REPORT_FILTER_STATE.startDate);
+      if (REPORT_FILTER_STATE.endDate) params.set('end_date', REPORT_FILTER_STATE.endDate);
+      if (REPORT_FILTER_STATE.specialist) params.set('specialist', REPORT_FILTER_STATE.specialist);
+
+      if (CURRENT_USER) {
+        if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
+        if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
+        else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
+      }
+
+      const printUrl = `${API_URL}/reports/print-view?${params.toString()}`;
+      window.open(printUrl, '_blank');
     }
 
     // Atajos de teclado para Modo TV

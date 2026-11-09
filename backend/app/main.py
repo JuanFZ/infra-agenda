@@ -1,6 +1,7 @@
 import datetime
 import hashlib
-from fastapi import FastAPI, Depends, Query, HTTPException, Header
+from fastapi import FastAPI, Depends, Query, HTTPException, Header, Response
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import or_, and_
@@ -14,6 +15,7 @@ from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_s
 from .sync.glpi_client import GLPIClient
 from .sync.clickup_client import ClickUpClient
 from .notifications.telegram_notifier import CARACAS_TZ, format_caracas_time, now_caracas_str
+from .reports.report_generator import get_report_data, generate_excel_report, generate_executive_html
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
@@ -906,6 +908,110 @@ def delete_item(item_id: int, db: Session = Depends(get_db), _role: str = Depend
         "message": f"Actividad {source} #{ext_id} eliminada con éxito",
         "deleted_id": item_id
     }
+
+
+# ==============================================================================
+# REPORTES EJECUTIVOS (M9) - EXCEL & PDF
+# ==============================================================================
+
+def _resolve_report_filters(start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param):
+    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
+    user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")).strip()
+    spec = specialist.strip() if isinstance(specialist, str) and specialist.strip() else None
+
+    # Si el usuario no es coordinador ni admin, restringir al especialista autenticado
+    if role and role not in ("coordinador", "admin", "administrador") and user_name:
+        spec = user_name
+
+    s_date = start_date.strip() if isinstance(start_date, str) and start_date.strip() else None
+    e_date = end_date.strip() if isinstance(end_date, str) and end_date.strip() else None
+    return s_date, e_date, spec
+
+
+@app.get("/api/reports/data")
+def api_report_data(
+    start_date: str = Query(None, description="Fecha inicio YYYY-MM-DD"),
+    end_date: str = Query(None, description="Fecha fin YYYY-MM-DD"),
+    specialist: str = Query(None, description="Filtrar por especialista"),
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    role_param: str = Query(None, alias="role"),
+    user_param: str = Query(None, alias="user"),
+):
+    """Retorna los datos consolidados para reportes ejecutivos en formato JSON."""
+    s_date, e_date, spec = _resolve_report_filters(
+        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param
+    )
+    data = get_report_data(
+        db=db,
+        start_date=s_date,
+        end_date=e_date,
+        specialist_filter=spec
+    )
+    return data
+
+
+@app.get("/api/reports/excel")
+def api_report_excel(
+    start_date: str = Query(None, description="Fecha inicio YYYY-MM-DD"),
+    end_date: str = Query(None, description="Fecha fin YYYY-MM-DD"),
+    specialist: str = Query(None, description="Filtrar por especialista"),
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    role_param: str = Query(None, alias="role"),
+    user_param: str = Query(None, alias="user"),
+):
+    """Genera y descarga el archivo Excel (.xlsx) corporativo con KPIs y métricas."""
+    s_date, e_date, spec = _resolve_report_filters(
+        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param
+    )
+    data = get_report_data(
+        db=db,
+        start_date=s_date,
+        end_date=e_date,
+        specialist_filter=spec
+    )
+
+    excel_buffer = generate_excel_report(data)
+    now_tag = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+    filename = f"Informe_Ejecutivo_Sycom_{now_tag}.xlsx"
+
+    return Response(
+        content=excel_buffer.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+
+
+@app.get("/api/reports/print-view", response_class=HTMLResponse)
+def api_report_print_view(
+    start_date: str = Query(None, description="Fecha inicio YYYY-MM-DD"),
+    end_date: str = Query(None, description="Fecha fin YYYY-MM-DD"),
+    specialist: str = Query(None, description="Filtrar por especialista"),
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    role_param: str = Query(None, alias="role"),
+    user_param: str = Query(None, alias="user"),
+):
+    """Genera la vista ejecutiva HTML lista para imprimir o guardar como PDF en alta resolución."""
+    s_date, e_date, spec = _resolve_report_filters(
+        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param
+    )
+    data = get_report_data(
+        db=db,
+        start_date=s_date,
+        end_date=e_date,
+        specialist_filter=spec
+    )
+
+    html_content = generate_executive_html(data)
+    return HTMLResponse(content=html_content)
+
 
 
 
