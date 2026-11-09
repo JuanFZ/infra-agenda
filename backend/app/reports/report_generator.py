@@ -324,7 +324,7 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
 
     # Banner de Título
     ws_resumen.merge_cells("A1:G1")
-    ws_resumen["A1"] = "SYCOM DATA TECHNOLOGY — AGENDA DE INFRAESTRUCTURA & BD"
+    ws_resumen["A1"] = "SOLUCIONES SYCOM — AGENDA DE INFRAESTRUCTURA & BD"
     ws_resumen["A1"].font = font_title
     ws_resumen["A1"].fill = fill_header
     ws_resumen["A1"].alignment = align_center
@@ -866,7 +866,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
     <div class="report-page">
         <div class="header">
             <div>
-                <div class="company-title">Sycom Data Technology, C.A.</div>
+                <div class="company-title">Soluciones SYCOM</div>
                 <div class="company-sub">Coordinación de Infraestructura y Base de Datos</div>
                 <div class="badge-period">Período: {data['period_label']}</div>
             </div>
@@ -950,12 +950,12 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             <div class="sig-block">
                 <div class="sig-line"></div>
                 <strong>Adonis Lozada Figueroa</strong><br>
-                <small style="color:#64748b">Coordinador de Infraestructura y BD<br>Sycom Data Technology, C.A.</small>
+                <small style="color:#64748b">Coordinador de Infraestructura y BD<br>Soluciones SYCOM</small>
             </div>
             <div class="sig-block">
                 <div class="sig-line"></div>
                 <strong>Dirección de Operaciones & TI</strong><br>
-                <small style="color:#64748b">Visto Bueno y Auditoría de SLA<br>Sycom Data Technology, C.A.</small>
+                <small style="color:#64748b">Visto Bueno y Auditoría de SLA<br>Soluciones SYCOM</small>
             </div>
         </div>
     </div>
