@@ -2337,7 +2337,7 @@
       <span class="label">Clientes</span>
     </div>
 
-    <div class="nav" onclick="openReportsModal()" title="Reportes Ejecutivos (M9)" style="cursor:pointer">
+    <div class="nav nav-action" id="sidebarNavReports" onclick="openReportsModal()" title="Reportes Ejecutivos (M9)" style="cursor:pointer">
       <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -4595,11 +4595,20 @@
         uRole.style.color = isCoord ? '#34d399' : (isAnal ? '#c084fc' : '#60a5fa');
       }
 
-      // 2. Botón Crear Actividad en cabecera principal y Role Badge
+      // 2. Botón Crear Actividad y Reportes en cabecera principal y Role Badge
       const btnHeadCreate = document.getElementById('btnNewActivityHeader');
+      const btnReports = document.getElementById('btnReports');
+      const sideNavReports = document.getElementById('sidebarNavReports');
       const rolePill = document.getElementById('roleBadgeHeader');
+
       if (btnHeadCreate) {
         btnHeadCreate.style.display = isCoord ? 'inline-flex' : 'none';
+      }
+      if (btnReports) {
+        btnReports.style.display = isCoord ? 'inline-flex' : 'none';
+      }
+      if (sideNavReports) {
+        sideNavReports.style.display = isCoord ? 'flex' : 'none';
       }
       if (rolePill) {
         if (isCoord) {
@@ -4743,17 +4752,18 @@
     }
 
     async function openReportsModal() {
+      if (!isCoordinator()) {
+        alert('Acceso restringido: La generación de reportes ejecutivos está reservada exclusivamente para el rol Coordinador.');
+        return;
+      }
+
       if (TV_MODE_ACTIVE && !TV_IS_PAUSED) {
         TV_PAUSED_BY_MODAL = true;
         tvTogglePause();
       }
 
       initReportDates();
-
-      // Restricción por rol: Coordinador/Admin ve todo; Especialista/Analista solo el suyo
-      if (!isCoordinator() && CURRENT_USER) {
-        REPORT_FILTER_STATE.specialist = CURRENT_USER.full_name || CURRENT_USER.username;
-      } else if (!REPORT_FILTER_STATE.specialist) {
+      if (!REPORT_FILTER_STATE.specialist) {
         REPORT_FILTER_STATE.specialist = '';
       }
 
@@ -4774,20 +4784,14 @@
       const now = new Date();
       const monthLabel = `${getMonthName(now.getMonth())} ${now.getFullYear()}`;
 
-      let specOptions = '';
-      if (isCoordinator()) {
-        specOptions = `
-          <option value="" ${REPORT_FILTER_STATE.specialist === '' ? 'selected' : ''}>Todo el equipo Sycom</option>
-          <option value="Adonis" ${REPORT_FILTER_STATE.specialist.includes('Adonis') ? 'selected' : ''}>Adonis Lozada</option>
-          <option value="Juan" ${REPORT_FILTER_STATE.specialist.includes('Juan') ? 'selected' : ''}>Juan Fernández</option>
-          <option value="Yoxaide" ${REPORT_FILTER_STATE.specialist.includes('Yoxaide') ? 'selected' : ''}>Yoxaide Jiménez</option>
-          <option value="Luis" ${REPORT_FILTER_STATE.specialist.includes('Luis') ? 'selected' : ''}>Luis Acosta</option>
-          <option value="Sin asignar" ${REPORT_FILTER_STATE.specialist === 'Sin asignar' ? 'selected' : ''}>Sin asignar (Bolsa común)</option>
-        `;
-      } else {
-        const myName = CURRENT_USER ? (CURRENT_USER.full_name || CURRENT_USER.username) : 'Mi Desempeño';
-        specOptions = `<option value="${escapeHtml(myName)}" selected>${escapeHtml(myName)} (Mi Perfil)</option>`;
-      }
+      const specOptions = `
+        <option value="" ${REPORT_FILTER_STATE.specialist === '' ? 'selected' : ''}>Todo el equipo Sycom</option>
+        <option value="Adonis" ${REPORT_FILTER_STATE.specialist.includes('Adonis') ? 'selected' : ''}>Adonis Lozada</option>
+        <option value="Juan" ${REPORT_FILTER_STATE.specialist.includes('Juan') ? 'selected' : ''}>Juan Fernández</option>
+        <option value="Yoxaide" ${REPORT_FILTER_STATE.specialist.includes('Yoxaide') ? 'selected' : ''}>Yoxaide Jiménez</option>
+        <option value="Luis" ${REPORT_FILTER_STATE.specialist.includes('Luis') ? 'selected' : ''}>Luis Acosta</option>
+        <option value="Sin asignar" ${REPORT_FILTER_STATE.specialist === 'Sin asignar' ? 'selected' : ''}>Sin asignar (Bolsa común)</option>
+      `;
 
       modal.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
@@ -4827,7 +4831,7 @@
 
             <div>
               <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Alcance / Especialista:</label>
-              <select id="reportSpecialistSelect" class="form-input" ${!isCoordinator() ? 'disabled' : ''} onchange="onReportSpecialistChange(this.value)" style="width:100%">
+              <select id="reportSpecialistSelect" class="form-input" onchange="onReportSpecialistChange(this.value)" style="width:100%">
                 ${specOptions}
               </select>
             </div>

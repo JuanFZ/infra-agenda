@@ -828,20 +828,21 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             background: #f8fafc;
         }}
         .footer-signatures {{
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             margin-top: 40px;
-            padding-top: 20px;
+            padding-top: 24px;
             border-top: 1px dashed #cbd5e1;
         }}
         .sig-block {{
             text-align: center;
+            min-width: 260px;
         }}
         .sig-line {{
-            width: 200px;
+            width: 240px;
             margin: 0 auto 8px auto;
-            border-bottom: 1px solid #0f172a;
+            border-bottom: 1.5px solid #0f172a;
         }}
         @media print {{
             body {{ background: #fff; padding: 0; }}
@@ -951,11 +952,6 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 <div class="sig-line"></div>
                 <strong>Adonis Lozada Figueroa</strong><br>
                 <small style="color:#64748b">Coordinador de Infraestructura y BD<br>Soluciones SYCOM</small>
-            </div>
-            <div class="sig-block">
-                <div class="sig-line"></div>
-                <strong>Dirección de Operaciones & TI</strong><br>
-                <small style="color:#64748b">Visto Bueno y Auditoría de SLA<br>Soluciones SYCOM</small>
             </div>
         </div>
     </div>

@@ -955,13 +955,15 @@ def api_test_telegram(_role: str = Depends(verify_coordinator_role)):
 
 def _resolve_report_filters(start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param):
     role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
-    user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")).strip()
+
+    # Restricción estricta: Solo el rol Coordinador / Administrador puede generar reportes
+    if role not in ("coordinador", "admin", "administrador"):
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: La generación de reportes ejecutivos está reservada exclusivamente para el rol Coordinador."
+        )
+
     spec = specialist.strip() if isinstance(specialist, str) and specialist.strip() else None
-
-    # Si el usuario no es coordinador ni admin, restringir al especialista autenticado
-    if role and role not in ("coordinador", "admin", "administrador") and user_name:
-        spec = user_name
-
     s_date = start_date.strip() if isinstance(start_date, str) and start_date.strip() else None
     e_date = end_date.strip() if isinstance(end_date, str) and end_date.strip() else None
     return s_date, e_date, spec
