@@ -2615,10 +2615,12 @@
     <!-- Vista de Repositorio de Escalamientos (BD Documental y Enlaces Google Docs) -->
     <div class="view" id="v-escalamientos">
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
+        <div
+          style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
           <div>
             <h3 style="margin:0;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
                 <line x1="16" y1="13" x2="8" y2="13" />
@@ -2626,29 +2628,35 @@
                 <polyline points="10 9 9 9 8 9" />
               </svg>
               <span>Repositorio de Escalamientos</span>
-              <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px" id="lblEscalationsCount">0 escalamientos</span>
+              <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px"
+                id="lblEscalationsCount">0 escalamientos</span>
             </h3>
-            <span class="muted" style="font-size:12px;margin-top:3px;display:block">Expedientes, actas y enlaces de escalamiento en Google Docs / Drive con control de autoría y acceso directo</span>
+            <span class="muted" style="font-size:12px;margin-top:3px;display:block">Expedientes, actas y enlaces de
+              escalamiento en Google Docs / Drive con control de autoría y acceso directo</span>
           </div>
 
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <div style="position:relative">
-              <input type="text" id="fSearchEscalations" placeholder="Buscar por código, título, autor o enlace..." oninput="filterEscalationsTable(this.value)"
+              <input type="text" id="fSearchEscalations" placeholder="Buscar por código, título, autor o enlace..."
+                oninput="filterEscalationsTable(this.value)"
                 style="font-size:12px;padding:7px 12px 7px 30px;width:280px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none"
                 title="Filtrar por código (ej: SIMF-ES-5260 88920 Venezolano), notas o autor">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"
                 style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
             </div>
             <button class="btn primary" id="btnUploadEscalationModal" onclick="openEscalationModal()"
               style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;border-color:rgba(79,140,255,.4);font-weight:700;display:inline-flex;align-items:center;gap:7px"
               title="Registrar un nuevo escalamiento en Google Docs">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span>+ Registrar Escalamiento</span>
+              <span> Registrar Escalamiento</span>
             </button>
           </div>
         </div>
@@ -2667,7 +2675,8 @@
             </thead>
             <tbody id="tblEscalationsBody">
               <tr>
-                <td colspan="6" style="text-align:center;padding:24px" class="muted">Cargando repositorio de escalamientos...</td>
+                <td colspan="6" style="text-align:center;padding:24px" class="muted">Cargando repositorio de
+                  escalamientos...</td>
               </tr>
             </tbody>
           </table>
@@ -2675,64 +2684,274 @@
       </div>
     </div>
 
-    <!-- Vista de Historial de Reportes Ejecutivos (M9) -->
+    <!-- Vista de Reportes Ejecutivos & Métricas KPI (M9) -->
     <div class="view" id="v-reportes">
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
-          <div>
-            <h3 style="margin:0;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-              <span>Historial de Reportes Ejecutivos</span>
-              <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px">M9</span>
-            </h3>
-            <span class="muted" style="font-size:12px;margin-top:3px;display:block">Consulta, descarga y reimprime los informes consolidados de gestión y cumplimiento SLA</span>
+      <!-- Selector de Pestañas / Sub-navegación -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+        <div style="display:inline-flex;background:rgba(255,255,255,0.04);padding:4px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);gap:4px">
+          <button type="button" id="tabBtnReportHistory" onclick="switchReportsSubView('history')"
+            style="padding:8px 16px;font-size:12.5px;font-weight:700;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .2s ease">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+            <span>Historial de Reportes</span>
+          </button>
+          <button type="button" id="tabBtnReportAnalytics" onclick="switchReportsSubView('analytics')"
+            style="padding:8px 16px;font-size:12.5px;font-weight:600;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .2s ease">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            <span>Indicadores y Gráficos KPI</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sub-vista 1: Historial de Reportes Ejecutivos -->
+      <div id="subViewReportsHistory">
+        <div class="card">
+          <div
+            style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
+            <div>
+              <h3 style="margin:0;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+                <span>Historial de Reportes Ejecutivos</span>
+                <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px">M9</span>
+              </h3>
+              <span class="muted" style="font-size:12px;margin-top:3px;display:block">Consulta, descarga y reimprime los
+                informes consolidados de gestión y cumplimiento SLA</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <div style="position:relative">
+                <input type="text" id="fSearchReports" placeholder="Buscar reporte (folio, mes, nombre)..."
+                  oninput="filterReportsHistoryTable(this.value)"
+                  style="font-size:12px;padding:7px 12px 7px 30px;width:240px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none"
+                  title="Filtrar historial de reportes">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"
+                  style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </div>
+              <button class="btn" id="btnGoToAnalytics" onclick="switchReportsSubView('analytics')"
+                style="background:rgba(79,140,255,0.12);color:var(--accent);border-color:rgba(79,140,255,0.35);font-weight:700;display:inline-flex;align-items:center;gap:7px"
+                title="Ver gráficos interactivos e indicadores KPI de la gestión consolidada">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="20" x2="18" y2="10"/>
+                  <line x1="12" y1="20" x2="12" y2="4"/>
+                  <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                <span>Ver Gráficos &amp; KPIs</span>
+              </button>
+              <button class="btn" id="btnAutoReportView" onclick="generateAutoMonthReport()"
+                style="background:rgba(16,185,129,0.12);color:#34d399;border-color:rgba(16,185,129,0.3);font-weight:600;display:inline-flex;align-items:center;gap:7px"
+                title="Generar automáticamente el informe consolidado del mes en curso">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  <path d="M21 3v9h-9" />
+                </svg>
+                <span>Generar Mes en Curso</span>
+              </button>
+              <button class="btn primary" id="btnNewReportModal" onclick="openReportsModal()"
+                style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;border-color:rgba(79,140,255,.4);font-weight:700;display:inline-flex;align-items:center;gap:7px"
+                title="Abrir formulario para generar reporte con fechas o filtros personalizados">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span>Generar Nuevo Reporte</span>
+              </button>
+            </div>
           </div>
 
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <div style="position:relative">
-              <input type="text" id="fSearchReports" placeholder="Buscar reporte (folio, mes, nombre)..." oninput="filterReportsHistoryTable(this.value)"
-                style="font-size:12px;padding:7px 12px 7px 30px;width:240px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none"
-                title="Filtrar historial de reportes">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-            </div>
-            <button class="btn" id="btnAutoReportView" onclick="generateAutoMonthReport()"
-              style="background:rgba(16,185,129,0.12);color:#34d399;border-color:rgba(16,185,129,0.3);font-weight:600;display:inline-flex;align-items:center;gap:7px"
-              title="Generar automáticamente el informe consolidado del mes en curso">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><path d="M21 3v9h-9"/></svg>
-              <span>Generar Mes en Curso</span>
-            </button>
-            <button class="btn primary" id="btnNewReportModal" onclick="openReportsModal()"
-              style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;border-color:rgba(79,140,255,.4);font-weight:700;display:inline-flex;align-items:center;gap:7px"
-              title="Abrir formulario para generar reporte con fechas o filtros personalizados">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              <span>Generar Nuevo Reporte</span>
-            </button>
+          <div class="table-responsive">
+            <table id="tblGeneratedReports">
+              <thead>
+                <tr>
+                  <th>Folio</th>
+                  <th>Título / Período</th>
+                  <th>Generado Por</th>
+                  <th>Fecha Generación</th>
+                  <th style="text-align:center">Actividades</th>
+                  <th style="text-align:center">Cumplimiento SLA</th>
+                  <th style="text-align:center">T. Promedio</th>
+                  <th style="text-align:center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tblGeneratedReportsBody">
+                <tr>
+                  <td colspan="8" style="text-align:center;padding:24px" class="muted">Cargando historial de reportes...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
+      </div>
 
-        <div class="table-responsive">
-          <table id="tblGeneratedReports">
-            <thead>
-              <tr>
-                <th>Folio</th>
-                <th>Título / Período</th>
-                <th>Generado Por</th>
-                <th>Fecha Generación</th>
-                <th style="text-align:center">Actividades</th>
-                <th style="text-align:center">Cumplimiento SLA</th>
-                <th style="text-align:center">T. Promedio</th>
-                <th style="text-align:center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="tblGeneratedReportsBody">
-              <tr>
-                <td colspan="8" style="text-align:center;padding:24px" class="muted">Cargando historial de reportes...</td>
-              </tr>
-            </tbody>
-          </table>
+      <!-- Sub-vista 2: Indicadores y Gráficos KPI de Gestión -->
+      <div id="subViewReportsAnalytics" style="display:none">
+        <div class="card" style="margin-bottom:20px">
+          <!-- Cabecera del Dashboard con Filtros Integrados -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
+            <div>
+              <h3 style="margin:0;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)">
+                  <line x1="18" y1="20" x2="18" y2="10"/>
+                  <line x1="12" y1="20" x2="12" y2="4"/>
+                  <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                <span>Tablero de Métricas &amp; Indicadores de Gestión</span>
+                <span class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:11px" id="lblAnalyticsStatus">En Vivo</span>
+              </h3>
+              <span class="muted" style="font-size:12px;margin-top:3px;display:block">
+                Analítica visual de rendimiento, cumplimiento de SLA, balance de carga y tiempos de atención
+              </span>
+            </div>
+
+            <!-- Filtros interactivos -->
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="muted" style="font-size:11.5px">Período:</span>
+                <select id="analyticsPeriodSelect" onchange="loadAnalyticsData()"
+                  style="font-size:12px;padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none">
+                  <option value="month" selected>Mes en Curso</option>
+                  <option value="last30">Últimos 30 días</option>
+                  <option value="last7">Últimos 7 días</option>
+                  <option value="all">Todo el Historial</option>
+                </select>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="muted" style="font-size:11.5px">Especialista:</span>
+                <select id="analyticsSpecialistSelect" onchange="loadAnalyticsData()"
+                  style="font-size:12px;padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none">
+                  <option value="">Todo el Equipo</option>
+                  <option value="Adonis Lozada">Adonis Lozada</option>
+                  <option value="Juan Fernández">Juan Fernández</option>
+                  <option value="Yoxaide Jiménez">Yoxaide Jiménez</option>
+                  <option value="Luis Acosta">Luis Acosta</option>
+                  <option value="Sin asignar">Sin Asignar</option>
+                </select>
+              </div>
+
+              <button class="btn" onclick="loadAnalyticsData()" title="Refrescar métricas ahora"
+                style="background:rgba(255,255,255,0.05);color:var(--text);border-color:rgba(255,255,255,0.14);display:inline-flex;align-items:center;gap:5px;padding:6px 11px">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"/>
+                </svg>
+                <span>Refrescar</span>
+              </button>
+
+              <button class="btn" onclick="switchReportsSubView('history')"
+                style="background:rgba(255,255,255,0.04);color:var(--muted);border-color:rgba(255,255,255,0.1);display:inline-flex;align-items:center;gap:6px;padding:6px 12px"
+                title="Regresar a la tabla de reportes ejecutivos">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+                </svg>
+                <span>Volver al Historial</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 1. Grid de Tarjetas KPI -->
+          <div id="analyticsKpiGrid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:14px;margin-bottom:22px">
+            <div style="grid-column:1/-1;text-align:center;padding:24px" class="muted">Cargando indicadores...</div>
+          </div>
+
+          <!-- 2. Gráficos Principales (Donut SLA y Especialistas) -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(360px, 1fr));gap:18px;margin-bottom:20px">
+            
+            <!-- Gráfico 1: Donut de Cumplimiento de SLA & Estados -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                <div>
+                  <h4 style="margin:0;font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <span>Cumplimiento de SLA &amp; Estados</span>
+                  </h4>
+                  <span class="muted" style="font-size:11px">Meta corporativa: 90% SLA alcanzado</span>
+                </div>
+                <span class="badge" id="lblSlaBadgePct" style="background:rgba(16,185,129,0.15);color:#34d399;font-weight:700">—</span>
+              </div>
+              <div id="chartSlaDonutContainer" style="display:flex;align-items:center;justify-content:space-around;gap:16px;flex-wrap:wrap;min-height:190px">
+                <!-- Generado por JS -->
+              </div>
+            </div>
+
+            <!-- Gráfico 2: Desempeño y Carga por Especialista -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                <div>
+                  <h4 style="margin:0;font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Productividad por Especialista</span>
+                  </h4>
+                  <span class="muted" style="font-size:11px">Casos cerrados, activos y cumplimiento individual</span>
+                </div>
+                <span class="muted" style="font-size:11px" id="lblSpecialistCount">—</span>
+              </div>
+              <div id="chartSpecialistsContainer" style="display:flex;flex-direction:column;gap:12px">
+                <!-- Generado por JS -->
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 3. Gráficos Secundarios: Plataformas, Prioridad y Clientes Top -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:18px">
+
+            <!-- Origen de Actividades (GLPI vs ClickUp) -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:18px">
+              <h4 style="margin:0 0 12px 0;font-size:13.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#f39c12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 12l-4-4-4 4"/><path d="M12 16V8"/></svg>
+                <span>Origen de Actividades</span>
+              </h4>
+              <div id="chartPlatformContainer" style="display:flex;flex-direction:column;gap:10px">
+                <!-- Generado por JS -->
+              </div>
+            </div>
+
+            <!-- Distribución por Nivel de Prioridad -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:18px">
+              <h4 style="margin:0 0 12px 0;font-size:13.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ff5d5d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <span>Distribución por Prioridad</span>
+              </h4>
+              <div id="chartPriorityContainer" style="display:flex;flex-direction:column;gap:8px">
+                <!-- Generado por JS -->
+              </div>
+            </div>
+
+            <!-- Top Clientes / Entidades -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:18px">
+              <h4 style="margin:0 0 12px 0;font-size:13.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#22c3d6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M9 8h1"/><path d="M9 12h1"/><path d="M9 16h1"/><path d="M14 8h1"/><path d="M14 12h1"/><path d="M14 16h1"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
+                <span>Top Clientes / Entidades</span>
+              </h4>
+              <div id="chartClientsContainer" style="display:flex;flex-direction:column;gap:8px">
+                <!-- Generado por JS -->
+              </div>
+            </div>
+
+          </div>
+
         </div>
       </div>
     </div>
@@ -2860,8 +3079,8 @@
       const userName = (user.username || '').toLowerCase();
       const firstName = fullName.split(' ')[0] || userName.split('.')[0] || '';
       return (fullName && assignee.includes(fullName)) ||
-             (firstName && firstName.length > 2 && assignee.includes(firstName)) ||
-             (userName && assignee.includes(userName));
+        (firstName && firstName.length > 2 && assignee.includes(firstName)) ||
+        (userName && assignee.includes(userName));
     }
 
     function isItemUnassigned(it) {
@@ -3152,9 +3371,9 @@
                    ${isCoordinator() ? `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5;color:var(--accent)"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>` : ''}
                  </div>`
               : (isCoordinator()
-                  ? `<button type="button" class="badge" style="background:rgba(243,156,18,.15);color:#f39c12;border:1px solid rgba(243,156,18,.35);cursor:pointer;padding:3px 8px;font-weight:600;border-radius:6px;font-size:11px;transition:all .15s" onclick="event.stopPropagation();openModal(${it.id})" title="Click para asignar responsable">+ Asignar</button>`
-                  : `<span class="muted" style="font-size:11px">Sin asignar</span>`
-                )
+                ? `<button type="button" class="badge" style="background:rgba(243,156,18,.15);color:#f39c12;border:1px solid rgba(243,156,18,.35);cursor:pointer;padding:3px 8px;font-weight:600;border-radius:6px;font-size:11px;transition:all .15s" onclick="event.stopPropagation();openModal(${it.id})" title="Click para asignar responsable">+ Asignar</button>`
+                : `<span class="muted" style="font-size:11px">Sin asignar</span>`
+              )
             )
           }
         </td>
@@ -3167,14 +3386,14 @@
         <td class="${it.is_overdue ? 'txt-red' : 'muted'}">${formatDate(it.due_at)}</td>
       </tr>
     `).join('');
-    }
+      }
 
-    // 2. Kanban
-    renderKanban(list);
+      // 2. Kanban
+      renderKanban(list);
 
-    // 3. Atrasados
-    const over = list.filter(i => i.is_overdue || i.semaphore === 'rojo');
-    document.querySelector('#tblOverdue tbody').innerHTML = over.map(it => `
+      // 3. Atrasados
+      const over = list.filter(i => i.is_overdue || i.semaphore === 'rojo');
+      document.querySelector('#tblOverdue tbody').innerHTML = over.map(it => `
     <tr class="click" onclick="openModal(${it.id})">
       <td><span class="sem rojo"></span></td>
       <td>${it.source} #${it.external_id}</td>
@@ -3187,12 +3406,12 @@
     </tr>
   `).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">Sin asuntos fuera de SLA.</td></tr>';
 
-    // 4. Clientes
-    renderClients(list);
+      // 4. Clientes
+      renderClients(list);
 
-    if (TV_MODE_ACTIVE) {
-      renderTvSlide();
-    }
+      if (TV_MODE_ACTIVE) {
+        renderTvSlide();
+      }
     }
 
     function renderClients(list) {
@@ -3401,11 +3620,11 @@
       const diffSec = Math.floor((new Date() - d) / 1000);
       if (diffSec < 45) return 'hace un momento';
       const diffMin = Math.floor(diffSec / 60);
-      if (diffMin < 60) return `hace ${ diffMin } min`;
+      if (diffMin < 60) return `hace ${diffMin} min`;
       const diffHours = Math.floor(diffMin / 60);
-      if (diffHours < 24) return `hace ${ diffHours }h ${ diffMin % 60 } m`;
+      if (diffHours < 24) return `hace ${diffHours}h ${diffMin % 60} m`;
       const diffDays = Math.floor(diffHours / 24);
-      return `hace ${ diffDays } d`;
+      return `hace ${diffDays} d`;
     }
 
     function renderSelectedAssigneeChips(itemId) {
@@ -3428,7 +3647,7 @@
           <div class="chip-name">${spec.name}</div>
           <div class="chip-email">${spec.email}</div>
         </div>
-        ${ !isClosed ? `<button type="button" class="chip-remove" onclick="removeAssigneeKey('${spec.key}', ${itemId})" title="Quitar">&times;</button>` : '' }
+        ${!isClosed ? `<button type="button" class="chip-remove" onclick="removeAssigneeKey('${spec.key}', ${itemId})" title="Quitar">&times;</button>` : ''}
       </div>
       `;
       }).join('');
@@ -3465,7 +3684,7 @@
           </div>
           <span class="opt-email">${s.email}</span>
         </div>
-        ${ isSelected ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#2ecc71;margin-left:6px"><polyline points="20 6 9 17 4 12"/></svg>' : '' }
+        ${isSelected ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#2ecc71;margin-left:6px"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
       </div>
       `;
       }).join('');
@@ -3522,7 +3741,7 @@
       const day = pad(d.getDate());
       const h = pad(d.getHours());
       const min = pad(d.getMinutes());
-      return `${ y } -${ m } -${ day }T${ h }:${ min } `;
+      return `${y} -${m} -${day}T${h}:${min} `;
     }
 
     function setCreateSource(src) {
@@ -3607,7 +3826,7 @@
           </div>
           <span class="opt-email">${s.email}</span>
         </div>
-        ${ isSelected ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#2ecc71;margin-left:6px"><polyline points="20 6 9 17 4 12"/></svg>' : '' }
+        ${isSelected ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#2ecc71;margin-left:6px"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
       </div>
       `;
       }).join('');
@@ -3687,58 +3906,58 @@
           headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
-    const data = await res.json();
+        const data = await res.json();
 
-    if (!res.ok) {
-      alert(`Error al crear la actividad: ${data.detail || 'Ocurrió un error en el servidor'}`);
-      btn.disabled = false;
-      btn.innerHTML = origBtnContent;
-      return;
-    }
+        if (!res.ok) {
+          alert(`Error al crear la actividad: ${data.detail || 'Ocurrió un error en el servidor'}`);
+          btn.disabled = false;
+          btn.innerHTML = origBtnContent;
+          return;
+        }
 
-    const createdItem = data.item;
-    closeModal();
+        const createdItem = data.item;
+        closeModal();
 
-    // 1. Limpiar filtros en vista principal para garantizar visibilidad inmediata
-    resetAllFilters();
+        // 1. Limpiar filtros en vista principal para garantizar visibilidad inmediata
+        resetAllFilters();
 
-    // 2. Si estamos en Modo TV, saltar al slide de Tablero Kanban
-    if (TV_MODE_ACTIVE) {
-      const slides = getTvSlides();
-      const kanbanIdx = slides.findIndex(s => s.type === 'kanban');
-      if (kanbanIdx !== -1) {
-        TV_CURRENT_SLIDE = kanbanIdx;
-      }
-    }
+        // 2. Si estamos en Modo TV, saltar al slide de Tablero Kanban
+        if (TV_MODE_ACTIVE) {
+          const slides = getTvSlides();
+          const kanbanIdx = slides.findIndex(s => s.type === 'kanban');
+          if (kanbanIdx !== -1) {
+            TV_CURRENT_SLIDE = kanbanIdx;
+          }
+        }
 
-    // 3. Resaltar visualmente la actividad recién creada
-    if (createdItem && createdItem.id) {
-      HIGHLIGHT_ITEM_ID = createdItem.id;
-      setTimeout(() => {
-        HIGHLIGHT_ITEM_ID = null;
-        if (TV_MODE_ACTIVE) renderTvSlide();
-        else renderAll();
-      }, 7000);
-    }
+        // 3. Resaltar visualmente la actividad recién creada
+        if (createdItem && createdItem.id) {
+          HIGHLIGHT_ITEM_ID = createdItem.id;
+          setTimeout(() => {
+            HIGHLIGHT_ITEM_ID = null;
+            if (TV_MODE_ACTIVE) renderTvSlide();
+            else renderAll();
+          }, 7000);
+        }
 
-    // 4. Recargar datos de la API
-    await loadData();
+        // 4. Recargar datos de la API
+        await loadData();
 
-    if (TV_MODE_ACTIVE) {
-      renderTvSlide();
-      startTvTimer();
-    }
+        if (TV_MODE_ACTIVE) {
+          renderTvSlide();
+          startTvTimer();
+        }
 
-    // 5. Notificación Toast elegante
-    const itemTitle = createdItem ? createdItem.title : title;
-    const itemSrc = createdItem ? `${createdItem.source} #${createdItem.external_id}` : source;
-    showToast('¡Actividad creada con éxito!', `${itemSrc}: "${itemTitle}" agregada a Pendientes y sincronizada.`, 'success', 5000);
+        // 5. Notificación Toast elegante
+        const itemTitle = createdItem ? createdItem.title : title;
+        const itemSrc = createdItem ? `${createdItem.source} #${createdItem.external_id}` : source;
+        showToast('¡Actividad creada con éxito!', `${itemSrc}: "${itemTitle}" agregada a Pendientes y sincronizada.`, 'success', 5000);
       } catch (err) {
-      console.error('Error creando actividad:', err);
-      alert('Error de conexión al conectar con el servidor.');
-      btn.disabled = false;
-      btn.innerHTML = origBtnContent;
-    }
+        console.error('Error creando actividad:', err);
+        alert('Error de conexión al conectar con el servidor.');
+        btn.disabled = false;
+        btn.innerHTML = origBtnContent;
+      }
     }
 
     function openCreateModal() {
@@ -3951,10 +4170,10 @@
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 <span>
                   ${it.assigned_at
-            ? `Agregado a la actividad: <b style="color:var(--text)">${formatDate(it.assigned_at, true)}</b> <span style="color:var(--accent)">(${getTimeAgo(it.assigned_at)})</span>`
-            : (it.assignee_name && !it.assignee_name.toLowerCase().includes('sin asignar')
-              ? `Agregado en registro inicial: <b style="color:var(--text)">${formatDate(it.created_at, true)}</b>`
-              : `Disponible para asignación`)}
+          ? `Agregado a la actividad: <b style="color:var(--text)">${formatDate(it.assigned_at, true)}</b> <span style="color:var(--accent)">(${getTimeAgo(it.assigned_at)})</span>`
+          : (it.assignee_name && !it.assignee_name.toLowerCase().includes('sin asignar')
+            ? `Agregado en registro inicial: <b style="color:var(--text)">${formatDate(it.created_at, true)}</b>`
+            : `Disponible para asignación`)}
                 </span>
               </div>
               <button class="btn primary" id="btnModalAssign" onclick="saveAssignmentFromModal(${it.id})" style="padding:6px 14px;font-size:12px">
@@ -4226,10 +4445,18 @@
         if (kpisEl) kpisEl.style.display = 'none';
         if (subTitleEl) {
           subTitleEl.textContent = (viewName === 'reportes')
-            ? 'Historial y generación de informes ejecutivos consolidados'
+            ? (CURRENT_REPORTS_SUBVIEW === 'analytics'
+                ? 'Tablero de indicadores y gráficos de rendimiento de la gestión'
+                : 'Historial y generación de informes ejecutivos consolidados')
             : 'Base documental y enlaces directos de escalamiento (Google Docs)';
         }
-        if (viewName === 'reportes') loadReportsHistory();
+        if (viewName === 'reportes') {
+          if (CURRENT_REPORTS_SUBVIEW === 'analytics') {
+            loadAnalyticsData();
+          } else {
+            loadReportsHistory();
+          }
+        }
         if (viewName === 'escalamientos') loadEscalations();
       } else {
         if (filtersEl) filtersEl.style.display = 'flex';
@@ -4481,8 +4708,8 @@
               </div>
               <div class="tv-kanban-cards">
                 ${colItems.map(it => {
-                  const canDrag = canUserEditItem(it);
-                  return `
+            const canDrag = canUserEditItem(it);
+            return `
                   <div class="tv-kanban-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-tv-${it.id}" draggable="${canDrag ? 'true' : 'false'}" ${canDrag ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!canDrag ? 'cursor:pointer;' : ''}">
                     <div style="display:flex;align-items:center;gap:6px;font-size:11px">
                       <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
@@ -4499,7 +4726,7 @@
                     </div>
                   </div>
                 `;
-                }).join('') || '<div class="muted" style="padding:24px 10px;text-align:center;font-size:12px;border:1px dashed rgba(255,255,255,.08);border-radius:8px">Sin actividades en esta columna</div>'}
+          }).join('') || '<div class="muted" style="padding:24px 10px;text-align:center;font-size:12px;border:1px dashed rgba(255,255,255,.08);border-radius:8px">Sin actividades en esta columna</div>'}
               </div>
             </div>
           `;
@@ -5592,6 +5819,461 @@
     }
 
     // =========================================================================
+    // MÓDULO DE REPORTES: SUB-VISTA DE ANALÍTICA, KPIS Y GRÁFICOS DE GESTIÓN
+    // =========================================================================
+    let CURRENT_REPORTS_SUBVIEW = 'history'; // 'history' | 'analytics'
+    let CURRENT_ANALYTICS_DATA = null;
+
+    function switchReportsSubView(subview) {
+      CURRENT_REPORTS_SUBVIEW = subview;
+      const historyEl = document.getElementById('subViewReportsHistory');
+      const analyticsEl = document.getElementById('subViewReportsAnalytics');
+      const tabHist = document.getElementById('tabBtnReportHistory');
+      const tabAnal = document.getElementById('tabBtnReportAnalytics');
+      const subTitleEl = document.querySelector('header .sub');
+
+      if (subview === 'analytics') {
+        if (historyEl) historyEl.style.display = 'none';
+        if (analyticsEl) analyticsEl.style.display = 'block';
+
+        if (tabHist) {
+          tabHist.style.background = 'transparent';
+          tabHist.style.color = 'var(--muted)';
+          tabHist.style.fontWeight = '600';
+        }
+        if (tabAnal) {
+          tabAnal.style.background = 'var(--accent)';
+          tabAnal.style.color = '#fff';
+          tabAnal.style.fontWeight = '700';
+        }
+        if (subTitleEl) {
+          subTitleEl.textContent = 'Tablero de indicadores y gráficos de rendimiento de la gestión';
+        }
+        loadAnalyticsData();
+      } else {
+        if (historyEl) historyEl.style.display = 'block';
+        if (analyticsEl) analyticsEl.style.display = 'none';
+
+        if (tabHist) {
+          tabHist.style.background = 'var(--accent)';
+          tabHist.style.color = '#fff';
+          tabHist.style.fontWeight = '700';
+        }
+        if (tabAnal) {
+          tabAnal.style.background = 'transparent';
+          tabAnal.style.color = 'var(--muted)';
+          tabAnal.style.fontWeight = '600';
+        }
+        if (subTitleEl) {
+          subTitleEl.textContent = 'Historial y generación de informes ejecutivos consolidados';
+        }
+        loadReportsHistory();
+      }
+    }
+
+    async function loadAnalyticsData() {
+      const kpiGrid = document.getElementById('analyticsKpiGrid');
+      const statusBadge = document.getElementById('lblAnalyticsStatus');
+      if (statusBadge) statusBadge.textContent = 'Actualizando...';
+
+      const periodSelect = document.getElementById('analyticsPeriodSelect');
+      const specSelect = document.getElementById('analyticsSpecialistSelect');
+      const periodVal = periodSelect ? periodSelect.value : 'month';
+      const specVal = specSelect ? specSelect.value : '';
+
+      let startDate = '';
+      let endDate = '';
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+
+      if (periodVal === 'month') {
+        startDate = `${yyyy}-${mm}-01`;
+        endDate = todayStr;
+      } else if (periodVal === 'last30') {
+        const d30 = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+        const d30y = d30.getFullYear();
+        const d30m = String(d30.getMonth() + 1).padStart(2, '0');
+        const d30d = String(d30.getDate()).padStart(2, '0');
+        startDate = `${d30y}-${d30m}-${d30d}`;
+        endDate = todayStr;
+      } else if (periodVal === 'last7') {
+        const d7 = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+        const d7y = d7.getFullYear();
+        const d7m = String(d7.getMonth() + 1).padStart(2, '0');
+        const d7d = String(d7.getDate()).padStart(2, '0');
+        startDate = `${d7y}-${d7m}-${d7d}`;
+        endDate = todayStr;
+      } else if (periodVal === 'all') {
+        startDate = '';
+        endDate = '';
+      }
+
+      try {
+        const params = new URLSearchParams();
+        if (startDate) params.set('start_date', startDate);
+        if (endDate) params.set('end_date', endDate);
+        if (specVal) params.set('specialist', specVal);
+
+        if (CURRENT_USER) {
+          if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
+          if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
+          else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
+        }
+
+        const res = await fetch(`${API_URL}/reports/data?${params.toString()}`, {
+          headers: getAuthHeaders()
+        });
+
+        if (!res.ok) {
+          throw new Error(`Error ${res.status}: ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        CURRENT_ANALYTICS_DATA = data;
+        renderAnalyticsDashboard(data);
+        if (statusBadge) statusBadge.textContent = 'En Vivo';
+      } catch (err) {
+        console.error('Error cargando analítica de reportes:', err);
+        if (statusBadge) statusBadge.textContent = 'Error';
+        if (kpiGrid) {
+          kpiGrid.innerHTML = `
+            <div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--red)">
+              Error al consultar analítica: ${escapeHtml(err.message)}
+            </div>
+          `;
+        }
+      }
+    }
+
+    function renderAnalyticsDashboard(data) {
+      if (!data) return;
+      renderAnalyticsKpis(data.kpis || {}, data.por_origen || {});
+      renderSlaDonutChart(data.kpis || {});
+      renderSpecialistsChart(data.por_especialista || []);
+      renderPlatformChart(data.por_origen || {});
+      renderPriorityChart(data.por_prioridad || {});
+      renderClientsChart(data.por_cliente || []);
+    }
+
+    function renderAnalyticsKpis(kpis, porOrigen) {
+      const kpiGrid = document.getElementById('analyticsKpiGrid');
+      if (!kpiGrid) return;
+
+      const slaVal = Number(kpis.cumplimiento_general != null ? kpis.cumplimiento_general : 100);
+      const slaColor = (slaVal >= 90) ? '#10b981' : ((slaVal >= 80) ? '#f59e0b' : '#ef4444');
+      const slaBadgeText = (slaVal >= 90) ? 'Excelente · Meta 90%' : ((slaVal >= 80) ? 'Aceptable' : 'En Riesgo');
+
+      const totalItems = kpis.total_items || 0;
+      const totalClosed = kpis.total_cerrados || 0;
+      const closePct = totalItems > 0 ? ((totalClosed / totalItems) * 100).toFixed(1) : '100.0';
+      const activeItems = (kpis.total_en_curso || 0) + (kpis.total_pendientes || 0) + (kpis.total_en_espera || 0);
+
+      const glpiCount = porOrigen.GLPI || 0;
+      const cuCount = porOrigen.ClickUp || 0;
+
+      kpiGrid.innerHTML = `
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px;border-left:4px solid ${slaColor}">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Cumplimiento SLA</span>
+            <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:10px;font-weight:700">${slaBadgeText}</span>
+          </div>
+          <div style="font-size:26px;font-weight:800;color:${slaColor};line-height:1.1">${slaVal.toFixed(1)}%</div>
+          <small class="muted" style="font-size:11px;margin-top:5px;display:block">
+            ${kpis.total_dentro_sla || 0} dentro de SLA · ${kpis.total_fuera_sla || 0} fuera de SLA
+          </small>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px;border-left:4px solid var(--accent)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Total Gestionadas</span>
+            <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:10px;font-weight:700">${closePct}% Cerradas</span>
+          </div>
+          <div style="font-size:26px;font-weight:800;color:var(--text);line-height:1.1">${totalItems}</div>
+          <small class="muted" style="font-size:11px;margin-top:5px;display:block">
+            ${totalClosed} resueltas · ${activeItems} en proceso
+          </small>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px;border-left:4px solid #a78bfa">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Tiempo de Resolución</span>
+            <span class="badge" style="background:rgba(167,139,250,0.15);color:#a78bfa;font-size:10px;font-weight:700">Promedio</span>
+          </div>
+          <div style="font-size:26px;font-weight:800;color:#f0f6fc;line-height:1.1">${escapeHtml(kpis.avg_resolution_str || '0m')}</div>
+          <small class="muted" style="font-size:11px;margin-top:5px;display:block">
+            Duración media desde apertura hasta cierre
+          </small>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px;border-left:4px solid #f39c12">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Balance de Fuentes</span>
+            <span class="badge" style="background:rgba(243,156,18,0.15);color:#f39c12;font-size:10px;font-weight:700">Multi-Plataforma</span>
+          </div>
+          <div style="font-size:24px;font-weight:800;color:var(--text);line-height:1.1">
+            <span style="color:#f39c12">${glpiCount}</span> <span style="font-size:14px;color:var(--muted);font-weight:400">GLPI</span> / 
+            <span style="color:#7b68ee">${cuCount}</span> <span style="font-size:14px;color:var(--muted);font-weight:400">ClickUp</span>
+          </div>
+          <small class="muted" style="font-size:11px;margin-top:5px;display:block">
+            Mesa de ayuda TI y tareas de proyectos
+          </small>
+        </div>
+      `;
+    }
+
+    function renderSlaDonutChart(kpis) {
+      const container = document.getElementById('chartSlaDonutContainer');
+      const badgePct = document.getElementById('lblSlaBadgePct');
+      if (!container) return;
+
+      const slaVal = Number(kpis.cumplimiento_general != null ? kpis.cumplimiento_general : 100);
+      const slaColor = (slaVal >= 90) ? '#10b981' : ((slaVal >= 80) ? '#f59e0b' : '#ef4444');
+
+      if (badgePct) {
+        badgePct.textContent = `${slaVal.toFixed(1)}% SLA`;
+        badgePct.style.background = `${slaColor}22`;
+        badgePct.style.color = slaColor;
+        badgePct.style.border = `1px solid ${slaColor}44`;
+      }
+
+      const dentro = kpis.total_dentro_sla || 0;
+      const fuera = kpis.total_fuera_sla || 0;
+      const enCurso = kpis.total_en_curso || 0;
+      const enEspera = kpis.total_en_espera || 0;
+      const total = dentro + fuera + enCurso + enEspera;
+
+      if (total === 0) {
+        container.innerHTML = `
+          <div style="text-align:center;padding:24px;color:var(--muted)">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8" style="opacity:0.4;display:block;margin:0 auto 6px auto"><circle cx="12" cy="12" r="10"/></svg>
+            No hay actividades registradas en el período seleccionado.
+          </div>
+        `;
+        return;
+      }
+
+      const r = 50;
+      const C = 2 * Math.PI * r; // 314.159265
+      const segments = [
+        { label: 'Dentro de SLA', count: dentro, color: '#10b981' },
+        { label: 'Fuera de SLA / Atrasadas', count: fuera, color: '#ef4444' },
+        { label: 'En Curso', count: enCurso, color: '#3b82f6' },
+        { label: 'En Espera', count: enEspera, color: '#f59e0b' }
+      ].filter(s => s.count > 0);
+
+      let cumulativeOffset = 0;
+      const circlesSvg = segments.map(seg => {
+        const segLen = (seg.count / total) * C;
+        const dashArray = `${segLen} ${C - segLen}`;
+        const dashOffset = -cumulativeOffset;
+        cumulativeOffset += segLen;
+        return `<circle cx="75" cy="75" r="${r}" fill="none" stroke="${seg.color}" stroke-width="16" stroke-dasharray="${dashArray}" stroke-dashoffset="${dashOffset}" transform="rotate(-90 75 75)" style="transition:stroke-dasharray .5s ease" />`;
+      }).join('');
+
+      const legendsHtml = [
+        { label: 'Dentro de SLA', count: dentro, color: '#10b981' },
+        { label: 'Fuera de SLA / Atrasadas', count: fuera, color: '#ef4444' },
+        { label: 'En Curso / Atención', count: enCurso, color: '#3b82f6' },
+        { label: 'En Espera', count: enEspera, color: '#f59e0b' }
+      ].map(item => {
+        const pct = total > 0 ? ((item.count / total) * 100).toFixed(1) : '0.0';
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11.5px;padding:3px 0">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="width:9px;height:9px;border-radius:50%;background:${item.color};display:inline-block"></span>
+              <span style="color:var(--text)">${item.label}</span>
+            </div>
+            <div style="font-weight:700;color:var(--text)">
+              ${item.count} <small class="muted" style="font-weight:400">(${pct}%)</small>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div style="position:relative;width:150px;height:150px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg viewBox="0 0 150 150" width="150" height="150">
+            <circle cx="75" cy="75" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="16" />
+            ${circlesSvg}
+          </svg>
+          <div style="position:absolute;text-align:center;pointer-events:none">
+            <div style="font-size:22px;font-weight:800;color:${slaColor};line-height:1">${slaVal.toFixed(1)}%</div>
+            <div style="font-size:9.5px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-top:2px">SLA Cumplido</div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:180px;display:flex;flex-direction:column;justify-content:center;gap:3px">
+          ${legendsHtml}
+        </div>
+      `;
+    }
+
+    function renderSpecialistsChart(list) {
+      const container = document.getElementById('chartSpecialistsContainer');
+      const countEl = document.getElementById('lblSpecialistCount');
+      if (!container) return;
+
+      if (!list || !list.length) {
+        container.innerHTML = `<div style="text-align:center;padding:18px;color:var(--muted)">Sin datos de especialistas.</div>`;
+        return;
+      }
+
+      if (countEl) countEl.textContent = `${list.length} perfiles`;
+
+      const maxTotal = Math.max(...list.map(x => x.total), 1);
+
+      container.innerHTML = list.map(s => {
+        const sla = Number(s.cumplimiento_pct) || 0;
+        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
+        const closedPct = s.total > 0 ? ((s.cerrados / s.total) * 100) : 0;
+        const activePct = s.total > 0 ? ((s.en_curso / s.total) * 100) : 0;
+        const overduePct = s.total > 0 ? ((s.fuera_sla / s.total) * 100) : 0;
+
+        const initials = s.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+        return `
+          <div style="background:rgba(255,255,255,0.02);padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.05)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="width:26px;height:26px;border-radius:50%;background:rgba(79,140,255,0.15);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px">
+                  ${initials}
+                </div>
+                <div>
+                  <strong style="font-size:12.5px;color:var(--text)">${escapeHtml(s.name)}</strong>
+                  <span class="muted" style="font-size:10.5px;display:block">${escapeHtml(s.role)}</span>
+                </div>
+              </div>
+              <div style="text-align:right">
+                <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:10.5px;font-weight:700">
+                  ${sla.toFixed(1)}% SLA
+                </span>
+                <span class="muted" style="font-size:10.5px;display:block;margin-top:2px">T. Prom: ${escapeHtml(s.avg_time_str || '0m')}</span>
+              </div>
+            </div>
+            
+            <div style="background:rgba(255,255,255,0.06);height:6px;border-radius:3px;overflow:hidden;display:flex">
+              <div style="width:${closedPct}%;background:#10b981;height:100%" title="${s.cerrados} cerradas"></div>
+              <div style="width:${activePct}%;background:#4f8cff;height:100%" title="${s.en_curso} en curso"></div>
+              <div style="width:${overduePct}%;background:#ef4444;height:100%" title="${s.fuera_sla} atrasadas"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:4px">
+              <span><strong>${s.total}</strong> asignadas · <span style="color:#10b981">${s.cerrados} cerradas</span></span>
+              <span><span style="color:#4f8cff">${s.en_curso} activas</span> · <span style="color:#ef4444">${s.fuera_sla} fuera SLA</span></span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderPlatformChart(porOrigen) {
+      const container = document.getElementById('chartPlatformContainer');
+      if (!container) return;
+
+      const glpi = porOrigen.GLPI || 0;
+      const clickup = porOrigen.ClickUp || 0;
+      const total = glpi + clickup;
+
+      const glpiPct = total > 0 ? ((glpi / total) * 100).toFixed(1) : '0.0';
+      const cuPct = total > 0 ? ((clickup / total) * 100).toFixed(1) : '0.0';
+
+      container.innerHTML = `
+        <div style="background:rgba(255,255,255,0.02);padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.05)">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+            <span style="color:#f39c12;font-weight:700">GLPI (Mesa de Ayuda)</span>
+            <span style="color:var(--text);font-weight:700">${glpi} <small class="muted">(${glpiPct}%)</small></span>
+          </div>
+          <div style="background:rgba(255,255,255,0.06);height:7px;border-radius:4px;overflow:hidden">
+            <div style="width:${glpiPct}%;background:#f39c12;height:100%"></div>
+          </div>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.02);padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.05)">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+            <span style="color:#7b68ee;font-weight:700">ClickUp (Proyectos &amp; Tareas)</span>
+            <span style="color:var(--text);font-weight:700">${clickup} <small class="muted">(${cuPct}%)</small></span>
+          </div>
+          <div style="background:rgba(255,255,255,0.06);height:7px;border-radius:4px;overflow:hidden">
+            <div style="width:${cuPct}%;background:#7b68ee;height:100%"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderPriorityChart(porPrioridad) {
+      const container = document.getElementById('chartPriorityContainer');
+      if (!container) return;
+
+      const priorities = [
+        { label: 'Crítica', key: 'Crítica', color: '#ff5d5d' },
+        { label: 'Alta', key: 'Alta', color: '#f97316' },
+        { label: 'Media', key: 'Media', color: '#4f8cff' },
+        { label: 'Baja', key: 'Baja', color: '#10b981' }
+      ];
+
+      const counts = priorities.map(p => porPrioridad[p.key] || 0);
+      const total = counts.reduce((a, b) => a + b, 0);
+
+      container.innerHTML = priorities.map(p => {
+        const c = porPrioridad[p.key] || 0;
+        const pct = total > 0 ? ((c / total) * 100).toFixed(1) : '0.0';
+        return `
+          <div style="background:rgba(255,255,255,0.02);padding:7px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.05)">
+            <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px">
+              <span style="display:flex;align-items:center;gap:6px;color:var(--text)">
+                <span style="width:7px;height:7px;border-radius:50%;background:${p.color}"></span>
+                ${p.label}
+              </span>
+              <span style="font-weight:700;color:var(--text)">${c} <small class="muted">(${pct}%)</small></span>
+            </div>
+            <div style="background:rgba(255,255,255,0.06);height:5px;border-radius:3px;overflow:hidden">
+              <div style="width:${pct}%;background:${p.color};height:100%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderClientsChart(list) {
+      const container = document.getElementById('chartClientsContainer');
+      if (!container) return;
+
+      if (!list || !list.length) {
+        container.innerHTML = `<div style="text-align:center;padding:16px;color:var(--muted)">Sin datos de clientes.</div>`;
+        return;
+      }
+
+      const topClients = list.slice(0, 5);
+      const maxTotal = Math.max(...topClients.map(c => c.total), 1);
+
+      container.innerHTML = topClients.map((c, idx) => {
+        const sla = Number(c.cumplimiento_pct) || 0;
+        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
+        const barPct = (c.total / maxTotal) * 100;
+
+        return `
+          <div style="background:rgba(255,255,255,0.02);padding:7px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.05)">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;margin-bottom:4px">
+              <span style="color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px" title="${escapeHtml(c.client_name)}">
+                #${idx + 1} ${escapeHtml(c.client_name)}
+              </span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-weight:700;color:var(--text)">${c.total}</span>
+                <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:10px;padding:2px 5px">
+                  ${sla.toFixed(0)}%
+                </span>
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.06);height:4px;border-radius:2px;overflow:hidden">
+              <div style="width:${barPct}%;background:#22c3d6;height:100%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // =========================================================================
     // MÓDULO DE ESCALAMIENTOS - REPOSITORIO DOCUMENTAL Y ENLACES (GOOGLE DOCS)
     // =========================================================================
     let ESCALATIONS_LIST = [];
@@ -5669,7 +6351,7 @@
                 <polyline points="10 9 9 9 8 9"/>
               </svg>
               No se encontraron escalamientos registrados.<br>
-              <small style="margin-top:4px;display:inline-block">Haz clic en <strong>"+ Registrar Escalamiento"</strong> para vincular el primer documento de Google Docs.</small>
+              <small style="margin-top:4px;display:inline-block">Haz clic en <strong>" Registrar Escalamiento"</strong> para vincular el primer documento de Google Docs.</small>
             </td>
           </tr>
         `;
@@ -5958,8 +6640,8 @@
       SELECTED_ESCALATION_FILE = file;
 
       const dropText = document.getElementById('escalationDropText');
-      const sizeStr = (file.size < 1024 * 1024) 
-        ? `${(file.size / 1024).toFixed(1)} KB` 
+      const sizeStr = (file.size < 1024 * 1024)
+        ? `${(file.size / 1024).toFixed(1)} KB`
         : `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
 
       if (dropText) {
@@ -6064,7 +6746,7 @@
         const file = SELECTED_ESCALATION_FILE;
         const reader = new FileReader();
 
-        reader.onload = async function() {
+        reader.onload = async function () {
           try {
             const base64Data = reader.result.split(',')[1];
             const payload = {
@@ -6102,7 +6784,7 @@
           }
         };
 
-        reader.onerror = function() {
+        reader.onerror = function () {
           alert('Error de lectura al procesar el archivo en el navegador.');
           if (btn) {
             btn.disabled = false;
