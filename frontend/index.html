@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="notranslate" translate="no">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="google" content="notranslate">
   <title>Agenda de Infra · Infraestructura y BD (En Vivo)</title>
   <link rel="icon" type="image/png" href="ICOSYCOM.png?v=2">
   <link rel="shortcut icon" type="image/png" href="ICOSYCOM.png?v=2">
@@ -6204,7 +6205,7 @@
         const overdueH = s.total > 0 ? Math.max(barH - closedH - activeH, (s.fuera_sla > 0 ? 4 : 0)) : 0;
 
         return `
-          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:46px;max-width:80px">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:55px;max-width:92px">
             <!-- Valor numérico superior con espaciado controlado -->
             <div style="font-size:12px;font-weight:800;color:${s.total > 0 ? '#ffffff' : 'var(--muted)'};margin-bottom:6px;line-height:1">
               ${s.total}
@@ -6229,14 +6230,14 @@
         const isBolsa = (s.name || '').toLowerCase().includes('sin asignar');
 
         const roleBadge = isCoord 
-          ? `<span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:9.5px">Coord</span>`
-          : (isBolsa ? `<span class="badge" style="visibility:hidden;font-size:9.5px">-</span>`
-                     : `<span class="badge" style="background:rgba(167,139,250,0.15);color:#a78bfa;font-size:9.5px">Espec</span>`);
+          ? `<span class="badge notranslate" translate="no" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:9px;padding:2px 5px">Coordinador</span>`
+          : (isBolsa ? `<span class="badge" style="visibility:hidden;font-size:9px;padding:2px 5px">-</span>`
+                     : `<span class="badge notranslate" translate="no" style="background:rgba(167,139,250,0.15);color:#a78bfa;font-size:9px;padding:2px 5px">Especialista</span>`);
 
         const shortName = isBolsa ? 'Sin asignar' : s.name.split(' ')[0];
 
         return `
-          <div style="flex:1;min-width:46px;max-width:80px;text-align:center">
+          <div style="flex:1;min-width:55px;max-width:92px;text-align:center">
             <strong style="font-size:11.5px;color:var(--text);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(s.name)}">
               ${escapeHtml(shortName)}
             </strong>
