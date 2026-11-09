@@ -203,7 +203,7 @@ def init_users():
 app = FastAPI(
     title="Agenda de Infra - Infraestructura y BD",
     description="API de consolidación y sincronización en tiempo real de GLPI y ClickUp",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 # Permitir CORS para que el dashboard web pueda consumir la API
