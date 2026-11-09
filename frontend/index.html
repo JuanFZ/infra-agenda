@@ -2875,40 +2875,44 @@
             <div style="grid-column:1/-1;text-align:center;padding:24px" class="muted">Cargando indicadores...</div>
           </div>
 
-          <!-- 2. Gráficos Principales (Donut SLA y Especialistas) -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(360px, 1fr));gap:18px;margin-bottom:20px">
+          <!-- 2. Gráficos Principales (Torta SLA y Barras por Especialista) -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(380px, 1fr));gap:18px;margin-bottom:20px">
             
-            <!-- Gráfico 1: Donut de Cumplimiento de SLA & Estados -->
-            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:18px">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-                <div>
-                  <h4 style="margin:0;font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                    <span>Cumplimiento de SLA &amp; Estados</span>
-                  </h4>
-                  <span class="muted" style="font-size:11px">Meta corporativa: 90% SLA alcanzado</span>
+            <!-- Gráfico 1: Torta de Cumplimiento de SLA & Estados -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;display:flex;flex-direction:column;justify-content:space-between">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                  <div>
+                    <h4 style="margin:0;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+                      <span>Cumplimiento de SLA &amp; Estados (Gráfico de Torta)</span>
+                    </h4>
+                    <span class="muted" style="font-size:11.5px">Distribución porcentual sobre el total de actividades</span>
+                  </div>
+                  <span class="badge" id="lblSlaBadgePct" style="background:rgba(16,185,129,0.15);color:#34d399;font-weight:700">—</span>
                 </div>
-                <span class="badge" id="lblSlaBadgePct" style="background:rgba(16,185,129,0.15);color:#34d399;font-weight:700">—</span>
-              </div>
-              <div id="chartSlaDonutContainer" style="display:flex;align-items:center;justify-content:space-around;gap:16px;flex-wrap:wrap;min-height:190px">
-                <!-- Generado por JS -->
+                <div id="chartSlaDonutContainer" style="min-height:240px">
+                  <!-- Generado por JS -->
+                </div>
               </div>
             </div>
 
-            <!-- Gráfico 2: Desempeño y Carga por Especialista -->
-            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:18px">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-                <div>
-                  <h4 style="margin:0;font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    <span>Productividad por Especialista</span>
-                  </h4>
-                  <span class="muted" style="font-size:11px">Casos cerrados, activos y cumplimiento individual</span>
+            <!-- Gráfico 2: Barras de Cantidad y Carga por Especialista / Coordinador -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;display:flex;flex-direction:column;justify-content:space-between">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                  <div>
+                    <h4 style="margin:0;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                      <span>Volumen por Especialista / Coordinador (Gráfico de Barras)</span>
+                    </h4>
+                    <span class="muted" style="font-size:11.5px">Comparativa de cantidad de actividades asignadas y resueltas</span>
+                  </div>
+                  <span class="muted" style="font-size:11px" id="lblSpecialistCount">—</span>
                 </div>
-                <span class="muted" style="font-size:11px" id="lblSpecialistCount">—</span>
-              </div>
-              <div id="chartSpecialistsContainer" style="display:flex;flex-direction:column;gap:12px">
-                <!-- Generado por JS -->
+                <div id="chartSpecialistsContainer">
+                  <!-- Generado por JS (Barras verticales + desglose) -->
+                </div>
               </div>
             </div>
 
@@ -6047,65 +6051,112 @@
 
       if (total === 0) {
         container.innerHTML = `
-          <div style="text-align:center;padding:24px;color:var(--muted)">
-            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8" style="opacity:0.4;display:block;margin:0 auto 6px auto"><circle cx="12" cy="12" r="10"/></svg>
-            No hay actividades registradas en el período seleccionado.
+          <div style="text-align:center;padding:50px 20px;color:var(--muted);width:100%">
+            <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" style="opacity:0.3;display:block;margin:0 auto 10px auto"><circle cx="12" cy="12" r="10"/></svg>
+            <strong style="font-size:13.5px;color:var(--text);display:block">No hay actividades registradas</strong>
+            <small style="font-size:11.5px;color:var(--muted);margin-top:4px;display:block">Prueba cambiando el rango de fechas en el selector superior.</small>
           </div>
         `;
         return;
       }
 
-      const r = 50;
-      const C = 2 * Math.PI * r; // 314.159265
+      // Geometría del Gráfico de Torta SVG grande
+      const cx = 115;
+      const cy = 115;
+      const r = 95;
+
       const segments = [
-        { label: 'Dentro de SLA', count: dentro, color: '#10b981' },
-        { label: 'Fuera de SLA / Atrasadas', count: fuera, color: '#ef4444' },
-        { label: 'En Curso', count: enCurso, color: '#3b82f6' },
-        { label: 'En Espera', count: enEspera, color: '#f59e0b' }
+        { label: 'Dentro de SLA', count: dentro, color: '#10b981', desc: 'Resueltas a tiempo' },
+        { label: 'Fuera de SLA / Atrasadas', count: fuera, color: '#ef4444', desc: 'Excedieron el SLA' },
+        { label: 'En Curso / Atención', count: enCurso, color: '#3b82f6', desc: 'Actividades activas' },
+        { label: 'En Espera', count: enEspera, color: '#f59e0b', desc: 'Pausadas por tercero' }
       ].filter(s => s.count > 0);
 
-      let cumulativeOffset = 0;
-      const circlesSvg = segments.map(seg => {
-        const segLen = (seg.count / total) * C;
-        const dashArray = `${segLen} ${C - segLen}`;
-        const dashOffset = -cumulativeOffset;
-        cumulativeOffset += segLen;
-        return `<circle cx="75" cy="75" r="${r}" fill="none" stroke="${seg.color}" stroke-width="16" stroke-dasharray="${dashArray}" stroke-dashoffset="${dashOffset}" transform="rotate(-90 75 75)" style="transition:stroke-dasharray .5s ease" />`;
-      }).join('');
+      let pieSvg = '';
+      if (segments.length === 1) {
+        // 100% de una sola categoría
+        const s = segments[0];
+        pieSvg = `
+          <circle cx="${cx}" cy="${cy}" r="${r}" fill="${s.color}" stroke="rgba(255,255,255,0.2)" stroke-width="2.5" />
+          <text x="${cx}" y="${cy - 4}" fill="#ffffff" font-size="24" font-weight="900" text-anchor="middle" dominant-baseline="central" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6))">100%</text>
+          <text x="${cx}" y="${cy + 18}" fill="rgba(255,255,255,0.9)" font-size="10.5" font-weight="700" text-anchor="middle" dominant-baseline="central" style="text-transform:uppercase;letter-spacing:0.5px">${escapeHtml(s.label)}</text>
+        `;
+      } else {
+        let currentAngle = -Math.PI / 2;
+        pieSvg = segments.map(seg => {
+          const fraction = seg.count / total;
+          const angleDelta = fraction * 2 * Math.PI;
+          const startAngle = currentAngle;
+          const endAngle = currentAngle + angleDelta;
+          currentAngle = endAngle;
 
-      const legendsHtml = [
-        { label: 'Dentro de SLA', count: dentro, color: '#10b981' },
-        { label: 'Fuera de SLA / Atrasadas', count: fuera, color: '#ef4444' },
-        { label: 'En Curso / Atención', count: enCurso, color: '#3b82f6' },
-        { label: 'En Espera', count: enEspera, color: '#f59e0b' }
-      ].map(item => {
+          const x1 = cx + r * Math.cos(startAngle);
+          const y1 = cy + r * Math.sin(startAngle);
+          const x2 = cx + r * Math.cos(endAngle);
+          const y2 = cy + r * Math.sin(endAngle);
+          const largeArc = fraction > 0.5 ? 1 : 0;
+
+          // Etiqueta de porcentaje en el centro del sector
+          const midAngle = startAngle + angleDelta / 2;
+          const labelR = r * 0.62;
+          const lx = cx + labelR * Math.cos(midAngle);
+          const ly = cy + labelR * Math.sin(midAngle);
+          const pctText = (fraction * 100).toFixed(0) + '%';
+          const showLabel = fraction >= 0.07;
+
+          return `
+            <path d="M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z" 
+              fill="${seg.color}" stroke="rgba(9,13,20,0.95)" stroke-width="2.5" 
+              title="${escapeHtml(seg.label)}: ${seg.count} (${(fraction * 100).toFixed(1)}%)">
+            </path>
+            ${showLabel ? `<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" fill="#ffffff" font-size="12" font-weight="800" text-anchor="middle" dominant-baseline="central" style="pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.8))">${pctText}</text>` : ''}
+          `;
+        }).join('');
+      }
+
+      const allItems = [
+        { label: 'Dentro de SLA', count: dentro, color: '#10b981', desc: 'Resueltas a tiempo' },
+        { label: 'Fuera de SLA / Atrasadas', count: fuera, color: '#ef4444', desc: 'Excedieron el SLA' },
+        { label: 'En Curso / Atención', count: enCurso, color: '#3b82f6', desc: 'Actividades activas' },
+        { label: 'En Espera', count: enEspera, color: '#f59e0b', desc: 'Pausadas por tercero' }
+      ];
+
+      const legendsHtml = allItems.map(item => {
         const pct = total > 0 ? ((item.count / total) * 100).toFixed(1) : '0.0';
         return `
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11.5px;padding:3px 0">
-            <div style="display:flex;align-items:center;gap:6px">
-              <span style="width:9px;height:9px;border-radius:50%;background:${item.color};display:inline-block"></span>
-              <span style="color:var(--text)">${item.label}</span>
+          <div style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="width:12px;height:12px;border-radius:3px;background:${item.color};display:inline-block;flex-shrink:0;box-shadow:0 0 8px ${item.color}66"></span>
+              <div>
+                <span style="color:var(--text);font-size:13px;font-weight:700;display:block">${item.label}</span>
+                <small class="muted" style="font-size:10.5px">${item.desc}</small>
+              </div>
             </div>
-            <div style="font-weight:700;color:var(--text)">
-              ${item.count} <small class="muted" style="font-weight:400">(${pct}%)</small>
+            <div style="text-align:right">
+              <span style="font-weight:800;font-size:15px;color:var(--text)">${item.count}</span>
+              <span class="muted" style="font-size:11px;font-weight:600;display:block">(${pct}%)</span>
             </div>
           </div>
         `;
       }).join('');
 
       container.innerHTML = `
-        <div style="position:relative;width:150px;height:150px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg viewBox="0 0 150 150" width="150" height="150">
-            <circle cx="75" cy="75" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="16" />
-            ${circlesSvg}
-          </svg>
-          <div style="position:absolute;text-align:center;pointer-events:none">
-            <div style="font-size:22px;font-weight:800;color:${slaColor};line-height:1">${slaVal.toFixed(1)}%</div>
-            <div style="font-size:9.5px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-top:2px">SLA Cumplido</div>
+        <div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:24px;width:100%;padding:14px 0">
+          <!-- Gráfico de Torta SVG (Gran tamaño) -->
+          <div style="position:relative;width:230px;height:230px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg viewBox="0 0 230 230" width="230" height="230" style="filter:drop-shadow(0 6px 18px rgba(0,0,0,0.4))">
+              ${pieSvg}
+            </svg>
           </div>
-        </div>
-        <div style="flex:1;min-width:180px;display:flex;flex-direction:column;justify-content:center;gap:3px">
-          ${legendsHtml}
+
+          <!-- Leyenda Completa y Detalle -->
+          <div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:8px">
+            ${legendsHtml}
+            <div style="padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:space-between;margin-top:2px">
+              <span class="muted" style="font-size:12px">Total evaluadas en este período:</span>
+              <strong style="color:var(--text);font-size:13.5px">${total} actividades</strong>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -6116,55 +6167,105 @@
       if (!container) return;
 
       if (!list || !list.length) {
-        container.innerHTML = `<div style="text-align:center;padding:18px;color:var(--muted)">Sin datos de especialistas.</div>`;
+        container.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted)">Sin datos de especialistas en este período.</div>`;
         return;
       }
 
-      if (countEl) countEl.textContent = `${list.length} perfiles`;
+      if (countEl) countEl.textContent = `${list.length} perfiles evaluados`;
 
       const maxTotal = Math.max(...list.map(x => x.total), 1);
 
-      container.innerHTML = list.map(s => {
+      // 1. Columnas Verticales del Gráfico de Barras
+      const barsHtml = list.map(s => {
         const sla = Number(s.cumplimiento_pct) || 0;
         const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
-        const closedPct = s.total > 0 ? ((s.cerrados / s.total) * 100) : 0;
-        const activePct = s.total > 0 ? ((s.en_curso / s.total) * 100) : 0;
-        const overduePct = s.total > 0 ? ((s.fuera_sla / s.total) * 100) : 0;
+        const isCoord = (s.role || '').toLowerCase().includes('coordinador');
+        const isBolsa = (s.name || '').toLowerCase().includes('sin asignar');
 
-        const initials = s.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const roleBadge = isCoord 
+          ? `<span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:9.5px">Coord</span>`
+          : (isBolsa ? `<span class="badge" style="background:rgba(243,156,18,0.15);color:#f39c12;font-size:9.5px">Bolsa</span>`
+                     : `<span class="badge" style="background:rgba(167,139,250,0.15);color:#a78bfa;font-size:9.5px">Espec</span>`);
+
+        const shortName = isBolsa ? 'Sin Asignar' : s.name.split(' ')[0];
+
+        // Altura proporcional (máx 130px, mín 6px)
+        const barH = s.total > 0 ? Math.max(Math.round((s.total / maxTotal) * 130), 18) : 6;
+        const closedH = s.total > 0 ? Math.round((s.cerrados / s.total) * barH) : 0;
+        const activeH = s.total > 0 ? Math.round((s.en_curso / s.total) * barH) : 0;
+        const overdueH = s.total > 0 ? Math.max(barH - closedH - activeH, (s.fuera_sla > 0 ? 4 : 0)) : 0;
 
         return `
-          <div style="background:rgba(255,255,255,0.02);padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.05)">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <div style="display:flex;align-items:center;gap:8px">
-                <div style="width:26px;height:26px;border-radius:50%;background:rgba(79,140,255,0.15);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px">
-                  ${initials}
-                </div>
-                <div>
-                  <strong style="font-size:12.5px;color:var(--text)">${escapeHtml(s.name)}</strong>
-                  <span class="muted" style="font-size:10.5px;display:block">${escapeHtml(s.role)}</span>
-                </div>
-              </div>
-              <div style="text-align:right">
-                <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:10.5px;font-weight:700">
-                  ${sla.toFixed(1)}% SLA
-                </span>
-                <span class="muted" style="font-size:10.5px;display:block;margin-top:2px">T. Prom: ${escapeHtml(s.avg_time_str || '0m')}</span>
-              </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:54px;max-width:90px">
+            <!-- Valor numérico superior -->
+            <div style="font-size:13px;font-weight:800;color:${s.total > 0 ? 'var(--text)' : 'var(--muted)'};margin-bottom:6px;min-height:18px">
+              ${s.total}
             </div>
-            
-            <div style="background:rgba(255,255,255,0.06);height:6px;border-radius:3px;overflow:hidden;display:flex">
-              <div style="width:${closedPct}%;background:#10b981;height:100%" title="${s.cerrados} cerradas"></div>
-              <div style="width:${activePct}%;background:#4f8cff;height:100%" title="${s.en_curso} en curso"></div>
-              <div style="width:${overduePct}%;background:#ef4444;height:100%" title="${s.fuera_sla} atrasadas"></div>
+
+            <!-- Barra vertical -->
+            <div style="width:34px;height:${barH}px;background:${s.total > 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)'};border-radius:6px 6px 0 0;overflow:hidden;display:flex;flex-direction:column-reverse;transition:all .3s ease"
+              title="${escapeHtml(s.name)}: ${s.total} asignadas (${s.cerrados} cerradas, ${s.en_curso} en curso, ${s.fuera_sla} fuera SLA)">
+              <div style="height:${closedH}px;background:#10b981;width:100%" title="${s.cerrados} cerradas"></div>
+              <div style="height:${activeH}px;background:#4f8cff;width:100%" title="${s.en_curso} en curso"></div>
+              <div style="height:${overdueH}px;background:#ef4444;width:100%" title="${s.fuera_sla} atrasadas"></div>
             </div>
-            <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:4px">
-              <span><strong>${s.total}</strong> asignadas · <span style="color:#10b981">${s.cerrados} cerradas</span></span>
-              <span><span style="color:#4f8cff">${s.en_curso} activas</span> · <span style="color:#ef4444">${s.fuera_sla} fuera SLA</span></span>
+
+            <!-- Eje y Etiquetas del Especialista -->
+            <div style="width:100%;border-top:2px solid rgba(255,255,255,0.12);padding-top:8px;text-align:center">
+              <strong style="font-size:11.5px;color:var(--text);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(s.name)}">
+                ${escapeHtml(shortName)}
+              </strong>
+              <div style="margin-top:3px">${roleBadge}</div>
+              <div style="font-size:10px;font-weight:700;color:${slaColor};margin-top:3px">${sla.toFixed(0)}% SLA</div>
             </div>
           </div>
         `;
       }).join('');
+
+      // 2. Leyenda y Resumen Compacto
+      const detailsHtml = list.map(s => {
+        const sla = Number(s.cumplimiento_pct) || 0;
+        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(255,255,255,0.02);border-radius:6px;border:1px solid rgba(255,255,255,0.04);font-size:11px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-weight:700;color:var(--text)">${escapeHtml(s.name)}</span>
+              <span class="muted">(${escapeHtml(s.role)})</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span><strong>${s.total}</strong> casos (<span style="color:#10b981">${s.cerrados} c.</span> / <span style="color:#4f8cff">${s.en_curso} act.</span>)</span>
+              <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:9.5px;font-weight:700">${sla.toFixed(0)}% SLA</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <!-- Gráfico de Barras Columnar -->
+          <div style="display:flex;align-items:flex-end;justify-content:space-around;gap:8px;height:190px;padding:10px 6px 0 6px;background:rgba(255,255,255,0.015);border-radius:10px;border:1px solid rgba(255,255,255,0.04)">
+            ${barsHtml}
+          </div>
+
+          <!-- Leyenda de colores de las barras -->
+          <div style="display:flex;align-items:center;justify-content:center;gap:18px;font-size:11px;padding:2px 0">
+            <span style="display:flex;align-items:center;gap:5px;color:var(--text)">
+              <span style="width:10px;height:10px;border-radius:2px;background:#10b981;display:inline-block"></span> Cerradas
+            </span>
+            <span style="display:flex;align-items:center;gap:5px;color:var(--text)">
+              <span style="width:10px;height:10px;border-radius:2px;background:#4f8cff;display:inline-block"></span> En Curso
+            </span>
+            <span style="display:flex;align-items:center;gap:5px;color:var(--text)">
+              <span style="width:10px;height:10px;border-radius:2px;background:#ef4444;display:inline-block"></span> Fuera de SLA
+            </span>
+          </div>
+
+          <!-- Desglose numérico por especialista -->
+          <div style="display:flex;flex-direction:column;gap:5px">
+            ${detailsHtml}
+          </div>
+        </div>
+      `;
     }
 
     function renderPlatformChart(porOrigen) {
