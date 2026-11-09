@@ -163,4 +163,19 @@ class GeneratedReport(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
+class EscalationDocument(Base):
+    __tablename__ = "escalation_documents"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    title = Column(String(250), nullable=False)               # ej. "SIMF-ES-5260 88920 Venezolano"
+    original_filename = Column(String(250), nullable=False)
+    stored_filename = Column(String(250), nullable=False)
+    file_size_bytes = Column(Integer, default=0)
+    file_size_formatted = Column(String(50), default="0 KB")
+    uploaded_by = Column(String(150), default="Adonis Lozada")
+    uploaded_by_role = Column(String(50), default="Coordinador")
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
 

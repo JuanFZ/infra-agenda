@@ -1,7 +1,11 @@
+import os
+import uuid
+import re
+import base64
 import datetime
 import hashlib
 from fastapi import FastAPI, Depends, Query, HTTPException, Header, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import or_, and_
@@ -9,13 +13,19 @@ from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from .database import engine, Base, get_db, SessionLocal
-from .models import Item, SyncLog, AlertLog, User, GeneratedReport
+from .models import Item, SyncLog, AlertLog, User, GeneratedReport, EscalationDocument
 from .config import SYNC_INTERVAL_MINUTES
 from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
 from .sync.glpi_client import GLPIClient
 from .sync.clickup_client import ClickUpClient
 from .notifications.telegram_notifier import CARACAS_TZ, format_caracas_time, now_caracas_str, test_telegram_connection
 from .reports.report_generator import get_report_data, generate_excel_report, generate_executive_html
+
+# Directorio de almacenamiento permanente para documentos de escalamiento (PDFs)
+UPLOAD_ESCALATIONS_DIR = os.path.abspath(
+    os.getenv("UPLOAD_ESCALATIONS_DIR", os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "escalations"))
+)
+os.makedirs(UPLOAD_ESCALATIONS_DIR, exist_ok=True)
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
@@ -95,7 +105,7 @@ SPECIALISTS_MAP = {
         "name": "Juan Fernández",
         "email": "j.fernandez@sycom.com.ve",
         "glpi_id": 10,
-        "clickup_id": 107105518,
+        "clickup_id": None,
         "telegram": "@Juuan8",
         "role": "Especialista"
     },
@@ -113,7 +123,7 @@ SPECIALISTS_MAP = {
         "name": "Luis Acosta",
         "email": "l.acosta@sycom.com.ve",
         "glpi_id": 9,
-        "clickup_id": 107105519,
+        "clickup_id": None,
         "telegram": "@lapsy0",
         "role": "Especialista"
     }
@@ -1239,6 +1249,214 @@ def api_reports_delete_history(
     db.delete(entry)
     db.commit()
     return {"status": "OK", "deleted_id": report_id}
+
+
+# =============================================================================
+# MÓDULO DE ESCALAMIENTOS - REPOSITORIO DOCUMENTAL DE PDFs
+# =============================================================================
+
+def format_file_size(num_bytes: int) -> str:
+    if num_bytes < 1024:
+        return f"{num_bytes} B"
+    elif num_bytes < 1024 * 1024:
+        return f"{num_bytes / 1024:.1f} KB"
+    else:
+        return f"{num_bytes / (1024 * 1024):.2f} MB"
+
+
+class UploadEscalationRequest(BaseModel):
+    title: str | None = None
+    filename: str
+    file_base64: str
+    notes: str | None = None
+
+
+@app.get("/api/escalations")
+def api_get_escalations(db: Session = Depends(get_db)):
+    """Lista todos los documentos de escalamiento registrados (con fecha y autor)."""
+    docs = db.query(EscalationDocument).order_by(EscalationDocument.created_at.desc()).all()
+    result = []
+    for d in docs:
+        result.append({
+            "id": d.id,
+            "title": d.title,
+            "original_filename": d.original_filename,
+            "stored_filename": d.stored_filename,
+            "file_size_bytes": d.file_size_bytes,
+            "file_size_formatted": d.file_size_formatted,
+            "uploaded_by": d.uploaded_by,
+            "uploaded_by_role": d.uploaded_by_role,
+            "notes": d.notes or "",
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "created_at_caracas": format_caracas_time(d.created_at, "%d-%m-%Y %I:%M %p") if d.created_at else "—",
+            "view_url": f"/api/escalations/{d.id}/view",
+            "download_url": f"/api/escalations/{d.id}/download"
+        })
+    return result
+
+
+@app.post("/api/escalations/upload")
+def api_upload_escalation(
+    req: UploadEscalationRequest,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name")
+):
+    """Carga y registra un documento de escalamiento en formato PDF."""
+    if not req.filename or not req.file_base64:
+        raise HTTPException(status_code=400, detail="Debe suministrar un archivo PDF válido.")
+
+    clean_filename = req.filename.strip()
+    if not clean_filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Solo se admiten documentos en formato PDF (.pdf).")
+
+    # Decodificar Base64
+    raw_b64 = req.file_base64
+    if "," in raw_b64:
+        raw_b64 = raw_b64.split(",", 1)[1]
+
+    try:
+        file_bytes = base64.b64decode(raw_b64)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="El contenido del archivo no es un Base64 válido.")
+
+    if len(file_bytes) < 10:
+        raise HTTPException(status_code=400, detail="El archivo está vacío o dañado.")
+
+    # Validar firma magic bytes PDF (%PDF-)
+    if not file_bytes.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="El archivo suministrado no tiene formato PDF válido.")
+
+    # Limitar tamaño a 50MB
+    if len(file_bytes) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="El archivo excede el tamaño máximo permitido de 50 MB.")
+
+    # Título por defecto: el suministrado por el usuario (ej. 'SIMF-ES-5260 88920 Venezolano') o el nombre del archivo
+    title = (req.title or "").strip()
+    if not title:
+        title = clean_filename[:-4] if clean_filename.lower().endswith(".pdf") else clean_filename
+
+    # Guardar en disco con nombre seguro único
+    safe_base = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', clean_filename)
+    unique_prefix = uuid.uuid4().hex[:10]
+    stored_name = f"{unique_prefix}_{safe_base}"
+    file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, stored_name)
+
+    try:
+        with open(file_path, "wb") as f:
+            f.write(file_bytes)
+    except Exception as e:
+        print(f"[Upload Escalation Disk Error] {e}")
+        raise HTTPException(status_code=500, detail="Error al guardar el archivo en el servidor de almacenamiento.")
+
+    user_name = (x_user_name.strip()) if isinstance(x_user_name, str) else "Adonis Lozada Figueroa"
+    user_role = (x_user_role.strip().capitalize()) if isinstance(x_user_role, str) else "Coordinador"
+
+    doc = EscalationDocument(
+        title=title,
+        original_filename=clean_filename,
+        stored_filename=stored_name,
+        file_size_bytes=len(file_bytes),
+        file_size_formatted=format_file_size(len(file_bytes)),
+        uploaded_by=user_name,
+        uploaded_by_role=user_role,
+        notes=(req.notes or "").strip() or None,
+        created_at=datetime.datetime.utcnow()
+    )
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+
+    return {
+        "status": "OK",
+        "message": "Documento de escalamiento cargado exitosamente.",
+        "document": {
+            "id": doc.id,
+            "title": doc.title,
+            "original_filename": doc.original_filename,
+            "file_size_formatted": doc.file_size_formatted,
+            "uploaded_by": doc.uploaded_by,
+            "uploaded_by_role": doc.uploaded_by_role,
+            "notes": doc.notes or "",
+            "created_at_caracas": format_caracas_time(doc.created_at, "%d-%m-%Y %I:%M %p"),
+            "view_url": f"/api/escalations/{doc.id}/view",
+            "download_url": f"/api/escalations/{doc.id}/download"
+        }
+    }
+
+
+@app.get("/api/escalations/{doc_id}/view")
+def api_view_escalation(doc_id: int, db: Session = Depends(get_db)):
+    """Abre el PDF en el visor integrado del navegador (inline)."""
+    doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Documento de escalamiento no encontrado.")
+
+    file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, doc.stored_filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="El archivo físico del documento no se encuentra en el servidor.")
+
+    return FileResponse(
+        path=file_path,
+        media_type="application/pdf",
+        filename=doc.original_filename,
+        content_disposition_type="inline"
+    )
+
+
+@app.get("/api/escalations/{doc_id}/download")
+def api_download_escalation(doc_id: int, db: Session = Depends(get_db)):
+    """Fuerza la descarga del PDF con su nombre original."""
+    doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Documento de escalamiento no encontrado.")
+
+    file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, doc.stored_filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="El archivo físico del documento no se encuentra en el servidor.")
+
+    return FileResponse(
+        path=file_path,
+        media_type="application/pdf",
+        filename=doc.original_filename,
+        content_disposition_type="attachment"
+    )
+
+
+@app.delete("/api/escalations/{doc_id}")
+def api_delete_escalation(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    role_param: str = Query(None, alias="role")
+):
+    """Elimina un documento de escalamiento de la BD y borra su archivo de disco."""
+    doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Documento no encontrado.")
+
+    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
+    user_name = (x_user_name.strip().lower()) if isinstance(x_user_name, str) else ""
+    doc_author = (doc.uploaded_by or "").strip().lower()
+
+    if role not in ("coordinador", "admin", "administrador") and (not user_name or user_name not in doc_author):
+        raise HTTPException(
+            status_code=403,
+            detail="Permiso denegado: Solo el Coordinador o el autor del documento pueden eliminarlo."
+        )
+
+    file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, doc.stored_filename)
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            print(f"[Delete Escalation File Error] {e}")
+
+    db.delete(doc)
+    db.commit()
+    return {"status": "OK", "deleted_id": doc_id}
+
 
 
 
