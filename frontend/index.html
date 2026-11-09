@@ -2601,6 +2601,15 @@
           </div>
 
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="position:relative">
+              <input type="text" id="fSearchReports" placeholder="Buscar reporte (folio, mes, nombre)..." oninput="filterReportsHistoryTable(this.value)"
+                style="font-size:12px;padding:7px 12px 7px 30px;width:240px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none"
+                title="Filtrar historial de reportes">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </div>
             <button class="btn" id="btnAutoReportView" onclick="generateAutoMonthReport()"
               style="background:rgba(16,185,129,0.12);color:#34d399;border-color:rgba(16,185,129,0.3);font-weight:600;display:inline-flex;align-items:center;gap:7px"
               title="Generar automáticamente el informe consolidado del mes en curso">
@@ -4110,8 +4119,20 @@
       if (window.innerWidth <= 768) {
         closeSidebarMobile();
       }
+
+      const filtersEl = document.querySelector('.filters');
+      const kpisEl = document.getElementById('kpisContainer');
+      const subTitleEl = document.querySelector('header .sub');
+
       if (viewName === 'reportes') {
+        if (filtersEl) filtersEl.style.display = 'none';
+        if (kpisEl) kpisEl.style.display = 'none';
+        if (subTitleEl) subTitleEl.textContent = 'Historial y generación de informes ejecutivos consolidados';
         loadReportsHistory();
+      } else {
+        if (filtersEl) filtersEl.style.display = 'flex';
+        if (kpisEl) kpisEl.style.display = 'grid';
+        if (subTitleEl) subTitleEl.textContent = 'Consolidación en vivo: GLPI + ClickUp';
       }
     }
 
@@ -5225,7 +5246,13 @@
         }
         const list = await res.json();
         GENERATED_REPORTS_LIST = list;
-        renderReportsHistoryTable(list);
+        const sInput = document.getElementById('fSearchReports');
+        const q = sInput ? sInput.value.trim() : '';
+        if (q) {
+          filterReportsHistoryTable(q);
+        } else {
+          renderReportsHistoryTable(list);
+        }
       } catch (err) {
         console.error('Error cargando historial de reportes:', err);
         tbody.innerHTML = `
@@ -5236,6 +5263,23 @@
           </tr>
         `;
       }
+    }
+
+    function filterReportsHistoryTable(term) {
+      const q = (term || '').toLowerCase().trim();
+      if (!q) {
+        renderReportsHistoryTable(GENERATED_REPORTS_LIST);
+        return;
+      }
+      const filtered = GENERATED_REPORTS_LIST.filter(r => {
+        const folio = `rep-${String(r.id).padStart(4, '0')}`.toLowerCase();
+        const title = (r.title || '').toLowerCase();
+        const period = (r.period_label || '').toLowerCase();
+        const spec = (r.specialist_filter || '').toLowerCase();
+        const user = (r.generated_by || '').toLowerCase();
+        return folio.includes(q) || title.includes(q) || period.includes(q) || spec.includes(q) || user.includes(q);
+      });
+      renderReportsHistoryTable(filtered);
     }
 
     function renderReportsHistoryTable(list) {
