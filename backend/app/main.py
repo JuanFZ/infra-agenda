@@ -50,6 +50,27 @@ def ensure_db_schema():
 
 ensure_db_schema()
 
+def _repair_clickup_assignees():
+    """Restaura la asignación histórica de especialistas en tareas de ClickUp si fueron sobreescritas por sincronizaciones anteriores."""
+    try:
+        db = SessionLocal()
+        repaired = False
+        target_ids = ["1dfdcycw8uu", "1dfdcycw8wm"]
+        for ext_id in target_ids:
+            it = db.query(Item).filter(Item.external_id == ext_id, Item.source == "ClickUp").first()
+            if it and (not it.assignee_name or it.assignee_name.lower() in ("sin asignar", "")):
+                it.assignee_name = "Juan Fernández"
+                if not it.assigned_at:
+                    it.assigned_at = it.created_at or datetime.datetime.utcnow()
+                repaired = True
+        if repaired:
+            db.commit()
+        db.close()
+    except Exception as e:
+        print(f"[Repair Assignees Error] {e}")
+
+_repair_clickup_assignees()
+
 def verify_coordinator_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
     """Valida que la solicitud provenga de un usuario con rol Coordinador o Administrador."""
     if not x_user_role or x_user_role.strip().lower() not in ("coordinador", "admin", "administrador"):
