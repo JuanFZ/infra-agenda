@@ -77,11 +77,15 @@ def sync_glpi(db: Session):
             if item:
                 incoming_assignee = (norm.get("assignee_name") or "").strip()
                 current_assignee = (item.assignee_name or "").strip()
-                
-                is_incoming_unassigned = not incoming_assignee or incoming_assignee.lower() in ("sin asignar", "sin asignar")
-                has_current_assignee = bool(current_assignee) and current_assignee.lower() not in ("sin asignar", "sin asignar")
 
-                if is_incoming_unassigned and has_current_assignee:
+                has_current_assignee = bool(current_assignee) and current_assignee.lower() not in (
+                    "sin asignar", "técnico glpi", "tecnico glpi"
+                )
+
+                # La Agenda de Infra es la fuente autoritativa de asignaciones del equipo:
+                # si la actividad ya tiene especialistas asignados en la Agenda, se preservan
+                # para que ningún ciclo de sincronización borre a Juan, Luis, Yoxaide o Adonis.
+                if has_current_assignee:
                     norm["assignee_name"] = current_assignee
                     if item.assigned_at:
                         norm["assigned_at"] = item.assigned_at
@@ -173,11 +177,15 @@ def sync_clickup(db: Session):
             if item:
                 incoming_assignee = (norm.get("assignee_name") or "").strip()
                 current_assignee = (item.assignee_name or "").strip()
-                
-                is_incoming_unassigned = not incoming_assignee or incoming_assignee.lower() in ("sin asignar", "sin asignar")
-                has_current_assignee = bool(current_assignee) and current_assignee.lower() not in ("sin asignar", "sin asignar")
 
-                if is_incoming_unassigned and has_current_assignee:
+                has_current_assignee = bool(current_assignee) and current_assignee.lower() not in (
+                    "sin asignar", "técnico glpi", "tecnico glpi"
+                )
+
+                # La Agenda de Infra es la fuente autoritativa de asignaciones del equipo:
+                # si la actividad ya tiene especialistas asignados en la Agenda, se preservan
+                # para que ningún ciclo de sincronización borre a Juan, Luis, Yoxaide o Adonis.
+                if has_current_assignee:
                     norm["assignee_name"] = current_assignee
                     if item.assigned_at:
                         norm["assigned_at"] = item.assigned_at

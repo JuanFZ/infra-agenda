@@ -1,4 +1,5 @@
 import datetime
+import unicodedata
 import requests
 from ..config import CLICKUP_TOKEN, CLICKUP_TEAM_ID, CLICKUP_SPACE_ID
 
@@ -25,6 +26,33 @@ PRIORITY_MAP_CLICKUP = {
     "normal": "Media",
     "low": "Baja"
 }
+
+CANONICAL_SPECIALISTS = [
+    {"key": "adonis", "name": "Adonis Lozada", "email": "a.lozada@sycom.com.ve", "tokens": ("adonis", "lozada", "a.lozada")},
+    {"key": "juan", "name": "Juan Fernández", "email": "j.fernandez@sycom.com.ve", "tokens": ("juan", "fernandez", "j.fernandez")},
+    {"key": "yoxaide", "name": "Yoxaide Jiménez", "email": "y.jimenez@sycom.com.ve", "tokens": ("yoxaide", "jimenez", "y.jimenez")},
+    {"key": "luis", "name": "Luis Acosta", "email": "l.acosta@sycom.com.ve", "tokens": ("luis", "acosta", "l.acosta")},
+]
+
+
+def _strip_accents(val: str) -> str:
+    if not val:
+        return ""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", str(val))
+        if unicodedata.category(c) != "Mn"
+    ).lower().strip()
+
+
+def normalize_specialist_name(raw_name: str | None, raw_email: str | None = None) -> str | None:
+    """Traduce un username o correo de ClickUp al nombre canónico del especialista en la Agenda."""
+    blob = f"{_strip_accents(raw_name or '')} {_strip_accents(raw_email or '')}".strip()
+    if not blob:
+        return None
+    for spec in CANONICAL_SPECIALISTS:
+        if any(tok in blob for tok in spec["tokens"]):
+            return spec["name"]
+    return (raw_name or raw_email or "").strip() or None
 
 class ClickUpClient:
     def __init__(self):
@@ -96,9 +124,15 @@ class ClickUpClient:
             sla_hours = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(prio_unif, 72)
             due_at = created_at + datetime.timedelta(hours=sla_hours)
 
-        # Responsables
+        # Responsables normalizados a nombres canónicos de la Agenda
         assignees = raw.get("assignees", [])
-        names = [a.get("username") or a.get("email") for a in assignees if a.get("username") or a.get("email")]
+        names = []
+        for a in assignees:
+            if not isinstance(a, dict):
+                continue
+            canon = normalize_specialist_name(a.get("username"), a.get("email"))
+            if canon and canon not in names:
+                names.append(canon)
         assignee_names = ", ".join(names) or "Sin asignar"
 
         return {
@@ -123,6 +157,8 @@ class ClickUpClient:
     def assign_task(self, task_id: str, user_ids: list[int] | int) -> bool:
         """
         Asigna o reasigna uno o varios especialistas a la tarea en ClickUp.
+        Si algún usuario aún no tiene permisos sobre el Space/List en ClickUp,
+        asigna individualmente a los que sí tengan permiso sin abortar toda la operación.
         """
         try:
             url = f"{self.base_url}/task/{task_id}"
@@ -131,12 +167,15 @@ class ClickUpClient:
             else:
                 uids = [int(u) for u in user_ids if u]
 
+            if not uids:
+                return True
+
             # Consultar asignados actuales para remover únicamente los que no estén en la nueva lista
             res_get = requests.get(url, headers=self.get_headers(), timeout=10)
             current_ids = []
             if res_get.status_code == 200:
                 current_ids = [a.get("id") for a in res_get.json().get("assignees", []) if a.get("id")]
-            
+
             payload = {
                 "assignees": {
                     "add": uids,
@@ -144,9 +183,21 @@ class ClickUpClient:
                 }
             }
             res = requests.put(url, headers=self.get_headers(), json=payload, timeout=10)
-            if res.status_code != 200:
-                print(f"[ClickUpClient] Error asignando tarea {task_id}: {res.status_code} - {res.text}")
-            return res.status_code == 200
+            if res.status_code == 200:
+                return True
+
+            print(f"[ClickUpClient] Asignación grupal devolvió {res.status_code} ({res.text}); intentando individualmente...")
+            any_ok = False
+            for uid in uids:
+                r_single = requests.put(
+                    url,
+                    headers=self.get_headers(),
+                    json={"assignees": {"add": [uid], "rem": []}},
+                    timeout=8
+                )
+                if r_single.status_code == 200:
+                    any_ok = True
+            return any_ok
         except Exception as e:
             print(f"[ClickUpClient] Error asignando tarea {task_id} a usuarios {user_ids}: {e}")
             return False
@@ -212,9 +263,22 @@ class ClickUpClient:
             
         try:
             res = requests.post(url, headers=self.get_headers(), json=payload, timeout=12)
-            res.raise_for_status()
-            data = res.json()
-            task_id = data.get("id")
+            if res.status_code not in (200, 201) and payload.get("assignees"):
+                # Si ClickUp rechaza la creación porque algún usuario aún no tiene permiso en la Lista/Espacio,
+                # crear la tarea sin assignees y luego intentar asignarlos individualmente.
+                print(f"[ClickUpClient] Aviso al crear con assignees ({res.status_code}): reintentando sin assignees...")
+                fallback_payload = dict(payload)
+                fallback_payload.pop("assignees", None)
+                res = requests.post(url, headers=self.get_headers(), json=fallback_payload, timeout=12)
+                res.raise_for_status()
+                data = res.json()
+                task_id = data.get("id")
+                if task_id and user_ids:
+                    self.assign_task(str(task_id), user_ids)
+            else:
+                res.raise_for_status()
+                data = res.json()
+                task_id = data.get("id")
             if task_id and not data.get("url"):
                 data["url"] = f"https://app.clickup.com/t/{task_id}"
             return data

@@ -3317,17 +3317,23 @@
       return headers;
     }
 
+    function stripAccentsText(str) {
+      return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    }
+
     function isItemAssignedToUser(it, user) {
       if (!it || !user) return false;
-      const assignee = (it.assignee_name || '').toLowerCase();
-      if (!assignee || assignee.includes('sin asignar') || assignee.includes('técnico glpi')) {
+      const assignee = stripAccentsText(it.assignee_name || '');
+      if (!assignee || assignee.includes('sin asignar') || assignee.includes('tecnico glpi')) {
         return false;
       }
-      const fullName = (user.full_name || '').toLowerCase();
-      const userName = (user.username || '').toLowerCase();
-      const firstName = fullName.split(' ')[0] || userName.split('.')[0] || '';
+      const fullName = stripAccentsText(user.full_name || '');
+      const userName = stripAccentsText(user.username || '');
+      const firstName = fullName.split(/\s+/)[0] || userName.split('.')[0] || '';
+      const lastName = fullName.split(/\s+/)[1] || userName.split('.')[1] || '';
       return (fullName && assignee.includes(fullName)) ||
-        (firstName && firstName.length > 2 && assignee.includes(firstName)) ||
+        (firstName && firstName.length >= 3 && assignee.includes(firstName)) ||
+        (lastName && lastName.length >= 4 && assignee.includes(lastName)) ||
         (userName && assignee.includes(userName));
     }
 
@@ -4641,10 +4647,11 @@
       const it = ALL_ITEMS.find(i => i.id === id || String(i.id) === String(id) || (i.external_id && String(i.external_id).toLowerCase() === String(id).toLowerCase()));
       if (!it) return;
 
-      const curName = (it.assignee_name || '').toLowerCase();
+      const curName = stripAccentsText(it.assignee_name || '');
       MODAL_SELECTED_KEYS = [];
       SYCOM_SPECIALISTS.forEach(spec => {
-        if (curName.includes(spec.key) || curName.includes(spec.name.toLowerCase().split(' ')[0])) {
+        const specFirst = stripAccentsText(spec.name).split(' ')[0];
+        if (curName.includes(spec.key) || (specFirst && curName.includes(specFirst))) {
           MODAL_SELECTED_KEYS.push(spec.key);
         }
       });
@@ -4935,8 +4942,23 @@
       }
 
       if (newStatus === 'cerrado') {
+        if (isCoordinator() && MODAL_SELECTED_KEYS && MODAL_SELECTED_KEYS.length) {
+          const curName = stripAccentsText(item.assignee_name || '');
+          const hasUnsaved = MODAL_SELECTED_KEYS.some(k => !curName.includes(k));
+          if (hasUnsaved) {
+            await assignItem(itemId, MODAL_SELECTED_KEYS);
+          }
+        }
         openCloseActivityModal(itemId, item.status);
         return;
+      }
+
+      if (isCoordinator() && MODAL_SELECTED_KEYS && MODAL_SELECTED_KEYS.length) {
+        const curName = stripAccentsText(item.assignee_name || '');
+        const hasUnsaved = MODAL_SELECTED_KEYS.some(k => !curName.includes(k));
+        if (hasUnsaved) {
+          await assignItem(itemId, MODAL_SELECTED_KEYS);
+        }
       }
 
       const oldStatus = item.status;

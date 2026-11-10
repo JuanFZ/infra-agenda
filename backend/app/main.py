@@ -357,14 +357,75 @@ def _repair_clickup_assignees():
 
 _repair_clickup_assignees()
 
+import unicodedata
+import urllib.parse
+
+
+def strip_accents_str(val: str | None) -> str:
+    if not val:
+        return ""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", str(val))
+        if unicodedata.category(c) != "Mn"
+    ).lower().strip()
+
+
+def decode_header_val(raw_val: str | None) -> str:
+    if not raw_val or not isinstance(raw_val, str):
+        return ""
+    return urllib.parse.unquote(raw_val).strip()
+
+
+def is_item_assigned_to_user_name(assignee_name: str | None, user_name_raw: str | None) -> bool:
+    """Comprueba si un usuario (por nombre completo, primer nombre, apellido o username) figura en assignee_name."""
+    user_clean = decode_header_val(user_name_raw)
+    if not user_clean:
+        return False
+    assignee_raw = (assignee_name or "").strip()
+    assignee_lower = assignee_raw.lower()
+    if not assignee_raw or "sin asignar" in assignee_lower or "técnico glpi" in assignee_lower or "tecnico glpi" in assignee_lower:
+        return False
+    assignee_norm = strip_accents_str(assignee_raw)
+    user_norm = strip_accents_str(user_clean)
+    parts = [p for p in user_norm.replace(".", " ").split() if len(p) >= 3]
+    first_norm = parts[0] if parts else user_norm
+    if user_norm and user_norm in assignee_norm:
+        return True
+    if first_norm and len(first_norm) >= 3 and first_norm in assignee_norm:
+        return True
+    for spec in SPECIALISTS_MAP.values():
+        spec_norm = strip_accents_str(spec["name"])
+        spec_user = strip_accents_str(spec["email"].split("@")[0])
+        if user_norm in (spec_norm, spec["key"], spec_user) or (first_norm and first_norm in spec_norm):
+            if spec["key"] in assignee_norm or spec_norm in assignee_norm:
+                return True
+    return False
+
+
+def is_item_visible_to_user(item: Item, role_raw: str | None, user_name_raw: str | None) -> bool:
+    """Coordinador/Admin ve todas; Especialista/Analista ve sus asignadas y las sin asignar."""
+    role = decode_header_val(role_raw).lower()
+    user_clean = decode_header_val(user_name_raw)
+    if not role or role in ("coordinador", "admin", "administrador"):
+        return True
+    if not user_clean:
+        return True
+    assignee_raw = (item.assignee_name or "").strip()
+    assignee_lower = assignee_raw.lower()
+    if not assignee_raw or "sin asignar" in assignee_lower or "técnico glpi" in assignee_lower or "tecnico glpi" in assignee_lower:
+        return True
+    return is_item_assigned_to_user_name(assignee_raw, user_clean)
+
+
 def verify_coordinator_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
     """Valida que la solicitud provenga de un usuario con rol Coordinador o Administrador."""
-    if not x_user_role or x_user_role.strip().lower() not in ("coordinador", "admin", "administrador"):
+    role_clean = decode_header_val(x_user_role).lower()
+    if not role_clean or role_clean not in ("coordinador", "admin", "administrador"):
         raise HTTPException(
             status_code=403,
             detail="Acceso restringido: Solo el rol Coordinador / Administrador tiene permisos para crear, asignar, mover estados o eliminar actividades."
         )
-    return x_user_role
+    return role_clean
 
 SPECIALISTS_MAP = {
     "adonis": {
@@ -609,29 +670,13 @@ def get_items(
 ):
     query = db.query(Item)
 
-    # Control de visibilidad por perfil:
-    # El usuario regular solo ve las asignadas a él y las que están sin asignar (NO las de los demás)
-    role = (x_user_role.strip().lower()) if isinstance(x_user_role, str) else ""
-    if role and role not in ("coordinador", "admin", "administrador") and isinstance(x_user_name, str) and x_user_name:
-        clean_name = x_user_name.strip()
-        first_name = clean_name.split()[0] if clean_name else ""
-        query = query.filter(
-            or_(
-                Item.assignee_name == None,
-                Item.assignee_name == "",
-                Item.assignee_name.ilike("%sin asignar%"),
-                Item.assignee_name.ilike("%técnico glpi%"),
-                Item.assignee_name.ilike(f"%{clean_name}%"),
-                Item.assignee_name.ilike(f"%{first_name}%")
-            )
-        )
-
     if src and isinstance(src, str):
         query = query.filter(Item.source == src)
     if tipo and isinstance(tipo, str):
         query = query.filter(Item.client_type == tipo)
     if resp and isinstance(resp, str):
-        query = query.filter(Item.assignee_name.ilike(f"%{resp}%"))
+        resp_clean = decode_header_val(resp)
+        query = query.filter(Item.assignee_name.ilike(f"%{resp_clean}%"))
     if prio and isinstance(prio, str):
         query = query.filter(Item.priority == prio)
     
@@ -660,7 +705,10 @@ def get_items(
         query = query.filter(Item.title.ilike(f"%{q}%"))
 
     items = query.order_by(Item.updated_at.desc()).all()
-    return [serialize_item(item) for item in items]
+    # Control de visibilidad por perfil (con decodificación URL y normalización de acentos):
+    # El usuario regular solo ve las asignadas a él y las que están sin asignar (NO las de los demás)
+    visible_items = [item for item in items if is_item_visible_to_user(item, x_user_role, x_user_name)]
+    return [serialize_item(item) for item in visible_items]
 
 @app.get("/api/items/{item_id}")
 def get_item_by_id(
@@ -681,19 +729,10 @@ def get_item_by_id(
         raise HTTPException(status_code=404, detail=f"Actividad #{item_id} no encontrada.")
 
     # Control de visibilidad por perfil
-    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
-    user_name_raw = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")) or ""
-    import urllib.parse
-    user_name_clean = urllib.parse.unquote(user_name_raw).strip().lower()
-
-    if role and role not in ("coordinador", "admin", "administrador") and user_name_clean:
-        clean_name = user_name_clean
-        first_name = clean_name.split()[0] if clean_name else ""
-        assignee = (item.assignee_name or "").lower()
-        is_unassigned = not item.assignee_name or "sin asignar" in assignee or "técnico glpi" in assignee
-        is_assigned_to_me = clean_name in assignee or first_name in assignee
-        if not (is_unassigned or is_assigned_to_me):
-            raise HTTPException(status_code=403, detail="No tienes permisos para visualizar esta actividad.")
+    role_raw = x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")
+    user_name_raw = x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")
+    if not is_item_visible_to_user(item, role_raw, user_name_raw):
+        raise HTTPException(status_code=403, detail="No tienes permisos para visualizar esta actividad.")
 
     return serialize_item(item)
 
@@ -972,6 +1011,7 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db),
     return {
         "status": "OK",
         "message": f"Asignado exitosamente a {combined_names}",
+        "sync_warning": sync_warning,
         "item": {
             "id": item.id,
             "external_id": item.external_id,
@@ -996,16 +1036,12 @@ def update_item_status(
     if not item:
         raise HTTPException(status_code=404, detail="Item no encontrado")
 
-    role = (x_user_role.strip().lower()) if isinstance(x_user_role, str) else ""
+    role = decode_header_val(x_user_role).lower()
     if role in ("coordinador", "admin", "administrador"):
         pass  # Coordinador / Administrador tiene autorización total sobre cualquier actividad
     elif role == "especialista":
         # Especialista solo puede cambiar de estado sus propias actividades asignadas
-        import urllib.parse
-        user_name_clean = urllib.parse.unquote(x_user_name.strip()).lower() if isinstance(x_user_name, str) else ""
-        first_name = user_name_clean.split()[0] if user_name_clean else ""
-        assignee_clean = (item.assignee_name or "").lower()
-        if not user_name_clean or (user_name_clean not in assignee_clean and first_name not in assignee_clean):
+        if not is_item_assigned_to_user_name(item.assignee_name, x_user_name):
             raise HTTPException(
                 status_code=403,
                 detail="Permiso denegado: Como Especialista, solo puedes actualizar el estado de tus propias actividades asignadas."
@@ -1350,10 +1386,8 @@ def update_item_details(
     if not item:
         raise HTTPException(status_code=404, detail="Actividad no encontrada")
 
-    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
+    role = decode_header_val(x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).lower()
     user_name_raw = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")) or ""
-    import urllib.parse
-    user_name_clean = urllib.parse.unquote(user_name_raw).strip().lower()
 
     recalc_due = False
     if role in ("coordinador", "admin", "administrador"):
@@ -1380,9 +1414,7 @@ def update_item_details(
             if parsed_esc:
                 item.escalated_at = parsed_esc
     elif role == "especialista":
-        assignee_clean = (item.assignee_name or "").lower()
-        first_name = user_name_clean.split()[0] if user_name_clean else ""
-        if not user_name_clean or (user_name_clean not in assignee_clean and first_name not in assignee_clean):
+        if not is_item_assigned_to_user_name(item.assignee_name, user_name_raw):
             raise HTTPException(
                 status_code=403,
                 detail="Permiso denegado: Como Especialista, solo puedes actualizar actividades asignadas a ti."

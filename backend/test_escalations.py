@@ -1052,6 +1052,100 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertFalse(updated_item["is_overdue"])
         self.assertEqual(updated_item["semaphore"], "verde")
 
+    @patch("app.sync.clickup_client.ClickUpClient.assign_task")
+    def test_20_specialist_visibility_url_encoded_and_sync_preserves_assignees(self, mock_cu_assign):
+        """Test that URL-encoded X-User-Name headers (e.g. Yoxaide%20Jim%C3%A9nez, Juan%20Fern%C3%A1ndez)
+        correctly return assigned items to specialists, and sync_clickup preserves Agenda assignees
+        even if ClickUp returns partial or empty assignees."""
+        mock_cu_assign.return_value = False  # Simulate ClickUp Space permission restriction
+
+        db = TestingSessionLocal()
+        t_yox = Item(
+            source="ClickUp",
+            external_id="cu_yox_1",
+            title="Revisión de backups Yoxaide",
+            priority="Alta",
+            status="pendiente",
+            assignee_name="Sin asignar"
+        )
+        t_jl = Item(
+            source="ClickUp",
+            external_id="cu_jl_1",
+            title="Despliegue cluster Juan y Luis",
+            priority="Media",
+            status="pendiente",
+            assignee_name="Sin asignar"
+        )
+        db.add_all([t_yox, t_jl])
+        db.commit()
+        yox_id = t_yox.id
+        jl_id = t_jl.id
+        db.close()
+
+        # 1. Coordinator assigns t_yox to Yoxaide
+        res_assign_yox = self.client.post(f"/api/items/{yox_id}/assign", json={
+            "specialist_keys": ["yoxaide"]
+        }, headers={"X-User-Role": "coordinador"})
+        self.assertEqual(res_assign_yox.status_code, 200)
+        self.assertEqual(res_assign_yox.json()["item"]["assignee_name"], "Yoxaide Jiménez")
+
+        # 2. Yoxaide logs in and fetches /api/items with URL-encoded header (as frontend sends)
+        res_yox_items = self.client.get("/api/items", headers={
+            "X-User-Role": "especialista",
+            "X-User-Name": "Yoxaide%20Jim%C3%A9nez"
+        })
+        self.assertEqual(res_yox_items.status_code, 200)
+        yox_ids = [x["id"] for x in res_yox_items.json()]
+        self.assertIn(yox_id, yox_ids)
+
+        # 3. Coordinator assigns t_jl to Juan and Luis
+        res_assign_jl = self.client.post(f"/api/items/{jl_id}/assign", json={
+            "specialist_keys": ["juan", "luis"]
+        }, headers={"X-User-Role": "coordinador"})
+        self.assertEqual(res_assign_jl.status_code, 200)
+        self.assertEqual(res_assign_jl.json()["item"]["assignee_name"], "Juan Fernández, Luis Acosta")
+
+        # 4. Run sync_clickup where ClickUp still reports Adonis or empty assignees
+        from app.sync.synchronizer import sync_clickup
+        db = TestingSessionLocal()
+        with patch("app.sync.clickup_client.ClickUpClient.fetch_tasks", return_value=[
+            {
+                "id": "cu_yox_1",
+                "name": "Revisión de backups Yoxaide",
+                "status": {"status": "in progress"},
+                "priority": {"priority": "high"},
+                "assignees": []
+            },
+            {
+                "id": "cu_jl_1",
+                "name": "Despliegue cluster Juan y Luis",
+                "status": {"status": "in progress"},
+                "priority": {"priority": "normal"},
+                "assignees": [{"username": "Adonis Lozada"}]
+            }
+        ]):
+            sync_clickup(db)
+        db.close()
+
+        # 5. Verify Juan, Luis, and Yoxaide were NOT erased by sync_clickup
+        res_juan = self.client.get("/api/items", headers={
+            "X-User-Role": "especialista",
+            "X-User-Name": "Juan%20Fern%C3%A1ndez"
+        })
+        self.assertEqual(res_juan.status_code, 200)
+        juan_item = next((x for x in res_juan.json() if x["id"] == jl_id), None)
+        self.assertIsNotNone(juan_item)
+        self.assertEqual(juan_item["assignee_name"], "Juan Fernández, Luis Acosta")
+
+        res_luis = self.client.get("/api/items", headers={
+            "X-User-Role": "especialista",
+            "X-User-Name": "Luis%20Acosta"
+        })
+        self.assertEqual(res_luis.status_code, 200)
+        luis_item = next((x for x in res_luis.json() if x["id"] == jl_id), None)
+        self.assertIsNotNone(luis_item)
+        self.assertEqual(luis_item["assignee_name"], "Juan Fernández, Luis Acosta")
+
 
 if __name__ == "__main__":
     unittest.main()
