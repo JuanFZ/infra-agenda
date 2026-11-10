@@ -22,6 +22,6 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 # URL Base de la aplicación Agenda para deep linking en notificaciones (ej: http://localhost:8000)
-AGENDA_BASE_URL = (os.getenv("AGENDA_BASE_URL") or os.getenv("APP_URL") or "http://localhost:8000").rstrip("/")
+AGENDA_BASE_URL = (os.getenv("AGENDA_BASE_URL") or os.getenv("APP_URL") or "http://localhost:8000").strip().rstrip("/")
 
 

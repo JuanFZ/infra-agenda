@@ -10,13 +10,15 @@ from ..models import Item, AlertLog, User
 # Zona Horaria de Venezuela (Caracas: UTC-4)
 CARACAS_TZ = datetime.timezone(datetime.timedelta(hours=-4))
 
-def get_agenda_deep_link(item_or_id: Item | int | str, view: str = "kanban") -> str:
+def get_agenda_deep_link(item_or_id: Item | int | str | None = None, view: str = "kanban") -> str:
     """
     Construye la URL con deep linking a la Agenda de Infraestructura,
     apuntando a la vista solicitada (por defecto 'kanban') y activando el modal de la actividad.
     """
+    base_url = (getattr(config, "AGENDA_BASE_URL", None) or os.getenv("AGENDA_BASE_URL") or os.getenv("APP_URL") or "http://localhost:8000").strip().rstrip("/")
+    if item_or_id is None:
+        return f"{base_url}/?view={view}"
     item_id = getattr(item_or_id, "id", item_or_id)
-    base_url = (getattr(config, "AGENDA_BASE_URL", None) or os.getenv("AGENDA_BASE_URL") or os.getenv("APP_URL") or "http://localhost:8000").rstrip("/")
     return f"{base_url}/?view={view}&item_id={item_id}"
 
 

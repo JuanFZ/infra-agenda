@@ -497,6 +497,41 @@ def trigger_sync():
     sync_all()
     return {"message": "Sincronización completada con éxito"}
 
+def serialize_item(item: Item) -> dict:
+    """Serializa una actividad con sus campos y métricas calculadas de SLA."""
+    return {
+        "id": item.id,
+        "source": item.source,
+        "external_id": item.external_id,
+        "url": item.url,
+        "title": item.title,
+        "category": item.category,
+        "client_name": item.client_name,
+        "project_name": getattr(item, "project_name", item.client_name) or item.client_name,
+        "client_type": item.client_type,
+        "assignee_name": item.assignee_name,
+        "priority": item.priority,
+        "status": item.status,
+        "status_origin": item.status_origin,
+        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "received_at": item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None),
+        "escalated_at": item.escalated_at.isoformat() if item.escalated_at else (item.created_at.isoformat() if item.created_at else None),
+        "assigned_at": item.assigned_at.isoformat() if item.assigned_at else None,
+        "due_at": item.due_at.isoformat() if item.due_at else None,
+        "closed_at": item.closed_at.isoformat() if item.closed_at else None,
+        "updated_at": item.updated_at.isoformat() if item.updated_at else None,
+        "synced_at": item.synced_at.isoformat() if item.synced_at else None,
+        "description": item.description,
+        "escalation_id": item.escalation_id,
+        "recommendations": item.recommendations,
+        "is_overdue": item.is_overdue,
+        "sla_percent": item.sla_percent,
+        "semaphore": item.semaphore,
+        "duration_human": item.duration_human,
+        "time_sla_label": item.time_sla_label,
+        "sla_remaining_human": item.sla_remaining_human
+    }
+
 @app.get("/api/items")
 def get_items(
     src: str = Query(None, description="GLPI o ClickUp"),
@@ -562,42 +597,43 @@ def get_items(
         query = query.filter(Item.title.ilike(f"%{q}%"))
 
     items = query.order_by(Item.updated_at.desc()).all()
+    return [serialize_item(item) for item in items]
 
-    results = []
-    for item in items:
-        results.append({
-            "id": item.id,
-            "source": item.source,
-            "external_id": item.external_id,
-            "url": item.url,
-            "title": item.title,
-            "category": item.category,
-            "client_name": item.client_name,
-            "project_name": getattr(item, "project_name", item.client_name) or item.client_name,
-            "client_type": item.client_type,
-            "assignee_name": item.assignee_name,
-            "priority": item.priority,
-            "status": item.status,
-            "status_origin": item.status_origin,
-            "created_at": item.created_at.isoformat() if item.created_at else None,
-            "received_at": item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None),
-            "escalated_at": item.escalated_at.isoformat() if item.escalated_at else (item.created_at.isoformat() if item.created_at else None),
-            "assigned_at": item.assigned_at.isoformat() if item.assigned_at else None,
-            "due_at": item.due_at.isoformat() if item.due_at else None,
-            "closed_at": item.closed_at.isoformat() if item.closed_at else None,
-            "updated_at": item.updated_at.isoformat() if item.updated_at else None,
-            "synced_at": item.synced_at.isoformat() if item.synced_at else None,
-            "description": item.description,
-            "escalation_id": item.escalation_id,
-            "recommendations": item.recommendations,
-            "is_overdue": item.is_overdue,
-            "sla_percent": item.sla_percent,
-            "semaphore": item.semaphore,
-            "duration_human": item.duration_human,
-            "time_sla_label": item.time_sla_label,
-            "sla_remaining_human": item.sla_remaining_human
-        })
-    return results
+@app.get("/api/items/{item_id}")
+def get_item_by_id(
+    item_id: str,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    role_param: str = Query(None, alias="role"),
+    user_param: str = Query(None, alias="user")
+):
+    """Obtiene una actividad individual por su ID de BD o ID externo (deep linking)."""
+    item = None
+    if item_id.isdigit():
+        item = db.query(Item).filter(Item.id == int(item_id)).first()
+    if not item:
+        item = db.query(Item).filter(Item.external_id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail=f"Actividad #{item_id} no encontrada.")
+
+    # Control de visibilidad por perfil
+    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
+    user_name_raw = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")) or ""
+    import urllib.parse
+    user_name_clean = urllib.parse.unquote(user_name_raw).strip().lower()
+
+    if role and role not in ("coordinador", "admin", "administrador") and user_name_clean:
+        clean_name = user_name_clean
+        first_name = clean_name.split()[0] if clean_name else ""
+        assignee = (item.assignee_name or "").lower()
+        is_unassigned = not item.assignee_name or "sin asignar" in assignee or "técnico glpi" in assignee
+        is_assigned_to_me = clean_name in assignee or first_name in assignee
+        if not (is_unassigned or is_assigned_to_me):
+            raise HTTPException(status_code=403, detail="No tienes permisos para visualizar esta actividad.")
+
+    return serialize_item(item)
+
 
 @app.get("/api/kpis")
 def get_kpis(db: Session = Depends(get_db)):

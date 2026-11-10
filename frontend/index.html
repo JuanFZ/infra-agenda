@@ -3225,6 +3225,7 @@
         renderAll();
         loadIbps().catch(e => console.warn('Preload IBPs:', e));
         loadEscalations().catch(e => console.warn('Preload escalations:', e));
+        await handleDeepLink();
       } catch (err) {
         document.getElementById('apiStatus').textContent = 'API Desconectada';
         console.error('Error conectando a FastAPI:', err);
@@ -4244,7 +4245,7 @@
       if (!ESCALATIONS_LIST || !ESCALATIONS_LIST.length) {
         await loadEscalations().catch(() => {});
       }
-      const it = ALL_ITEMS.find(i => i.id === id);
+      const it = ALL_ITEMS.find(i => i.id === id || String(i.id) === String(id) || (i.external_id && String(i.external_id).toLowerCase() === String(id).toLowerCase()));
       if (!it) return;
 
       const curName = (it.assignee_name || '').toLowerCase();
@@ -4905,6 +4906,165 @@
       if (e.target.id === 'modalBg') document.getElementById('modalBg').classList.remove('show');
     };
 
+    // Deep Linking y Enrutamiento por URL / Hash
+    function getRouteParams() {
+      const params = {};
+      if (window.location.search) {
+        const sp = new URLSearchParams(window.location.search);
+        for (const [key, val] of sp.entries()) {
+          if (val !== undefined && val !== null && val !== '') {
+            const k = key.toLowerCase();
+            let v = val;
+            if (k === 'view') {
+              v = v.toLowerCase();
+              if (v === 'kaban') v = 'kanban';
+            }
+            params[k] = v;
+          }
+        }
+      }
+      if (window.location.hash) {
+        let hash = window.location.hash.replace(/^#\/?/, '');
+        if (hash.includes('?')) {
+          const parts = hash.split('?');
+          if (parts[0]) {
+            let pv = parts[0].replace(/^\//, '').toLowerCase();
+            if (pv === 'kaban') pv = 'kanban';
+            params['view'] = pv;
+          }
+          hash = parts[1];
+        }
+
+        // Reconocer patrones de ruta hash como #/kanban/42 o #item/42 o #item-42
+        const slashMatch = hash.match(/^(?:kanban\/|item\/|task\/)(\d+)$/i);
+        const dashMatch = hash.match(/^(?:item|task)-(\d+)$/i);
+        if (slashMatch) {
+          params['item_id'] = slashMatch[1];
+        } else if (dashMatch) {
+          params['item_id'] = dashMatch[1];
+        }
+
+        const hp = new URLSearchParams(hash);
+        for (const [key, val] of hp.entries()) {
+          if (val) {
+            const k = key.toLowerCase();
+            let v = val;
+            if (k === 'view') {
+              v = v.toLowerCase();
+              if (v === 'kaban') v = 'kanban';
+            }
+            params[k] = v;
+          } else if (key) {
+            const kLow = key.toLowerCase();
+            if (['kanban', 'kaban', 'resumen', 'atrasados', 'escalamientos', 'reportes'].includes(kLow)) {
+              params['view'] = (kLow === 'kaban') ? 'kanban' : kLow;
+            } else if (/^\d+$/.test(kLow)) {
+              params['item_id'] = kLow;
+            }
+          }
+        }
+      }
+      return params;
+    }
+
+    let DEEP_LINK_HANDLED = false;
+
+    async function handleDeepLink(force = false) {
+      if (DEEP_LINK_HANDLED && !force) return;
+
+      const params = getRouteParams();
+      let targetView = params.view;
+      if (targetView === 'kaban') targetView = 'kanban';
+      const targetItemId = params.item_id || params.item || params.id || params.itemid || params.task_id || params.task || params.external_id;
+
+      if (!targetView && !targetItemId) return;
+
+      if (!CURRENT_USER) return;
+      if (!ALL_ITEMS) return;
+
+      DEEP_LINK_HANDLED = true;
+
+      // 1. Activar la vista solicitada (por defecto 'kanban' si viene un item_id o view=kanban)
+      const viewToSwitch = targetView || 'kanban';
+      switchView(viewToSwitch);
+
+      // 2. Si viene un item referenciado, abrir automaticamente el modal de actividad
+      if (targetItemId) {
+        let item = ALL_ITEMS.find(i => i.id === Number(targetItemId) || String(i.id) === String(targetItemId) || (i.external_id && String(i.external_id).toLowerCase() === String(targetItemId).toLowerCase()));
+
+        // Si el item no esta en el listado cargado en memoria (ej: cerrado con anterioridad o nuevo), consultarlo al backend
+        if (!item) {
+          try {
+            const fetchRes = await fetch(`${API_URL}/items/${encodeURIComponent(targetItemId)}`, { headers: getAuthHeaders() });
+            if (fetchRes.ok) {
+              item = await fetchRes.json();
+              if (item && item.id) {
+                const existsIdx = ALL_ITEMS.findIndex(x => x.id === item.id);
+                if (existsIdx >= 0) {
+                  ALL_ITEMS[existsIdx] = item;
+                } else {
+                  ALL_ITEMS.unshift(item);
+                }
+              }
+            } else if (fetchRes.status === 403) {
+              showToast('Acceso Restringido', 'Esta actividad no esta asignada a tu perfil.', 'warning');
+              return;
+            } else if (fetchRes.status === 404) {
+              showToast('Actividad no encontrada', `La actividad #${targetItemId} no existe o fue eliminada.`, 'info');
+              return;
+            }
+          } catch (e) {
+            console.warn('[DeepLink] Error consultando actividad por ID:', e);
+          }
+        }
+
+        if (item) {
+          // Limpiar filtros activos para garantizar que la tarjeta aparezca en el tablero
+          const srcInput = document.getElementById('fSrc');
+          const prioInput = document.getElementById('fPrio');
+          const respInput = document.getElementById('fResp');
+          const searchInput = document.getElementById('fSearch');
+          if (srcInput) srcInput.value = '';
+          if (prioInput) prioInput.value = '';
+          if (respInput) respInput.value = '';
+          if (searchInput) searchInput.value = '';
+          ACTIVE_KPI_FILTER = null;
+          document.querySelectorAll('.kpi').forEach(el => el.classList.remove('selected'));
+
+          HIGHLIGHT_ITEM_ID = item.id;
+          renderAll();
+
+          setTimeout(() => {
+            HIGHLIGHT_ITEM_ID = null;
+            renderAll();
+          }, 7000);
+
+          await openModal(item.id);
+
+          setTimeout(() => {
+            const cardEl = document.getElementById(`kcard-${item.id}`) || document.getElementById(`kcard-tv-${item.id}`);
+            if (cardEl && typeof cardEl.scrollIntoView === 'function') {
+              cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 250);
+        } else {
+          console.warn(`[DeepLink] Actividad #${targetItemId} no encontrada.`);
+          showToast('Actividad no encontrada', `No se encontro la actividad #${targetItemId}.`, 'info');
+        }
+      }
+    }
+
+    window.addEventListener('hashchange', () => {
+      DEEP_LINK_HANDLED = false;
+      handleDeepLink(true);
+    });
+
+    window.addEventListener('popstate', () => {
+      DEEP_LINK_HANDLED = false;
+      handleDeepLink(true);
+    });
+
+
     // Reloj en formato estricto 24 horas (HH:mm:ss) sin fluctuaciones
     function updateClock() {
       const clk = document.getElementById('clock');
@@ -5376,19 +5536,21 @@
         btnText.textContent = origText;
 
         applyRolePermissions();
-        showToast('Bienvenido', `SesiÃ³n iniciada como ${CURRENT_USER.full_name} (${formatRoleName(CURRENT_USER.role)})`, 'success', 4000);
+        await loadData();
+        await handleDeepLink(true);
+        showToast('Bienvenido', `Sesión iniciada como ${CURRENT_USER.full_name} (${formatRoleName(CURRENT_USER.role)})`, 'success', 4000);
       } catch (err) {
         console.error('Error logging in:', err);
         btn.disabled = false;
         btnText.textContent = origText;
         if (alertBox) {
           alertBox.style.display = 'flex';
-          alertBox.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Error al conectar con el servidor de autenticaciÃ³n.</span>';
+          alertBox.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Error al conectar con el servidor de autenticación.</span>';
         }
       }
     }
 
-    function enterGuestTvMode() {
+    async function enterGuestTvMode() {
       CURRENT_USER = {
         id: 0,
         full_name: 'Pantalla Modo TV',
@@ -5398,6 +5560,8 @@
       localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
       document.getElementById('loginOverlay').style.display = 'none';
       applyRolePermissions();
+      await loadData();
+      await handleDeepLink(true);
       if (!TV_MODE_ACTIVE) {
         toggleTvMode();
       }
