@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <meta name="google" content="notranslate">
-  <title>Agenda de Infra Â· Infraestructura y BD (En Vivo)</title>
+  <title>Agenda de Infra · Infraestructura y BD (En Vivo)</title>
   <link rel="icon" type="image/png" href="ICOSYCOM.png?v=2">
   <link rel="shortcut icon" type="image/png" href="ICOSYCOM.png?v=2">
   <link rel="apple-touch-icon" href="ICOSYCOM.png?v=2">
@@ -611,7 +611,7 @@
       background: rgba(255, 255, 255, 0.85);
     }
 
-    /* Barra indicadora sutil sin resplandor chillÃ³n */
+    /* Barra indicadora sutil sin resplandor chillón */
     .kpi::before {
       content: "";
       position: absolute;
@@ -752,6 +752,149 @@
 
     body.light tr.click:hover td {
       background: rgba(79, 140, 255, .06);
+    }
+
+    /* Filas desplegables de Escalamientos */
+    tr.escalation-row {
+      cursor: pointer;
+      transition: background 0.16s ease;
+    }
+
+    tr.escalation-row:hover td {
+      background: rgba(79, 140, 255, 0.06);
+    }
+
+    body.light tr.escalation-row:hover td {
+      background: rgba(79, 140, 255, 0.05);
+    }
+
+    tr.escalation-row.expanded td {
+      background: rgba(79, 140, 255, 0.09);
+      border-bottom-color: transparent;
+    }
+
+    body.light tr.escalation-row.expanded td {
+      background: rgba(79, 140, 255, 0.08);
+      border-bottom-color: transparent;
+    }
+
+    .esc-chevron {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: transform 0.2s ease, color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    body.light .esc-chevron {
+      background: rgba(0, 0, 0, 0.03);
+      border-color: rgba(0, 0, 0, 0.08);
+    }
+
+    tr.escalation-row:hover .esc-chevron {
+      color: var(--accent);
+      border-color: rgba(79, 140, 255, 0.35);
+    }
+
+    tr.escalation-row.expanded .esc-chevron {
+      transform: rotate(90deg);
+      color: var(--accent);
+      background: rgba(79, 140, 255, 0.15);
+      border-color: rgba(79, 140, 255, 0.4);
+    }
+
+    tr.escalation-detail-row td.escalation-detail-cell {
+      padding: 4px 16px 16px 44px;
+      background: rgba(79, 140, 255, 0.035);
+      border-bottom: 1px solid rgba(79, 140, 255, 0.18);
+    }
+
+    body.light tr.escalation-detail-row td.escalation-detail-cell {
+      background: rgba(79, 140, 255, 0.03);
+      border-bottom: 1px solid rgba(79, 140, 255, 0.2);
+    }
+
+    .escalation-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      padding-top: 6px;
+    }
+
+    .escalation-detail-box {
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+
+    body.light .escalation-detail-box {
+      background: rgba(255, 255, 255, 0.88);
+      border-color: rgba(0, 0, 0, 0.08);
+    }
+
+    .escalation-detail-box.recs-box {
+      background: rgba(16, 185, 129, 0.06);
+      border-color: rgba(16, 185, 129, 0.22);
+    }
+
+    body.light .escalation-detail-box.recs-box {
+      background: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.28);
+    }
+
+    .escalation-detail-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    body.light .escalation-detail-header {
+      border-bottom-color: rgba(0, 0, 0, 0.06);
+    }
+
+    .escalation-detail-box.recs-box .escalation-detail-header {
+      color: #34d399;
+      border-bottom-color: rgba(16, 185, 129, 0.15);
+    }
+
+    body.light .escalation-detail-box.recs-box .escalation-detail-header {
+      color: #059669;
+    }
+
+    .escalation-detail-content {
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .escalation-detail-box.recs-box .escalation-detail-content {
+      color: #d1fae5;
+    }
+
+    body.light .escalation-detail-box.recs-box .escalation-detail-content {
+      color: #064e3b;
+    }
+
+    tr.escalation-row:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
     }
 
     /* Etiquetas y luces suaves */
@@ -1702,7 +1845,16 @@
         padding: 14px;
       }
 
-      /* Modo TV en mÃ³vil */
+      tr.escalation-detail-row td.escalation-detail-cell {
+        padding: 6px 12px 14px 16px;
+      }
+
+      .escalation-detail-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      /* Modo TV en móvil */
       .tv-overlay {
         padding: 12px 14px;
       }
@@ -1825,7 +1977,7 @@
     }
 
     /* ========================================================
-       ESTILOS SISTEMA DE AUTENTICACIÃN Y ROLES
+       ESTILOS SISTEMA DE AUTENTICACIÓN Y ROLES
        ======================================================== */
     .login-overlay {
       position: fixed;
@@ -2187,10 +2339,10 @@
           <img src="ICOSYCOM.png?v=2" alt="Sycom" class="login-logo">
         </div>
         <h2 class="login-title">Agenda de Infraestructura</h2>
-        <p class="login-sub">Control de Acceso Operativo Â· Sycom</p>
+        <p class="login-sub">Control de Acceso Operativo · Sycom</p>
       </div>
 
-      <!-- Selector rÃ¡pido de usuario -->
+      <!-- Selector rápido de usuario -->
       <div class="login-quick-users">
         <div class="login-quick-label">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"
@@ -2213,14 +2365,14 @@
           <button type="button" class="quick-user-btn" onclick="quickSelectUser('j.fernandez', 'especialista')">
             <span class="qu-avatar spec">J</span>
             <div class="qu-info">
-              <span class="qu-name">Juan FernÃ¡ndez</span>
+              <span class="qu-name">Juan Fernández</span>
               <span class="qu-role spec">Especialista</span>
             </div>
           </button>
           <button type="button" class="quick-user-btn" onclick="quickSelectUser('y.jimenez', 'especialista')">
             <span class="qu-avatar spec">Y</span>
             <div class="qu-info">
-              <span class="qu-name">Yoxaide JimÃ©nez</span>
+              <span class="qu-name">Yoxaide Jiménez</span>
               <span class="qu-role spec">Especialista</span>
             </div>
           </button>
@@ -2260,9 +2412,9 @@
         </div>
 
         <div class="form-group" style="margin-bottom:18px">
-          <label class="form-label" for="loginPass">ContraseÃ±a:</label>
+          <label class="form-label" for="loginPass">Contraseña:</label>
           <div style="position:relative">
-            <input type="password" id="loginPass" class="form-input" placeholder="Ingresa tu contraseÃ±a..." required
+            <input type="password" id="loginPass" class="form-input" placeholder="Ingresa tu contraseña..." required
               autocomplete="current-password" style="padding-left:36px;padding-right:38px">
             <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)"
               viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
@@ -2272,7 +2424,7 @@
             </svg>
             <button type="button" onclick="togglePasswordVisibility()"
               style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px"
-              title="Mostrar/ocultar contraseÃ±a">
+              title="Mostrar/ocultar contraseña">
               <svg id="eyeIcon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -2290,7 +2442,7 @@
             <polyline points="10 17 15 12 10 7" />
             <line x1="15" y1="12" x2="3" y2="12" />
           </svg>
-          <span id="btnLoginText">Iniciar SesiÃ³n</span>
+          <span id="btnLoginText">Iniciar Sesión</span>
         </button>
       </form>
 
@@ -2301,7 +2453,7 @@
             <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
             <polyline points="17 2 12 7 7 2" />
           </svg>
-          <span>Acceder en Modo TV PÃºblico (Informativo)</span>
+          <span>Acceder en Modo TV Público (Informativo)</span>
         </button>
       </div>
     </div>
@@ -2316,7 +2468,7 @@
     <div class="brand">
       <img src="ICOSYCOM.png?v=2" alt="Sycom" class="logo-sycom">
       <div class="brand-text">Agenda de Infra<small>Infraestructura & BD</small></div>
-      <button class="btn-toggle-side" id="btnToggleSidebar" title="Contraer / Expandir menÃº" onclick="toggleSidebar()">
+      <button class="btn-toggle-side" id="btnToggleSidebar" title="Contraer / Expandir menú" onclick="toggleSidebar()">
         <svg id="arrowSidebar" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="15 18 9 12 15 6" />
@@ -2383,7 +2535,7 @@
           <div class="sidebar-user-role" id="sidebarUserRole">Coordinador</div>
         </div>
       </div>
-      <button class="btn-logout" onclick="handleLogout()" title="Cerrar SesiÃ³n">
+      <button class="btn-logout" onclick="handleLogout()" title="Cerrar Sesión">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -2396,17 +2548,17 @@
 
     <div class="side-foot">
       <div><span class="dot"></span><span class="foot-text" id="apiStatus">Conectando API...</span></div>
-      <div id="syncTime" class="foot-text" style="margin-top:4px">Ãltima sync: â</div>
+      <div id="syncTime" class="foot-text" style="margin-top:4px">Última sync: —</div>
     </div>
   </aside>
 
-  <!-- TelÃ³n oscuro para cerrar menÃº mÃ³vil -->
+  <!-- Telón oscuro para cerrar menú móvil -->
   <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebarMobile()"></div>
 
   <main>
     <header>
       <div style="display:flex;align-items:center;gap:10px">
-        <button class="btn" id="btnHeaderToggle" onclick="toggleSidebar()" title="Abrir / Cerrar menÃº"
+        <button class="btn" id="btnHeaderToggle" onclick="toggleSidebar()" title="Abrir / Cerrar menú"
           style="padding:8px 11px">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
@@ -2417,7 +2569,7 @@
         </button>
         <div>
           <h1 id="viewTitle">Resumen general</h1>
-          <div class="sub">ConsolidaciÃ³n en vivo: GLPI + ClickUp</div>
+          <div class="sub">Consolidación en vivo: GLPI + ClickUp</div>
         </div>
       </div>
       <div class="spacer"></div>
@@ -2436,7 +2588,7 @@
         </button>
         <button class="btn" id="btnReports" onclick="handleHeaderReportClick()"
           style="background:rgba(79,140,255,0.12);color:var(--accent);border-color:rgba(79,140,255,0.3);font-weight:600"
-          title="Generar automÃ¡ticamente informe ejecutivo o consultar historial">
+          title="Generar automáticamente informe ejecutivo o consultar historial">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -2494,8 +2646,8 @@
         <select id="fResp">
           <option value="">Todo el equipo</option>
           <option value="Adonis">Adonis Lozada</option>
-          <option value="Juan">Juan FernÃ¡ndez</option>
-          <option value="Yoxaide">Yoxaide JimÃ©nez</option>
+          <option value="Juan">Juan Fernández</option>
+          <option value="Yoxaide">Yoxaide Jiménez</option>
           <option value="Luis">Luis Acosta</option>
           <option value="Sin asignar">Sin asignar</option>
         </select>
@@ -2609,15 +2761,15 @@
                 id="lblEscalationsCount">0 escalamientos</span>
             </h3>
             <span class="muted" style="font-size:12px;margin-top:3px;display:block">Expedientes, actas y enlaces de
-              escalamiento en Google Docs / Drive con control de autorÃ­a y acceso directo</span>
+              escalamiento en Google Docs / Drive con control de autoría y acceso directo</span>
           </div>
 
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <div style="position:relative">
-              <input type="text" id="fSearchEscalations" placeholder="Buscar por cÃ³digo, IBP, categoría, notas..."
+              <input type="text" id="fSearchEscalations" placeholder="Buscar por código, IBP, categoría, notas..."
                 oninput="filterEscalationsTable()"
                 style="font-size:12px;padding:7px 12px 7px 30px;width:230px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none"
-                title="Filtrar por cÃ³digo, tÃ­tulo, IBP, categoría, enlace o autor">
+                title="Filtrar por código, título, IBP, categoría, enlace o autor">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round"
                 style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none">
@@ -2659,20 +2811,18 @@
           <table id="tblEscalations">
             <thead>
               <tr>
-                <th style="min-width:210px">CÃ³digo / TÃ­tulo del Escalamiento</th>
+                <th style="min-width:220px">Código / Título del Escalamiento</th>
                 <th style="min-width:140px">IBP / Banco</th>
                 <th style="min-width:110px">Categoría</th>
                 <th style="min-width:130px">Documento / Enlace</th>
                 <th>Registrado Por</th>
                 <th>Fecha de Registro</th>
-                <th style="min-width:150px">Observaciones</th>
-                <th style="min-width:180px">Recomendaciones</th>
                 <th style="text-align:center;min-width:170px">Acciones</th>
               </tr>
             </thead>
             <tbody id="tblEscalationsBody">
               <tr>
-                <td colspan="9" style="text-align:center;padding:24px" class="muted">Cargando repositorio de
+                <td colspan="7" style="text-align:center;padding:24px" class="muted">Cargando repositorio de
                   escalamientos...</td>
               </tr>
             </tbody>
@@ -2681,9 +2831,9 @@
       </div>
     </div>
 
-    <!-- Vista de Reportes Ejecutivos & MÃ©tricas KPI (M9) -->
+    <!-- Vista de Reportes Ejecutivos & Métricas KPI (M9) -->
     <div class="view" id="v-reportes">
-      <!-- Selector de PestaÃ±as / Sub-navegaciÃ³n -->
+      <!-- Selector de Pestañas / Sub-navegación -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
         <div style="display:inline-flex;background:rgba(255,255,255,0.04);padding:4px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);gap:4px">
           <button type="button" id="tabBtnReportHistory" onclick="switchReportsSubView('history')"
@@ -2704,7 +2854,7 @@
               <line x1="12" y1="20" x2="12" y2="4"/>
               <line x1="6" y1="20" x2="6" y2="14"/>
             </svg>
-            <span>Indicadores y GrÃ¡ficos KPI</span>
+            <span>Indicadores y Gráficos KPI</span>
           </button>
         </div>
       </div>
@@ -2728,7 +2878,7 @@
                 <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px">M9</span>
               </h3>
               <span class="muted" style="font-size:12px;margin-top:3px;display:block">Consulta, descarga y reimprime los
-                informes consolidados de gestiÃ³n y cumplimiento SLA</span>
+                informes consolidados de gestión y cumplimiento SLA</span>
             </div>
 
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -2746,17 +2896,17 @@
               </div>
               <button class="btn" id="btnGoToAnalytics" onclick="switchReportsSubView('analytics')"
                 style="background:rgba(79,140,255,0.12);color:var(--accent);border-color:rgba(79,140,255,0.35);font-weight:700;display:inline-flex;align-items:center;gap:7px"
-                title="Ver grÃ¡ficos interactivos e indicadores KPI de la gestiÃ³n consolidada">
+                title="Ver gráficos interactivos e indicadores KPI de la gestión consolidada">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="18" y1="20" x2="18" y2="10"/>
                   <line x1="12" y1="20" x2="12" y2="4"/>
                   <line x1="6" y1="20" x2="6" y2="14"/>
                 </svg>
-                <span>Ver GrÃ¡ficos &amp; KPIs</span>
+                <span>Ver Gráficos &amp; KPIs</span>
               </button>
               <button class="btn" id="btnAutoReportView" onclick="generateAutoMonthReport()"
                 style="background:rgba(16,185,129,0.12);color:#34d399;border-color:rgba(16,185,129,0.3);font-weight:600;display:inline-flex;align-items:center;gap:7px"
-                title="Generar automÃ¡ticamente el informe consolidado del mes en curso">
+                title="Generar automáticamente el informe consolidado del mes en curso">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
                   stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 12a9 9 0 1 1-6.219-8.56" />
@@ -2782,9 +2932,9 @@
               <thead>
                 <tr>
                   <th>Folio</th>
-                  <th>TÃ­tulo / PerÃ­odo</th>
+                  <th>Título / Período</th>
                   <th>Generado Por</th>
-                  <th>Fecha GeneraciÃ³n</th>
+                  <th>Fecha Generación</th>
                   <th style="text-align:center">Actividades</th>
                   <th style="text-align:center">Cumplimiento SLA</th>
                   <th style="text-align:center">T. Promedio</th>
@@ -2802,7 +2952,7 @@
         </div>
       </div>
 
-      <!-- Sub-vista 2: Indicadores y GrÃ¡ficos KPI de Gestión -->
+      <!-- Sub-vista 2: Indicadores y Gráficos KPI de Gestión -->
       <div id="subViewReportsAnalytics" style="display:none">
         <div class="card" style="margin-bottom:20px">
           <!-- Cabecera del Dashboard con Filtros Integrados -->
@@ -2814,23 +2964,23 @@
                   <line x1="12" y1="20" x2="12" y2="4"/>
                   <line x1="6" y1="20" x2="6" y2="14"/>
                 </svg>
-                <span>Tablero de MÃ©tricas &amp; Indicadores de Gestión</span>
+                <span>Tablero de Métricas &amp; Indicadores de Gestión</span>
                 <span class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:11px" id="lblAnalyticsStatus">En Vivo</span>
               </h3>
               <span class="muted" style="font-size:12px;margin-top:3px;display:block">
-                AnalÃ­tica visual de rendimiento, cumplimiento de SLA, balance de carga y tiempos de atenciÃ³n
+                Analítica visual de rendimiento, cumplimiento de SLA, balance de carga y tiempos de atención
               </span>
             </div>
 
             <!-- Filtros interactivos -->
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <div style="display:flex;align-items:center;gap:6px">
-                <span class="muted" style="font-size:11.5px">PerÃ­odo:</span>
+                <span class="muted" style="font-size:11.5px">Período:</span>
                 <select id="analyticsPeriodSelect" onchange="loadAnalyticsData()"
                   style="font-size:12px;padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none">
                   <option value="month" selected>Mes en Curso</option>
-                  <option value="last30">Ãltimos 30 dÃ­as</option>
-                  <option value="last7">Ãltimos 7 dÃ­as</option>
+                  <option value="last30">Últimos 30 días</option>
+                  <option value="last7">Últimos 7 días</option>
                   <option value="all">Todo el Historial</option>
                 </select>
               </div>
@@ -2841,14 +2991,14 @@
                   style="font-size:12px;padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none">
                   <option value="">Todo el Equipo</option>
                   <option value="Adonis Lozada">Adonis Lozada</option>
-                  <option value="Juan FernÃ¡ndez">Juan FernÃ¡ndez</option>
-                  <option value="Yoxaide JimÃ©nez">Yoxaide JimÃ©nez</option>
+                  <option value="Juan Fernández">Juan Fernández</option>
+                  <option value="Yoxaide Jiménez">Yoxaide Jiménez</option>
                   <option value="Luis Acosta">Luis Acosta</option>
                   <option value="Sin asignar">Sin Asignar</option>
                 </select>
               </div>
 
-              <button class="btn" onclick="loadAnalyticsData()" title="Refrescar mÃ©tricas ahora"
+              <button class="btn" onclick="loadAnalyticsData()" title="Refrescar métricas ahora"
                 style="background:rgba(255,255,255,0.05);color:var(--text);border-color:rgba(255,255,255,0.14);display:inline-flex;align-items:center;gap:5px;padding:6px 11px">
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"/>
@@ -2872,21 +3022,21 @@
             <div style="grid-column:1/-1;text-align:center;padding:24px" class="muted">Cargando indicadores...</div>
           </div>
 
-          <!-- 2. GrÃ¡ficos Principales (Torta SLA y Barras por Especialista) -->
+          <!-- 2. Gráficos Principales (Torta SLA y Barras por Especialista) -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(380px, 1fr));gap:18px;margin-bottom:20px">
             
-            <!-- GrÃ¡fico 1: Torta de Cumplimiento de SLA & Estados -->
+            <!-- Gráfico 1: Torta de Cumplimiento de SLA & Estados -->
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;display:flex;flex-direction:column;justify-content:space-between">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
                   <div>
                     <h4 style="margin:0;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-                      <span>DistribuciÃ³n de Estados &amp; Cumplimiento SLA (Torta)</span>
+                      <span>Distribución de Estados &amp; Cumplimiento SLA (Torta)</span>
                     </h4>
                     <span class="muted" style="font-size:11.5px">Cerradas, en curso, pendientes y casos fuera de SLA</span>
                   </div>
-                  <span class="badge" id="lblSlaBadgePct" style="background:rgba(16,185,129,0.15);color:#34d399;font-weight:700">â</span>
+                  <span class="badge" id="lblSlaBadgePct" style="background:rgba(16,185,129,0.15);color:#34d399;font-weight:700">—</span>
                 </div>
                 <div id="chartSlaDonutContainer" style="min-height:240px">
                   <!-- Generado por JS -->
@@ -2894,18 +3044,18 @@
               </div>
             </div>
 
-            <!-- GrÃ¡fico 2: Barras de Cantidad y Carga por Especialista / Coordinador -->
+            <!-- Gráfico 2: Barras de Cantidad y Carga por Especialista / Coordinador -->
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;display:flex;flex-direction:column;justify-content:space-between">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
                   <div>
                     <h4 style="margin:0;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                      <span>Volumen por Especialista / Coordinador (GrÃ¡fico de Barras)</span>
+                      <span>Volumen por Especialista / Coordinador (Gráfico de Barras)</span>
                     </h4>
                     <span class="muted" style="font-size:11.5px">Comparativa de cantidad de actividades asignadas y resueltas</span>
                   </div>
-                  <span class="muted" style="font-size:11px" id="lblSpecialistCount">â</span>
+                  <span class="muted" style="font-size:11px" id="lblSpecialistCount">—</span>
                 </div>
                 <div id="chartSpecialistsContainer">
                   <!-- Generado por JS (Barras verticales + desglose) -->
@@ -2915,7 +3065,7 @@
 
           </div>
 
-          <!-- 3. GrÃ¡ficos Secundarios: Plataformas, Prioridad y Clientes Top -->
+          <!-- 3. Gráficos Secundarios: Plataformas, Prioridad y Clientes Top -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:18px">
 
             <!-- Origen de Actividades (GLPI vs ClickUp) -->
@@ -2929,11 +3079,11 @@
               </div>
             </div>
 
-            <!-- DistribuciÃ³n por Nivel de Prioridad -->
+            <!-- Distribución por Nivel de Prioridad -->
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:18px">
               <h4 style="margin:0 0 12px 0;font-size:13.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#ff5d5d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                <span>DistribuciÃ³n por Prioridad</span>
+                <span>Distribución por Prioridad</span>
               </h4>
               <div id="chartPriorityContainer" style="display:flex;flex-direction:column;gap:8px">
                 <!-- Generado por JS -->
@@ -2963,14 +3113,14 @@
     <div class="modal" id="modalContent"></div>
   </div>
 
-  <!-- MODO TV / PRESENTACIÃN SALA DE OPERACIONES -->
+  <!-- MODO TV / PRESENTACIÓN SALA DE OPERACIONES -->
   <div id="tvOverlay" class="tv-overlay" style="display:none">
     <div class="tv-header">
       <div class="tv-brand">
         <img src="ICOSYCOM.png?v=2" alt="Sycom" class="tv-logo">
         <div>
           <div class="tv-title" id="tvSlideTitle">Cargando Modo TV...</div>
-          <div class="tv-sub" id="tvSlideSub">Agenda de Infra Â· Sala de Operaciones</div>
+          <div class="tv-sub" id="tvSlideSub">Agenda de Infra · Sala de Operaciones</div>
         </div>
       </div>
       <div class="tv-progress-container">
@@ -2995,7 +3145,7 @@
           </svg>
           <span id="tvTimerSec">18s</span>
         </span>
-        <button class="tv-btn" onclick="tvPrevSlide()" title="Diapositiva Anterior (â)">
+        <button class="tv-btn" onclick="tvPrevSlide()" title="Diapositiva Anterior (←)">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
             <polygon points="19 20 9 12 19 4 19 20" />
             <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2" />
@@ -3010,7 +3160,7 @@
           </span>
           <span id="tvPlayPauseText">Pausa</span>
         </button>
-        <button class="tv-btn" onclick="tvNextSlide()" title="Siguiente Diapositiva (â)">
+        <button class="tv-btn" onclick="tvNextSlide()" title="Siguiente Diapositiva (→)">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
             <polygon points="5 4 15 12 5 20 5 4" />
             <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2" />
@@ -3073,7 +3223,7 @@
     function isItemAssignedToUser(it, user) {
       if (!it || !user) return false;
       const assignee = (it.assignee_name || '').toLowerCase();
-      if (!assignee || assignee.includes('sin asignar') || assignee.includes('tÃ©cnico glpi')) {
+      if (!assignee || assignee.includes('sin asignar') || assignee.includes('técnico glpi')) {
         return false;
       }
       const fullName = (user.full_name || '').toLowerCase();
@@ -3087,14 +3237,14 @@
     function isItemUnassigned(it) {
       if (!it) return true;
       const assignee = (it.assignee_name || '').toLowerCase().trim();
-      return !assignee || assignee.includes('sin asignar') || assignee.includes('tÃ©cnico glpi');
+      return !assignee || assignee.includes('sin asignar') || assignee.includes('técnico glpi');
     }
 
     function isItemVisibleForUser(it, user) {
       if (!user) return true;
       const role = (user.role || '').toLowerCase();
       if (role === 'coordinador') return true;
-      // Para Especialista y Analista: solo sus asignadas y las que estÃ¡n sin asignar (NO las de los demÃ¡s)
+      // Para Especialista y Analista: solo sus asignadas y las que están sin asignar (NO las de los demás)
       return isItemAssignedToUser(it, user) || isItemUnassigned(it);
     }
 
@@ -3159,7 +3309,7 @@
     }
 
     function formatDate(dateStr, includeTime = false) {
-      if (!dateStr) return 'â';
+      if (!dateStr) return '—';
       const s = (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+')) ? dateStr + 'Z' : dateStr;
       const d = new Date(s);
       if (isNaN(d.getTime())) return dateStr;
@@ -3190,9 +3340,9 @@
       else if (mins > 0) dur = `${mins}m`;
       else dur = '< 1m';
 
-      if (it.status === 'cerrado') return `DurÃ³ ${dur}`;
+      if (it.status === 'cerrado') return `Duró ${dur}`;
       if (it.status === 'pendiente') return `Por iniciar: ${dur}`;
-      if (it.status === 'curso') return `En atenciÃ³n: ${dur}`;
+      if (it.status === 'curso') return `En atención: ${dur}`;
       if (it.status === 'espera') return `En espera: ${dur}`;
       return `Transcurrido: ${dur}`;
     }
@@ -3219,7 +3369,7 @@
         const resKpi = await fetch(`${API_URL}/kpis`, { headers: getAuthHeaders() });
         const kpis = await resKpi.json();
         document.getElementById('apiStatus').textContent = 'API Conectada';
-        document.getElementById('syncTime').textContent = kpis.last_sync ? `Ãltima sync: ${formatDate(kpis.last_sync, true)}` : 'Sync: OK';
+        document.getElementById('syncTime').textContent = kpis.last_sync ? `Última sync: ${formatDate(kpis.last_sync, true)}` : 'Sync: OK';
 
         const resItems = await fetch(`${API_URL}/items`, { headers: getAuthHeaders() });
         ALL_ITEMS = await resItems.json();
@@ -3237,7 +3387,7 @@
       const isFiltered = !!(document.getElementById('fSrc').value || document.getElementById('fPrio').value || document.getElementById('fResp').value || document.getElementById('fSearch').value);
       const cards = [
         { key: 'pendiente', lbl: 'Pendientes', val: k.pendientes, hint: isFiltered ? 'Filtrados' : 'Por iniciar', c: 'var(--accent)' },
-        { key: 'curso', lbl: 'En Curso', val: k.en_curso, hint: isFiltered ? 'Filtrados' : 'En atenciÃ³n', c: 'var(--cyan)' },
+        { key: 'curso', lbl: 'En Curso', val: k.en_curso, hint: isFiltered ? 'Filtrados' : 'En atención', c: 'var(--cyan)' },
         { key: 'espera', lbl: 'En Espera', val: k.en_espera, hint: isFiltered ? 'Filtrados' : 'Cliente / Proveedor', c: 'var(--purple)' },
         { key: 'atrasados', lbl: 'Atrasadas', val: k.atrasados, hint: isFiltered ? 'Con SLA vencido' : 'SLA vencido', c: 'var(--red)' },
         { key: 'cumplimiento', lbl: 'Cumplimiento SLA', val: `${k.cumplimiento_sla}%`, hint: 'Meta: 90%', c: k.cumplimiento_sla >= 90 ? 'var(--green)' : 'var(--yellow)' },
@@ -3291,7 +3441,7 @@
       const q = document.getElementById('fSearch').value.toLowerCase().trim();
 
       return ALL_ITEMS.filter(it => {
-        // Regla por perfil: la persona solo puede ver las asignadas a Ã©l y las que estÃ¡n sin asignar (NO las de los demÃ¡s)
+        // Regla por perfil: la persona solo puede ver las asignadas a él y las que están sin asignar (NO las de los demás)
         if (!isItemVisibleForUser(it, CURRENT_USER)) return false;
 
         if (src && it.source !== src) return false;
@@ -3386,7 +3536,7 @@
         <td>${it.status_origin || it.status}</td>
         <td>
           <div style="font-weight:600;font-size:12px;color:var(--text)">${getItemTimeLabel(it)}</div>
-          <div class="muted" style="font-size:11px">${it.sla_percent}% consumido${getItemSlaRemaining(it) ? ' Â· ' + getItemSlaRemaining(it) : ''}</div>
+          <div class="muted" style="font-size:11px">${it.sla_percent}% consumido${getItemSlaRemaining(it) ? ' · ' + getItemSlaRemaining(it) : ''}</div>
         </td>
         <td class="${it.is_overdue ? 'txt-red' : 'muted'}">${formatDate(it.due_at)}</td>
       </tr>
@@ -3467,7 +3617,7 @@
       const item = ALL_ITEMS.find(i => i.id === itemId);
       if (!canUserEditItem(item)) {
         e.preventDefault();
-        showToast('AcciÃ³n no permitida', isSpecialist() ? 'Solo puedes mover tus propias tareas asignadas.' : 'Modo solo lectura: solo el Coordinador puede mover estados.', 'error', 3500);
+        showToast('Acción no permitida', isSpecialist() ? 'Solo puedes mover tus propias tareas asignadas.' : 'Modo solo lectura: solo el Coordinador puede mover estados.', 'error', 3500);
         return;
       }
       DRAGGED_ITEM_ID = itemId;
@@ -3533,13 +3683,13 @@
         return;
       }
 
-      // ValidaciÃ³n: ClickUp no posee estado 'En espera'
+      // Validación: ClickUp no posee estado 'En espera'
       if (item.source === 'ClickUp' && targetStatus === 'espera') {
         alert("Las tareas de ClickUp solo tienen 3 estados: Pendientes (TO DO), En curso (IN PROGRESS) y Cerrados (COMPLETE).\n\nEl estado 'En espera' es exclusivo de GLPI.");
         return;
       }
 
-      // Si se mueve a Cerrado, abrir modal de cierre con recomendaciones y vinculaciÃ³n a escalamiento
+      // Si se mueve a Cerrado, abrir modal de cierre con recomendaciones y vinculación a escalamiento
       if (targetStatus === 'cerrado') {
         openCloseActivityModal(itemId, item.status);
         return;
@@ -3558,7 +3708,7 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          alert(`Error al actualizar estado: ${data.detail || 'OcurriÃ³ un error en el servidor'}`);
+          alert(`Error al actualizar estado: ${data.detail || 'Ocurrió un error en el servidor'}`);
           item.status = oldStatus;
           renderKanban(ALL_ITEMS);
           if (TV_MODE_ACTIVE) renderTvSlide();
@@ -3570,7 +3720,7 @@
         showToast('Estado sincronizado', `${item.source} #${item.external_id} movido a ${stLabels[targetStatus] || targetStatus}.`, 'info', 3500);
       } catch (err) {
         console.error('Error actualizando estado desde Kanban:', err);
-        alert('Error de conexiÃ³n al mover la tarjeta.');
+        alert('Error de conexión al mover la tarjeta.');
         item.status = oldStatus;
         renderKanban(ALL_ITEMS);
         if (TV_MODE_ACTIVE) renderTvSlide();
@@ -3601,7 +3751,7 @@
             <div class="title">${it.title}</div>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:2px;flex-wrap:wrap">
               <div class="muted" style="font-size:11px">${escapeHtml(it.project_name || it.client_name || 'Interno')}</div>
-              ${it.escalation_id ? `<span class="badge" style="background:rgba(79,140,255,0.12);color:var(--accent);border:1px solid rgba(79,140,255,0.25);font-size:10px;padding:1px 5px" title="Vinculado a Escalamiento #${it.escalation_id}">ð Escalamiento #${it.escalation_id}</span>` : ''}
+              ${it.escalation_id ? `<span class="badge" style="background:rgba(79,140,255,0.12);color:var(--accent);border:1px solid rgba(79,140,255,0.25);font-size:10px;padding:1px 5px;display:inline-flex;align-items:center;gap:3px" title="Vinculado a Escalamiento #${it.escalation_id}"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span>Escalamiento #${it.escalation_id}</span></span>` : ''}
             </div>
             <div style="font-size:11px;font-weight:600;margin-top:4px;display:flex;align-items:center;justify-content:space-between;color:var(--text)">
               <div style="display:flex;align-items:center;gap:4px;overflow:hidden">
@@ -3618,7 +3768,7 @@
             </div>
           </div>
         `;
-        }).join('') || `<div class="muted" style="font-size:12px;text-align:center;padding:24px;border:1px dashed rgba(255,255,255,.08);border-radius:8px;pointer-events:none">${isCoordinator() ? 'Arrastra actividades aquÃ­' : 'Sin actividades en esta columna'}</div>`}
+        }).join('') || `<div class="muted" style="font-size:12px;text-align:center;padding:24px;border:1px dashed rgba(255,255,255,.08);border-radius:8px;pointer-events:none">${isCoordinator() ? 'Arrastra actividades aquí' : 'Sin actividades en esta columna'}</div>`}
       </div>
       `;
       }).join('');
@@ -3626,8 +3776,8 @@
 
     const SYCOM_SPECIALISTS = [
       { key: 'adonis', name: 'Adonis Lozada', email: 'a.lozada@sycom.com.ve', role: 'Coordinador Infra & BD' },
-      { key: 'juan', name: 'Juan FernÃ¡ndez', email: 'j.fernandez@sycom.com.ve', role: 'Especialista Infra & BD' },
-      { key: 'yoxaide', name: 'Yoxaide JimÃ©nez', email: 'y.jimenez@sycom.com.ve', role: 'Especialista Infra & BD' },
+      { key: 'juan', name: 'Juan Fernández', email: 'j.fernandez@sycom.com.ve', role: 'Especialista Infra & BD' },
+      { key: 'yoxaide', name: 'Yoxaide Jiménez', email: 'y.jimenez@sycom.com.ve', role: 'Especialista Infra & BD' },
       { key: 'luis', name: 'Luis Acosta', email: 'l.acosta@sycom.com.ve', role: 'Especialista Infra & BD' }
     ];
 
@@ -3687,7 +3837,7 @@
       });
 
       if (!matches.length) {
-        menu.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--muted)">No se encontrÃ³ ningÃºn especialista con ese correo o nombre.</div>';
+        menu.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--muted)">No se encontró ningún especialista con ese correo o nombre.</div>';
         menu.style.display = 'block';
         return;
       }
@@ -3851,7 +4001,7 @@
         badge.innerHTML = `
           <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(79,140,255,0.12);color:var(--accent);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid rgba(79,140,255,0.25)">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span>SLA Interno del Equipo: <b style="color:#ffffff">+${h}h</b> &nbsp;Â·&nbsp; Vence: <b style="color:#ffffff">${formattedTarget}</b></span>
+            <span>SLA Interno del Equipo: <b style="color:#ffffff">+${h}h</b> &nbsp;·&nbsp; Vence: <b style="color:#ffffff">${formattedTarget}</b></span>
           </div>
         `;
       }
@@ -3861,7 +4011,7 @@
       const container = document.getElementById('createSelectedAssigneeChips');
       if (!container) return;
       if (!CREATE_SELECTED_KEYS.length) {
-        container.innerHTML = '<span class="muted" style="font-size:12px;font-style:italic">Sin responsable (se crearÃ¡ como disponible para tomar).</span>';
+        container.innerHTML = '<span class="muted" style="font-size:12px;font-style:italic">Sin responsable (se creará como disponible para tomar).</span>';
         return;
       }
       container.innerHTML = CREATE_SELECTED_KEYS.map(key => {
@@ -3894,7 +4044,7 @@
       });
 
       if (!matches.length) {
-        menu.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--muted)">No se encontrÃ³ ningÃºn especialista con ese correo o nombre.</div>';
+        menu.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--muted)">No se encontró ningún especialista con ese correo o nombre.</div>';
         menu.style.display = 'block';
         return;
       }
@@ -3951,7 +4101,7 @@
 
     async function submitCreateItem() {
       if (!isCoordinator()) {
-        alert('Permiso denegado: Solo el rol Coordinador tiene autorizaciÃ³n para crear actividades.');
+        alert('Permiso denegado: Solo el rol Coordinador tiene autorización para crear actividades.');
         return;
       }
 
@@ -3966,7 +4116,7 @@
       const btn = document.getElementById('btnSubmitCreate');
 
       if (!title) {
-        alert('Por favor ingresa el tÃ­tulo o asunto de la actividad.');
+        alert('Por favor ingresa el título o asunto de la actividad.');
         const tInput = document.getElementById('createTitle');
         if (tInput) tInput.focus();
         return;
@@ -4020,7 +4170,7 @@
         const data = await res.json();
 
         if (!res.ok) {
-          alert(`Error al crear la actividad: ${data.detail || 'OcurriÃ³ un error en el servidor'}`);
+          alert(`Error al crear la actividad: ${data.detail || 'Ocurrió un error en el servidor'}`);
           btn.disabled = false;
           btn.innerHTML = origBtnContent;
           return;
@@ -4041,7 +4191,7 @@
           }
         }
 
-        // 3. Resaltar visualmente la actividad reciÃ©n creada
+        // 3. Resaltar visualmente la actividad recién creada
         if (createdItem && createdItem.id) {
           HIGHLIGHT_ITEM_ID = createdItem.id;
           setTimeout(() => {
@@ -4059,13 +4209,13 @@
           startTvTimer();
         }
 
-        // 5. NotificaciÃ³n Toast elegante
+        // 5. Notificación Toast elegante
         const itemTitle = createdItem ? createdItem.title : title;
         const itemSrc = createdItem ? `${createdItem.source} #${createdItem.external_id}` : source;
-        showToast('Â¡Actividad creada con Ã©xito!', `${itemSrc}: "${itemTitle}" agregada a Pendientes y sincronizada.`, 'success', 5000);
+        showToast('¡Actividad creada con éxito!', `${itemSrc}: "${itemTitle}" agregada a Pendientes y sincronizada.`, 'success', 5000);
       } catch (err) {
         console.error('Error creando actividad:', err);
-        alert('Error de conexiÃ³n al conectar con el servidor.');
+        alert('Error de conexión al conectar con el servidor.');
         btn.disabled = false;
         btn.innerHTML = origBtnContent;
       }
@@ -4111,19 +4261,19 @@
               <span class="badge src-ClickUp" style="font-size:11px">ClickUp</span>
               <span style="font-weight:700;font-size:13px">Infra & BD</span>
             </div>
-            <div class="muted" style="font-size:11px;margin-top:4px">Espacio Infraestructura Â· Action Items</div>
+            <div class="muted" style="font-size:11px;margin-top:4px">Espacio Infraestructura · Action Items</div>
           </div>
           <div class="create-platform-card" id="cardSrcGLPI" onclick="setCreateSource('GLPI')">
             <div style="display:flex;align-items:center;gap:8px">
               <span class="badge src-GLPI" style="font-size:11px">GLPI</span>
               <span style="font-weight:700;font-size:13px">Mesa de Ayuda</span>
             </div>
-            <div class="muted" style="font-size:11px;margin-top:4px">Tickets TI Â· Soporte e Incidentes</div>
+            <div class="muted" style="font-size:11px;margin-top:4px">Tickets TI · Soporte e Incidentes</div>
           </div>
         </div>
       </div>
 
-      <!-- 2. Subproyecto / Entidad segÃºn Plataforma -->
+      <!-- 2. Subproyecto / Entidad según Plataforma -->
       <div class="form-group" id="createSubprojectGroup" style="margin-bottom:14px">
         <label class="form-label" id="lblCreateSubproject" for="createSubprojectSelect">
           <span>Proyecto ClickUp:</span> <span style="color:var(--red)">*</span>
@@ -4142,16 +4292,16 @@
         </small>
       </div>
 
-      <!-- 3. Asunto / TÃ­tulo -->
+      <!-- 3. Asunto / Título -->
       <div class="form-group">
-        <label class="form-label" for="createTitle">Asunto / TÃ­tulo de la Actividad: <span style="color:var(--red)">*</span></label>
-        <input type="text" id="createTitle" class="form-input" placeholder="Ej: MigraciÃ³n de respaldo PostgreSQL en srvbd02..." required autocomplete="off">
+        <label class="form-label" for="createTitle">Asunto / Título de la Actividad: <span style="color:var(--red)">*</span></label>
+        <input type="text" id="createTitle" class="form-input" placeholder="Ej: Migración de respaldo PostgreSQL en srvbd02..." required autocomplete="off">
       </div>
 
-      <!-- 4. DescripciÃ³n (Opcional) -->
+      <!-- 4. Descripción (Opcional) -->
       <div class="form-group">
-        <label class="form-label" for="createDesc">DescripciÃ³n / Detalle Requerimiento: <span class="muted" style="font-weight:400;text-transform:none">(Opcional)</span></label>
-        <textarea id="createDesc" class="form-input" rows="3" placeholder="Detalles tÃ©cnicos, comandos, alcance o requerimientos especÃ­ficos..."></textarea>
+        <label class="form-label" for="createDesc">Descripción / Detalle Requerimiento: <span class="muted" style="font-weight:400;text-transform:none">(Opcional)</span></label>
+        <textarea id="createDesc" class="form-input" rows="3" placeholder="Detalles técnicos, comandos, alcance o requerimientos específicos..."></textarea>
       </div>
 
       <!-- 5. Doble SLA: Fechas (Sycom y Equipo) -->
@@ -4193,7 +4343,7 @@
               <input type="text" id="createAssigneeSearch" class="form-input" placeholder="Buscar por correo @sycom.com.ve o nombre..." autocomplete="off" onfocus="showCreateAssigneeDropdown(this.value)" oninput="showCreateAssigneeDropdown(this.value)" style="padding-left:32px">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </div>
-            <button type="button" class="btn" onclick="toggleCreateAssigneeDropdown()" style="padding:8px 10px;font-size:12px" title="Ver catÃ¡logo completo de especialistas">
+            <button type="button" class="btn" onclick="toggleCreateAssigneeDropdown()" style="padding:8px 10px;font-size:12px" title="Ver catálogo completo de especialistas">
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
           </div>
@@ -4208,10 +4358,10 @@
           <option value="">-- Sin escalamiento vinculado --</option>
           ${ESCALATIONS_LIST.map(esc => `<option value="${esc.id}">${formatEscalationOption(esc)}</option>`).join('')}
         </select>
-        <small class="muted" style="font-size:11px;margin-top:3px;display:block">Si la actividad deriva de un escalamiento, selecciÃ³nalo para relacionarlo y aÃ±adir recomendaciones al cerrar.</small>
+        <small class="muted" style="font-size:11px;margin-top:3px;display:block">Si la actividad deriva de un escalamiento, selecciónalo para relacionarlo y añadir recomendaciones al cerrar.</small>
       </div>
 
-      <!-- Botones de AcciÃ³n -->
+      <!-- Botones de Acción -->
       <div class="actions" style="margin-top:20px;border-top:1px solid rgba(255,255,255,.08);padding-top:16px">
         <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
         <button type="submit" class="btn" id="btnSubmitCreate" style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700;display:inline-flex;align-items:center;gap:6px">
@@ -4267,7 +4417,7 @@
       document.getElementById('modalContent').innerHTML = `
     ${roleBanner}
     <div style="margin-bottom:10px">
-      <span class="badge src-${it.source}">${it.source}</span> #${it.external_id} Â· <span class="sem ${it.semaphore}"></span>
+      <span class="badge src-${it.source}">${it.source}</span> #${it.external_id} · <span class="sem ${it.semaphore}"></span>
     </div>
     <h2 style="font-size:18px;line-height:1.3;margin-bottom:8px">${it.title}</h2>
     <dl>
@@ -4297,7 +4447,7 @@
             <div id="selectedAssigneeChips" class="selected-chips-wrap"></div>
             <div style="margin-top:8px;font-size:11.5px;color:var(--muted)">
               ${it.assigned_at ? `Asignado el: <b style="color:var(--text)">${formatDate(it.assigned_at, true)}</b>` : ''} 
-              ${it.closed_at ? `Â· Cerrado el: <b style="color:var(--text)">${formatDate(it.closed_at, true)}</b>` : ''}
+              ${it.closed_at ? `· Cerrado el: <b style="color:var(--text)">${formatDate(it.closed_at, true)}</b>` : ''}
             </div>
           </div>
         ` : `
@@ -4324,7 +4474,7 @@
               <div id="assigneeDropdownMenu" class="assignee-dropdown-menu" style="display:none"></div>
             </div>
 
-            <!-- InformaciÃ³n de cuÃ¡ndo fue agregado a la actividad -->
+            <!-- Información de cuándo fue agregado a la actividad -->
             <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
               <div style="font-size:11.5px;color:var(--muted);display:inline-flex;align-items:center;gap:6px">
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -4338,7 +4488,7 @@
               </div>
               <button class="btn primary" id="btnModalAssign" onclick="saveAssignmentFromModal(${it.id})" style="padding:6px 14px;font-size:12px">
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                <span>Guardar AsignaciÃ³n</span>
+                <span>Guardar Asignación</span>
               </button>
             </div>
           </div>
@@ -4355,7 +4505,7 @@
       ${it.escalated_at ? `<dt>Escalado a Infra (SLA Equipo):</dt><dd><b>${formatDate(it.escalated_at, true)}</b></dd>` : ''}
       <dt>Tiempo registrado:</dt><dd><b>${getItemTimeLabel(it)}</b></dd>
       <dt>Vencimiento SLA Equipo:</dt><dd>${formatDate(it.due_at, true)}</dd>
-      <dt>SLA / Plazo Equipo:</dt><dd><b>${it.sla_percent}%</b> consumido (${it.semaphore.toUpperCase()}) ${getItemSlaRemaining(it) ? 'Â· <b>' + getItemSlaRemaining(it) + '</b>' : ''}</dd>
+      <dt>SLA / Plazo Equipo:</dt><dd><b>${it.sla_percent}%</b> consumido (${it.semaphore.toUpperCase()}) ${getItemSlaRemaining(it) ? '· <b>' + getItemSlaRemaining(it) + '</b>' : ''}</dd>
       <dt>Escalamiento vinculado:</dt>
       <dd>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -4382,7 +4532,7 @@
         ${(isCoordinator() || canUserEditItem(it)) ? `
           <div style="display:flex;flex-direction:column;gap:6px">
             <textarea id="modalItemRecommendationsInput" class="form-input" rows="2" 
-              placeholder="Escribe recomendaciones tÃ©cnicas (se anexan automÃ¡ticamente al escalamiento vinculado)..."
+              placeholder="Escribe recomendaciones técnicas (se anexan automáticamente al escalamiento vinculado)..."
               style="font-size:12px;resize:vertical;width:100%">${escapeHtml(it.recommendations || '')}</textarea>
             <div style="display:flex;justify-content:flex-end">
               <button type="button" class="btn" id="btnSaveModalRecs" onclick="saveItemRecommendations(${it.id})" 
@@ -4427,10 +4577,10 @@
       const it = ALL_ITEMS.find(i => i.id === itemId);
       if (!it) return;
 
-      const confirmMsg = `Â¿EstÃ¡s seguro de que deseas eliminar permanentemente esta actividad?\n\n` +
-        `â¢ ${it.source} #${it.external_id}: "${it.title}"\n` +
-        `â¢ Se eliminarÃ¡ de la Agenda y de la plataforma nativa (${it.source}).\n\n` +
-        `Esta acciÃ³n no se puede deshacer.`;
+      const confirmMsg = `¿Estás seguro de que deseas eliminar permanentemente esta actividad?\n\n` +
+        `• ${it.source} #${it.external_id}: "${it.title}"\n` +
+        `• Se eliminará de la Agenda y de la plataforma nativa (${it.source}).\n\n` +
+        `Esta acción no se puede deshacer.`;
 
       if (!confirm(confirmMsg)) return;
 
@@ -4441,7 +4591,7 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          alert(`Error al eliminar la actividad: ${data.detail || 'OcurriÃ³ un error en el servidor'}`);
+          alert(`Error al eliminar la actividad: ${data.detail || 'Ocurrió un error en el servidor'}`);
           return;
         }
 
@@ -4451,7 +4601,7 @@
         showToast('Actividad eliminada', `${it.source} #${it.external_id} "${it.title}" ha sido eliminada.`, 'error', 4500);
       } catch (err) {
         console.error('Error eliminando actividad:', err);
-        alert('Error de conexiÃ³n al conectar con el servidor.');
+        alert('Error de conexión al conectar con el servidor.');
       }
     }
 
@@ -4471,19 +4621,19 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          alert(`Error al asignar: ${data.detail || 'OcurriÃ³ un error en el servidor'}`);
+          alert(`Error al asignar: ${data.detail || 'Ocurrió un error en el servidor'}`);
           return false;
         }
         await loadData();
         if (data.sync_warning) {
           showToast('Asignado con advertencia de sincronización', data.sync_warning, 'warning', 7000);
         } else {
-          showToast('AsignaciÃ³n guardada', 'Especialista(s) asignados y notificados por Telegram.', 'success', 3500);
+          showToast('Asignación guardada', 'Especialista(s) asignados y notificados por Telegram.', 'success', 3500);
         }
         return true;
       } catch (err) {
         console.error('Error in assignItem:', err);
-        alert('Error de conexiÃ³n al intentar asignar el responsable.');
+        alert('Error de conexión al intentar asignar el responsable.');
         return false;
       }
     }
@@ -4536,7 +4686,7 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          alert(`Error al cambiar estado: ${data.detail || 'OcurriÃ³ un error en el servidor'}`);
+          alert(`Error al cambiar estado: ${data.detail || 'Ocurrió un error en el servidor'}`);
           item.status = oldStatus;
           openModal(itemId);
           return;
@@ -4547,7 +4697,7 @@
         showToast('Estado sincronizado', `${item.source} #${item.external_id} cambiado a ${stLabels[newStatus] || newStatus}.`, 'info', 3500);
       } catch (err) {
         console.error('Error in changeStatusFromModal:', err);
-        alert('Error de conexiÃ³n al cambiar estado.');
+        alert('Error de conexión al cambiar estado.');
         item.status = oldStatus;
         openModal(itemId);
       }
@@ -4578,7 +4728,7 @@
               <span>Cierre de Actividad</span>
             </h2>
             <div class="muted" style="font-size:12px;margin-top:2px">
-              ${escapeHtml(it.source)} #${escapeHtml(it.external_id)} Â· ${escapeHtml(it.title)}
+              ${escapeHtml(it.source)} #${escapeHtml(it.external_id)} · ${escapeHtml(it.title)}
             </div>
           </div>
           <button type="button" class="btn" onclick="cancelCloseActivityModal(${it.id}, '${previousStatus}')" style="padding:4px 9px;font-size:16px;line-height:1" title="Cancelar">&times;</button>
@@ -4595,7 +4745,7 @@
               ${ESCALATIONS_LIST.map(esc => `<option value="${esc.id}" ${it.escalation_id === esc.id ? 'selected' : ''}>${formatEscalationOption(esc)}</option>`).join('')}
             </select>
             <small class="muted" style="font-size:11px;margin-top:4px;display:block">
-              Si seleccionas un escalamiento, las recomendaciones ingresadas se aÃ±adirÃ¡n automÃ¡ticamente al expediente del escalamiento.
+              Si seleccionas un escalamiento, las recomendaciones ingresadas se añadirán automáticamente al expediente del escalamiento.
             </small>
           </div>
 
@@ -4605,14 +4755,14 @@
               Recomendaciones del Cierre: <span class="muted" style="font-weight:400;text-transform:none">(Opcional)</span>
             </label>
             <textarea id="closeActivityRecommendations" class="form-input" rows="4" 
-              placeholder="Escribe recomendaciones tÃ©cnicas, observaciones finales, acciones preventivas o causa raÃ­z..." 
+              placeholder="Escribe recomendaciones técnicas, observaciones finales, acciones preventivas o causa raíz..." 
               style="width:100%;font-size:12.5px;resize:vertical">${escapeHtml(it.recommendations || '')}</textarea>
             <small class="muted" style="font-size:11px;margin-top:4px;display:block">
-              Se anexarÃ¡n al campo de Recomendaciones del escalamiento vinculado y quedarÃ¡n registradas en la actividad.
+              Se anexarán al campo de Recomendaciones del escalamiento vinculado y quedarán registradas en la actividad.
             </small>
           </div>
 
-          <!-- Botones de AcciÃ³n -->
+          <!-- Botones de Acción -->
           <div class="actions" style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:18px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px">
             <button type="button" class="btn" onclick="cancelCloseActivityModal(${it.id}, '${previousStatus}')">Cancelar</button>
             <button type="submit" class="btn primary" id="btnConfirmCloseActivity" 
@@ -4679,7 +4829,7 @@
 
         const data = await res.json();
         if (!res.ok) {
-          alert(`Error al cerrar la actividad: ${data.detail || 'OcurriÃ³ un error en el servidor'}`);
+          alert(`Error al cerrar la actividad: ${data.detail || 'Ocurrió un error en el servidor'}`);
           item.status = oldStatus;
           renderKanban(ALL_ITEMS);
           if (TV_MODE_ACTIVE) renderTvSlide();
@@ -4697,7 +4847,7 @@
         showToast('Actividad Cerrada', `${item.source} #${item.external_id} cerrada exitosamente${recommendations ? ' y recomendaciones registradas' : ''}.`, 'success', 4000);
       } catch (err) {
         console.error('Error cerrando actividad:', err);
-        alert('Error de conexiÃ³n al cerrar la actividad.');
+        alert('Error de conexión al cerrar la actividad.');
         item.status = oldStatus;
         renderKanban(ALL_ITEMS);
         if (TV_MODE_ACTIVE) renderTvSlide();
@@ -4727,11 +4877,11 @@
         }
         const it = ALL_ITEMS.find(i => i.id === itemId);
         if (it) it.escalation_id = escalationId ? parseInt(escalationId) : null;
-        showToast('Escalamiento actualizado', 'El vÃ­nculo con el escalamiento se actualizÃ³ correctamente.', 'info', 3000);
+        showToast('Escalamiento actualizado', 'El vínculo con el escalamiento se actualizó correctamente.', 'info', 3000);
         openModal(itemId);
       } catch (err) {
         console.error('Error in changeItemEscalation:', err);
-        alert('Error de conexiÃ³n al vincular el escalamiento.');
+        alert('Error de conexión al vincular el escalamiento.');
       }
     }
 
@@ -4759,7 +4909,7 @@
         openModal(itemId);
       } catch (err) {
         console.error('Error in saveItemRecommendations:', err);
-        alert('Error de conexiÃ³n al guardar las recomendaciones.');
+        alert('Error de conexión al guardar las recomendaciones.');
         if (btn) btn.disabled = false;
       }
     }
@@ -4772,12 +4922,12 @@
       if (!specialistKey) return;
       const specialistNames = {
         adonis: 'Adonis Lozada',
-        juan: 'Juan FernÃ¡ndez',
-        yoxaide: 'Yoxaide JimÃ©nez',
+        juan: 'Juan Fernández',
+        yoxaide: 'Yoxaide Jiménez',
         luis: 'Luis Acosta'
       };
       const name = specialistNames[specialistKey] || specialistKey;
-      if (!confirm(`Â¿Confirmas asignar este caso a ${name}? Se sincronizarÃ¡ inmediatamente en la plataforma nativa y se notificarÃ¡ por Telegram.`)) {
+      if (!confirm(`¿Confirmas asignar este caso a ${name}? Se sincronizará inmediatamente en la plataforma nativa y se notificará por Telegram.`)) {
         return;
       }
       const ok = await assignItem(itemId, specialistKey);
@@ -4794,7 +4944,7 @@
       try {
         await fetch(`${API_URL}/sync`, { method: 'POST' });
         await loadData();
-        btn.title = "Â¡Sincronizado con Ã©xito!";
+        btn.title = "¡Sincronizado con éxito!";
         btn.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
         setTimeout(() => {
           btn.title = "Sincronizar ahora (GLPI + ClickUp)";
@@ -4810,7 +4960,7 @@
       }
     }
 
-    // Colapsar / Abrir MenÃº Lateral Responsive
+    // Colapsar / Abrir Menú Lateral Responsive
     function toggleSidebar() {
       const isMobile = window.innerWidth <= 768;
       const sb = document.getElementById('sidebar');
@@ -4870,8 +5020,8 @@
         if (subTitleEl) {
           subTitleEl.textContent = (viewName === 'reportes')
             ? (CURRENT_REPORTS_SUBVIEW === 'analytics'
-                ? 'Tablero de indicadores y grÃ¡ficos de rendimiento de la gestiÃ³n'
-                : 'Historial y generaciÃ³n de informes ejecutivos consolidados')
+                ? 'Tablero de indicadores y gráficos de rendimiento de la gestión'
+                : 'Historial y generación de informes ejecutivos consolidados')
             : 'Base documental y enlaces directos de escalamiento (Google Docs)';
         }
         if (viewName === 'reportes') {
@@ -4888,11 +5038,11 @@
       } else {
         if (filtersEl) filtersEl.style.display = 'flex';
         if (kpisEl) kpisEl.style.display = 'grid';
-        if (subTitleEl) subTitleEl.textContent = 'ConsolidaciÃ³n en vivo: GLPI + ClickUp';
+        if (subTitleEl) subTitleEl.textContent = 'Consolidación en vivo: GLPI + ClickUp';
       }
     }
 
-    // NavegaciÃ³n de vistas
+    // Navegación de vistas
     document.querySelectorAll('.nav[data-view]').forEach(n => {
       n.onclick = () => switchView(n.dataset.view);
     });
@@ -5080,7 +5230,7 @@
     setInterval(updateClock, 1000);
 
     // ==========================================
-    // MODO TV / PRESENTACIÃN SALA DE OPERACIONES
+    // MODO TV / PRESENTACIÓN SALA DE OPERACIONES
     // ==========================================
     let TV_MODE_ACTIVE = false;
     let TV_CURRENT_SLIDE = 0;
@@ -5092,15 +5242,15 @@
 
     const TV_SPECIALISTS = [
       { name: "Adonis Lozada", tag: "@adonislozada", key: "adonis", isCoord: true },
-      { name: "Juan FernÃ¡ndez", tag: "@Juuan8", key: "juan" },
-      { name: "Yoxaide JimÃ©nez", tag: "@Yjimenezg", key: "yoxaide" },
+      { name: "Juan Fernández", tag: "@Juuan8", key: "juan" },
+      { name: "Yoxaide Jiménez", tag: "@Yjimenezg", key: "yoxaide" },
       { name: "Luis Acosta", tag: "@lapsy0", key: "luis" }
     ];
 
     function getTvSlides() {
       const slides = [
         { type: 'resumen', title: 'Panorama General del Equipo', sub: 'Indicadores globales y casos prioritarios en curso' },
-        { type: 'kanban', title: 'Tablero Kanban en Sala', sub: 'Flujo de trabajo en 4 columnas: Pendientes Â· En curso Â· En espera Â· Cerrados' },
+        { type: 'kanban', title: 'Tablero Kanban en Sala', sub: 'Flujo de trabajo en 4 columnas: Pendientes · En curso · En espera · Cerrados' },
         { type: 'unassigned', title: 'Asuntos Sin Asignar', sub: 'Disponibles para asignación inmediata del equipo' }
       ];
       if (!CURRENT_USER || isCoordinator() || CURRENT_USER.username === 'modo.tv') {
@@ -5108,7 +5258,7 @@
           slides.push({
             type: 'specialist',
             spec: spec,
-            title: `${spec.isCoord ? 'CoordinaciÃ³n' : 'Especialista'}: ${spec.name}`,
+            title: `${spec.isCoord ? 'Coordinación' : 'Especialista'}: ${spec.name}`,
             sub: `Tareas y tickets asignados (${spec.tag})`
           });
         });
@@ -5223,7 +5373,7 @@
           <div class="num">${pendientes}</div>
         </div>
         <div class="tv-stat-box" style="border-left:4px solid var(--cyan)">
-          <span class="muted" style="font-size:12px;text-transform:uppercase">En AtenciÃ³n</span>
+          <span class="muted" style="font-size:12px;text-transform:uppercase">En Atención</span>
           <div class="num">${enCurso}</div>
         </div>
         <div class="tv-stat-box" style="border-left:4px solid var(--red)">
@@ -5231,11 +5381,11 @@
           <div class="num" style="color:var(--red)">${atrasados}</div>
         </div>
         <div class="tv-stat-box" style="border-left:4px solid var(--yellow)">
-          <span class="muted" style="font-size:12px;text-transform:uppercase">Casos CrÃ­ticos</span>
+          <span class="muted" style="font-size:12px;text-transform:uppercase">Casos Críticos</span>
           <div class="num" style="color:var(--yellow)">${criticos}</div>
         </div>
       </div>
-      <h3 style="margin-bottom:12px;font-size:16px">Casos Prioritarios y Actividades en AtenciÃ³n</h3>
+      <h3 style="margin-bottom:12px;font-size:16px">Casos Prioritarios y Actividades en Atención</h3>
       <div class="tv-card-grid">
         ${active.slice(0, 6).map(it => `
           <div class="tv-item-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}">
@@ -5244,10 +5394,10 @@
               <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
             </div>
             <div style="font-size:15px;font-weight:700">${it.title}</div>
-            <div class="muted" style="font-size:12px">Cliente: ${it.client_name} Â· Responsable: <b>${it.assignee_name || 'Sin asignar'}</b></div>
+            <div class="muted" style="font-size:12px">Cliente: ${it.client_name} · Responsable: <b>${it.assignee_name || 'Sin asignar'}</b></div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;font-size:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px">
               <span style="font-weight:600;color:var(--accent)">${getItemTimeLabel(it)}</span>
-              <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? 'Â· ' + getItemSlaRemaining(it) : ''}</span>
+              <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? '· ' + getItemSlaRemaining(it) : ''}</span>
             </div>
           </div>
         `).join('') || '<div class="muted" style="padding:40px;text-align:center">No hay tickets activos en este momento.</div>'}
@@ -5315,7 +5465,7 @@
                     </div>
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;border-top:1px solid rgba(255,255,255,.06);padding-top:6px;font-size:11px">
                       <span style="font-weight:600;color:var(--accent)">${getItemTimeLabel(it)}</span>
-                      <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? 'Â· ' + getItemSlaRemaining(it) : ''}</span>
+                      <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? '· ' + getItemSlaRemaining(it) : ''}</span>
                     </div>
                   </div>
                 `;
@@ -5327,7 +5477,7 @@
       </div>
     `;
       } else if (s.type === 'unassigned') {
-        const unassigned = ALL_ITEMS.filter(it => it.status !== 'cerrado' && (!it.assignee_name || it.assignee_name.toLowerCase().includes('sin asignar') || it.assignee_name.toLowerCase().includes('tÃ©cnico glpi')));
+        const unassigned = ALL_ITEMS.filter(it => it.status !== 'cerrado' && (!it.assignee_name || it.assignee_name.toLowerCase().includes('sin asignar') || it.assignee_name.toLowerCase().includes('técnico glpi')));
 
         container.innerHTML = `
       <div class="tv-unassigned-banner">
@@ -5340,7 +5490,7 @@
       ${unassigned.length === 0 ? `
         <div style="background:rgba(20,28,40,.65);border:1px dashed #2ecc71;border-radius:12px;padding:50px;text-align:center">
           <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#2ecc71" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:10px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          <div style="font-size:18px;color:#2ecc71;font-weight:700">Â¡Equipo al dÃ­a!</div>
+          <div style="font-size:18px;color:#2ecc71;font-weight:700">¡Equipo al día!</div>
           <div class="muted" style="margin-top:6px;font-size:14px">No hay tickets ni tareas pendientes por asignar en este momento.</div>
         </div>
       ` : `
@@ -5366,11 +5516,11 @@
                   <select onchange="assignItemDirect(${it.id}, this.value)" style="flex:1;min-width:0;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:7px;padding:6px 8px;font-size:11.5px;cursor:pointer;outline:none;text-overflow:ellipsis;overflow:hidden;white-space:nowrap">
                     <option value="" style="background:#141c2b;color:#fff">Asignar a...</option>
                     <option value="adonis" style="background:#141c2b;color:#fff">Adonis Lozada</option>
-                    <option value="juan" style="background:#141c2b;color:#fff">Juan FernÃ¡ndez</option>
-                    <option value="yoxaide" style="background:#141c2b;color:#fff">Yoxaide JimÃ©nez</option>
+                    <option value="juan" style="background:#141c2b;color:#fff">Juan Fernández</option>
+                    <option value="yoxaide" style="background:#141c2b;color:#fff">Yoxaide Jiménez</option>
                     <option value="luis" style="background:#141c2b;color:#fff">Luis Acosta</option>
                   </select>
-                  <button type="button" onclick="openModal(${it.id})" class="tv-action-btn" style="flex-shrink:0;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);padding:6px 10px;font-size:11.5px" title="Asignar mÃºltiples especialistas">
+                  <button type="button" onclick="openModal(${it.id})" class="tv-action-btn" style="flex-shrink:0;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);padding:6px 10px;font-size:11.5px" title="Asignar múltiples especialistas">
                     <span>+ Varios</span>
                   </button>
                 </div>
@@ -5418,7 +5568,7 @@
       ${items.length === 0 ? `
         <div style="background:rgba(20,28,40,.65);border:1px dashed rgba(255,255,255,.15);border-radius:12px;padding:40px;text-align:center">
           <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          <div style="font-size:16px;font-weight:600">${spec.name} tiene todas sus tareas al dÃ­a.</div>
+          <div style="font-size:16px;font-weight:600">${spec.name} tiene todas sus tareas al día.</div>
           <div class="muted" style="margin-top:4px;font-size:13px">Sin actividades pendientes actualmente.</div>
         </div>
       ` : `
@@ -5430,10 +5580,10 @@
                 <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
               </div>
               <div style="font-size:15px;font-weight:700">${it.title}</div>
-              <div class="muted" style="font-size:12px">Cliente: ${it.client_name} Â· Estado: <b>${it.status_origin || it.status}</b></div>
+              <div class="muted" style="font-size:12px">Cliente: ${it.client_name} · Estado: <b>${it.status_origin || it.status}</b></div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;font-size:12px;gap:6px;flex-wrap:wrap">
                 <span style="font-weight:600;color:var(--accent)">${getItemTimeLabel(it)}</span>
-                <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? 'Â· ' + getItemSlaRemaining(it) : ''}</span>
+                <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? '· ' + getItemSlaRemaining(it) : ''}</span>
                 <div style="display:inline-flex;align-items:center;gap:6px">
                   ${isCoordinator() ? `
                   <button type="button" onclick="openModal(${it.id})" class="tv-action-btn" style="cursor:pointer;padding:4px 8px;font-size:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)" title="Reasignar o sumar especialistas">
@@ -5455,7 +5605,7 @@
     }
 
     /* ========================================================
-       FUNCIONES DE LOGIN, AUTENTICACIÃN Y ROLES
+       FUNCIONES DE LOGIN, AUTENTICACIÓN Y ROLES
        ======================================================== */
     function quickSelectUser(username, role) {
       const uInput = document.getElementById('loginUser');
@@ -5501,7 +5651,7 @@
       if (!username || !password) {
         if (alertBox) {
           alertBox.style.display = 'flex';
-          alertBox.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Por favor ingresa usuario y contraseÃ±a.</span>';
+          alertBox.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Por favor ingresa usuario y contraseña.</span>';
         }
         return;
       }
@@ -5524,7 +5674,7 @@
           btnText.textContent = origText;
           if (alertBox) {
             alertBox.style.display = 'flex';
-            alertBox.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${data.detail || 'Credenciales invÃ¡lidas.'}</span>`;
+            alertBox.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${data.detail || 'Credenciales inválidas.'}</span>`;
           }
           return;
         }
@@ -5569,7 +5719,7 @@
     }
 
     function handleLogout() {
-      if (!confirm('Â¿Deseas cerrar tu sesiÃ³n actual en la Agenda?')) return;
+      if (!confirm('¿Deseas cerrar tu sesión actual en la Agenda?')) return;
       localStorage.removeItem('sycom_user');
       CURRENT_USER = null;
       checkAuthAndInit();
@@ -5601,7 +5751,7 @@
         uRole.style.color = isCoord ? '#34d399' : (isAnal ? '#c084fc' : '#60a5fa');
       }
 
-      // 2. BotÃ³n Crear Actividad y Reportes en cabecera principal y Role Badge
+      // 2. Botón Crear Actividad y Reportes en cabecera principal y Role Badge
       const btnHeadCreate = document.getElementById('btnNewActivityHeader');
       const btnReports = document.getElementById('btnReports');
       const sideNavReports = document.getElementById('sidebarNavReports');
@@ -5624,7 +5774,7 @@
           rolePill.innerHTML = `
             <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(59,130,246,0.14);border:1px solid rgba(59,130,246,0.35);border-radius:20px;font-size:12px;color:#93c5fd;font-weight:600">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              <span>Especialista Â· ${CURRENT_USER.full_name || CURRENT_USER.username}</span>
+              <span>Especialista · ${CURRENT_USER.full_name || CURRENT_USER.username}</span>
             </div>
           `;
         } else {
@@ -5632,13 +5782,13 @@
           rolePill.innerHTML = `
             <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(168,85,247,0.14);border:1px solid rgba(168,85,247,0.35);border-radius:20px;font-size:12px;color:#d8b4fe;font-weight:600">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              <span>Modo Lectura / MÃ©tricas Â· Analista</span>
+              <span>Modo Lectura / Métricas · Analista</span>
             </div>
           `;
         }
       }
 
-      // 3. BotÃ³n Crear Actividad en vista Kanban y subtÃ­tulo
+      // 3. Botón Crear Actividad en vista Kanban y subtítulo
       const btnKanbanCreate = document.getElementById('btnKanbanNewActivity');
       const kanbanSub = document.getElementById('kanbanSubText');
       if (btnKanbanCreate) {
@@ -5648,33 +5798,33 @@
         if (isCoord) {
           kanbanSub.textContent = 'Arrastra actividades entre columnas para sincronizar su estado';
         } else if (isSpec) {
-          kanbanSub.textContent = `Modo Especialista (${CURRENT_USER.full_name || CURRENT_USER.username}) Â· Puedes arrastrar y actualizar tus propias tareas asignadas`;
+          kanbanSub.textContent = `Modo Especialista (${CURRENT_USER.full_name || CURRENT_USER.username}) · Puedes arrastrar y actualizar tus propias tareas asignadas`;
         } else {
-          kanbanSub.textContent = `Modo Analista Â· VisualizaciÃ³n global y anÃ¡lisis de mÃ©tricas (solo lectura)`;
+          kanbanSub.textContent = `Modo Analista · Visualización global y análisis de métricas (solo lectura)`;
         }
       }
 
-      // 4. BotÃ³n Actividad en Modo TV
+      // 4. Botón Actividad en Modo TV
       const btnTvAct = document.getElementById('tvBtnNewActivity');
       if (btnTvAct) {
         btnTvAct.style.display = isCoord ? 'inline-flex' : 'none';
       }
 
-      // 5. ConfiguraciÃ³n dinÃ¡mica del selector de Responsable segÃºn el perfil
+      // 5. Configuración dinámica del selector de Responsable según el perfil
       const respSelect = document.getElementById('fResp');
       if (respSelect) {
         if (isCoord) {
           respSelect.innerHTML = `
             <option value="">Todo el equipo</option>
             <option value="Adonis">Adonis Lozada</option>
-            <option value="Juan">Juan FernÃ¡ndez</option>
-            <option value="Yoxaide">Yoxaide JimÃ©nez</option>
+            <option value="Juan">Juan Fernández</option>
+            <option value="Yoxaide">Yoxaide Jiménez</option>
             <option value="Luis">Luis Acosta</option>
             <option value="Sin asignar">Sin asignar</option>
           `;
           respSelect.value = '';
         } else {
-          // El especialista/analista solo puede ver las asignadas a Ã©l y las sin asignar (NO las de los demÃ¡s)
+          // El especialista/analista solo puede ver las asignadas a él y las sin asignar (NO las de los demás)
           const uFull = CURRENT_USER.full_name || CURRENT_USER.username;
           const uFirst = (CURRENT_USER.full_name || '').split(' ')[0] || (CURRENT_USER.username || '').split('.')[0];
           respSelect.innerHTML = `
@@ -5759,7 +5909,7 @@
 
     async function openReportsModal() {
       if (!isCoordinator()) {
-        alert('Acceso restringido: La generaciÃ³n de reportes ejecutivos estÃ¡ reservada exclusivamente para el rol Coordinador.');
+        alert('Acceso restringido: La generación de reportes ejecutivos está reservada exclusivamente para el rol Coordinador.');
         return;
       }
 
@@ -5793,8 +5943,8 @@
       const specOptions = `
         <option value="" ${REPORT_FILTER_STATE.specialist === '' ? 'selected' : ''}>Todo el equipo</option>
         <option value="Adonis" ${REPORT_FILTER_STATE.specialist.includes('Adonis') ? 'selected' : ''}>Adonis Lozada</option>
-        <option value="Juan" ${REPORT_FILTER_STATE.specialist.includes('Juan') ? 'selected' : ''}>Juan FernÃ¡ndez</option>
-        <option value="Yoxaide" ${REPORT_FILTER_STATE.specialist.includes('Yoxaide') ? 'selected' : ''}>Yoxaide JimÃ©nez</option>
+        <option value="Juan" ${REPORT_FILTER_STATE.specialist.includes('Juan') ? 'selected' : ''}>Juan Fernández</option>
+        <option value="Yoxaide" ${REPORT_FILTER_STATE.specialist.includes('Yoxaide') ? 'selected' : ''}>Yoxaide Jiménez</option>
         <option value="Luis" ${REPORT_FILTER_STATE.specialist.includes('Luis') ? 'selected' : ''}>Luis Acosta</option>
         <option value="Sin asignar" ${REPORT_FILTER_STATE.specialist === 'Sin asignar' ? 'selected' : ''}>Sin asignar</option>
       `;
@@ -5816,7 +5966,7 @@
                 <span>Centro de Reportes Ejecutivos</span>
                 <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px">M9</span>
               </h2>
-              <div class="muted" style="font-size:12px;margin-top:2px">ExportaciÃ³n oficial en Excel (.xlsx) y vista de impresiÃ³n PDF con mÃ©tricas y SLA</div>
+              <div class="muted" style="font-size:12px;margin-top:2px">Exportación oficial en Excel (.xlsx) y vista de impresión PDF con métricas y SLA</div>
             </div>
           </div>
           <button type="button" class="btn" onclick="closeModal()" style="padding:4px 9px;font-size:16px;line-height:1" title="Cerrar">&times;</button>
@@ -5826,11 +5976,11 @@
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;margin-bottom:16px">
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:12px;align-items:end">
             <div>
-              <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">PerÃ­odo de AnÃ¡lisis:</label>
+              <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Período de Análisis:</label>
               <select id="reportPeriodSelect" class="form-input" onchange="onReportPeriodChange(this.value)" style="width:100%">
                 <option value="month" ${REPORT_FILTER_STATE.period === 'month' ? 'selected' : ''}>Mes en Curso (${monthLabel})</option>
-                <option value="30days" ${REPORT_FILTER_STATE.period === '30days' ? 'selected' : ''}>Ãltimos 30 dÃ­as</option>
-                <option value="all" ${REPORT_FILTER_STATE.period === 'all' ? 'selected' : ''}>HistÃ³rico completo</option>
+                <option value="30days" ${REPORT_FILTER_STATE.period === '30days' ? 'selected' : ''}>Últimos 30 días</option>
+                <option value="all" ${REPORT_FILTER_STATE.period === 'all' ? 'selected' : ''}>Histórico completo</option>
                 <option value="custom" ${REPORT_FILTER_STATE.period === 'custom' ? 'selected' : ''}>Rango personalizado...</option>
               </select>
             </div>
@@ -5859,18 +6009,18 @@
         <div id="reportPreviewContainer" style="margin-bottom:16px;min-height:160px">
           <div style="display:flex;align-items:center;justify-content:center;padding:36px;color:var(--muted);gap:10px">
             <svg class="spin-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-            <span style="font-size:13px">Cargando mÃ©tricas consolidadas del reporte...</span>
+            <span style="font-size:13px">Cargando métricas consolidadas del reporte...</span>
           </div>
         </div>
 
-        <!-- Acciones de Descarga / ExportaciÃ³n -->
+        <!-- Acciones de Descarga / Exportación -->
         <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;flex-wrap:wrap;gap:10px">
           <button type="button" class="btn" onclick="closeModal()">Cerrar</button>
           
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <button type="button" class="btn" id="btnDownloadExcel" onclick="downloadExecutiveExcel()"
               style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700;display:inline-flex;align-items:center;gap:8px;padding:9px 16px"
-              title="Descargar libro Excel multi-pestaÃ±a con fÃ³rmulas y estilo corporativo">
+              title="Descargar libro Excel multi-pestaña con fórmulas y estilo corporativo">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
@@ -5881,7 +6031,7 @@
 
             <button type="button" class="btn" id="btnPrintPdf" onclick="openExecutivePrintView()"
               style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;border-color:rgba(79,140,255,.4);font-weight:700;display:inline-flex;align-items:center;gap:8px;padding:9px 16px"
-              title="Abrir vista ejecutiva membretada optimizada para impresiÃ³n en PDF">
+              title="Abrir vista ejecutiva membretada optimizada para impresión en PDF">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 9 6 2 18 2 18 9"/>
                 <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
@@ -5926,7 +6076,7 @@
       preview.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:center;padding:32px;color:var(--muted);gap:10px">
           <svg class="spin-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-          <span style="font-size:13px">Actualizando mÃ©tricas...</span>
+          <span style="font-size:13px">Actualizando métricas...</span>
         </div>
       `;
 
@@ -5976,9 +6126,9 @@
         }
 
         preview.innerHTML = `
-          <!-- Indicador de perÃ­odo -->
+          <!-- Indicador de período -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:12px;color:var(--muted)">
-            <span>${escapeHtml(data.period_label || 'PerÃ­odo seleccionado')}</span>
+            <span>${escapeHtml(data.period_label || 'Período seleccionado')}</span>
             <span>${data.items ? data.items.length : 0} actividades en alcance</span>
           </div>
 
@@ -6000,7 +6150,7 @@
               <div class="muted" style="font-size:10px;margin-top:2px">Meta: 90.0%</div>
             </div>
             <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
-              <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">ResoluciÃ³n Prom.</div>
+              <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Resolución Prom.</div>
               <div style="font-size:18px;font-weight:800;color:#38bdf8;margin-top:4px">${escapeHtml(k.avg_resolution_str || '0m')}</div>
               <div class="muted" style="font-size:10px;margin-top:2px">Promedio general</div>
             </div>
@@ -6035,7 +6185,7 @@
         console.error('Error cargando preview de reportes:', err);
         preview.innerHTML = `
           <div style="padding:20px;text-align:center;color:var(--red);font-size:12px">
-            No se pudieron calcular las mÃ©tricas: ${escapeHtml(err.message)}
+            No se pudieron calcular las métricas: ${escapeHtml(err.message)}
           </div>
         `;
       }
@@ -6086,7 +6236,7 @@
         window.URL.revokeObjectURL(url);
         a.remove();
 
-        showToast('Â¡Descarga Exitosa!', `Se ha generado ${filename}`);
+        showToast('¡Descarga Exitosa!', `Se ha generado ${filename}`);
         recordCurrentReportInHistory();
       } catch (err) {
         console.error('Error al descargar reporte Excel:', err);
@@ -6103,9 +6253,9 @@
         const now = new Date();
         return `Informe Ejecutivo - ${getMonthName(now.getMonth())} ${now.getFullYear()}${spec}`;
       } else if (REPORT_FILTER_STATE.period === '30days') {
-        return `Informe Ejecutivo - Ãltimos 30 dÃ­as${spec}`;
+        return `Informe Ejecutivo - Últimos 30 días${spec}`;
       } else if (REPORT_FILTER_STATE.period === 'all') {
-        return `Informe Ejecutivo - HistÃ³rico Completo${spec}`;
+        return `Informe Ejecutivo - Histórico Completo${spec}`;
       } else {
         return `Informe Ejecutivo - ${REPORT_FILTER_STATE.startDate || 'Inicio'} al ${REPORT_FILTER_STATE.endDate || 'Hoy'}${spec}`;
       }
@@ -6146,13 +6296,13 @@
     }
 
     // =========================================================================
-    // GESTIÃN DE HISTORIAL DE REPORTES EJECUTIVOS (TABLA EN MENÃ)
+    // GESTIÓN DE HISTORIAL DE REPORTES EJECUTIVOS (TABLA EN MENÚ)
     // =========================================================================
     let GENERATED_REPORTS_LIST = [];
 
     async function handleHeaderReportClick() {
       if (!isCoordinator()) {
-        alert('Acceso restringido: La generaciÃ³n de reportes ejecutivos estÃ¡ reservada exclusivamente para el rol Coordinador.');
+        alert('Acceso restringido: La generación de reportes ejecutivos está reservada exclusivamente para el rol Coordinador.');
         return;
       }
       switchView('reportes');
@@ -6233,7 +6383,7 @@
             <td><span class="badge" style="background:rgba(255,255,255,0.06);font-family:monospace;font-weight:700">${folio}</span></td>
             <td>
               <strong style="color:var(--text)">${escapeHtml(r.title)}</strong><br>
-              <small class="muted">${escapeHtml(r.period_label || '')} Â· <span style="color:var(--accent)">${escapeHtml(r.specialist_filter || 'Todo el equipo')}</span></small>
+              <small class="muted">${escapeHtml(r.period_label || '')} · <span style="color:var(--accent)">${escapeHtml(r.specialist_filter || 'Todo el equipo')}</span></small>
             </td>
             <td>
               <div style="font-weight:600;font-size:12px">${escapeHtml(r.generated_by || 'Coordinador')}</div>
@@ -6331,9 +6481,9 @@
 
         const data = await res.json();
         await loadReportsHistory();
-        showToast('Â¡Reporte Generado!', `Informe de ${monthName} ${yyyy} registrado en el historial.`);
+        showToast('¡Reporte Generado!', `Informe de ${monthName} ${yyyy} registrado en el historial.`);
       } catch (err) {
-        console.error('Error generando reporte automÃ¡tico:', err);
+        console.error('Error generando reporte automático:', err);
         alert(`No se pudo generar el reporte: ${err.message}`);
       } finally {
         if (btnHeader) {
@@ -6395,7 +6545,7 @@
         alert('Acceso restringido: Solo el Coordinador puede eliminar reportes.');
         return;
       }
-      if (!confirm(`Â¿EstÃ¡s seguro de que deseas eliminar el reporte #REP-${String(id).padStart(4, '0')} del historial?`)) {
+      if (!confirm(`¿Estás seguro de que deseas eliminar el reporte #REP-${String(id).padStart(4, '0')} del historial?`)) {
         return;
       }
 
@@ -6416,7 +6566,7 @@
     }
 
     // =========================================================================
-    // MÃDULO DE REPORTES: SUB-VISTA DE ANALÃTICA, KPIS Y GRÃFICOS DE GESTIÃN
+    // MÓDULO DE REPORTES: SUB-VISTA DE ANALÍTICA, KPIS Y GRÁFICOS DE GESTIÓN
     // =========================================================================
     let CURRENT_REPORTS_SUBVIEW = 'history'; // 'history' | 'analytics'
     let CURRENT_ANALYTICS_DATA = null;
@@ -6444,7 +6594,7 @@
           tabAnal.style.fontWeight = '700';
         }
         if (subTitleEl) {
-          subTitleEl.textContent = 'Tablero de indicadores y grÃ¡ficos de rendimiento de la gestiÃ³n';
+          subTitleEl.textContent = 'Tablero de indicadores y gráficos de rendimiento de la gestión';
         }
         loadAnalyticsData();
       } else {
@@ -6462,7 +6612,7 @@
           tabAnal.style.fontWeight = '600';
         }
         if (subTitleEl) {
-          subTitleEl.textContent = 'Historial y generaciÃ³n de informes ejecutivos consolidados';
+          subTitleEl.textContent = 'Historial y generación de informes ejecutivos consolidados';
         }
         loadReportsHistory();
       }
@@ -6533,12 +6683,12 @@
         renderAnalyticsDashboard(data);
         if (statusBadge) statusBadge.textContent = 'En Vivo';
       } catch (err) {
-        console.error('Error cargando analÃ­tica de reportes:', err);
+        console.error('Error cargando analítica de reportes:', err);
         if (statusBadge) statusBadge.textContent = 'Error';
         if (kpiGrid) {
           kpiGrid.innerHTML = `
             <div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--red)">
-              Error al consultar analÃ­tica: ${escapeHtml(err.message)}
+              Error al consultar analítica: ${escapeHtml(err.message)}
             </div>
           `;
         }
@@ -6561,7 +6711,7 @@
 
       const slaVal = Number(kpis.cumplimiento_general != null ? kpis.cumplimiento_general : 100);
       const slaColor = (slaVal >= 90) ? '#10b981' : ((slaVal >= 80) ? '#f59e0b' : '#ef4444');
-      const slaBadgeText = (slaVal >= 90) ? 'Excelente Â· Meta 90%' : ((slaVal >= 80) ? 'Aceptable' : 'En Riesgo');
+      const slaBadgeText = (slaVal >= 90) ? 'Excelente · Meta 90%' : ((slaVal >= 80) ? 'Aceptable' : 'En Riesgo');
 
       const totalItems = kpis.total_items || 0;
       const totalClosed = kpis.total_cerrados || 0;
@@ -6579,7 +6729,7 @@
           </div>
           <div style="font-size:26px;font-weight:800;color:${slaColor};line-height:1.1">${slaVal.toFixed(1)}%</div>
           <small class="muted" style="font-size:11px;margin-top:5px;display:block">
-            ${kpis.total_dentro_sla || 0} dentro de SLA Â· ${kpis.total_fuera_sla || 0} fuera de SLA
+            ${kpis.total_dentro_sla || 0} dentro de SLA · ${kpis.total_fuera_sla || 0} fuera de SLA
           </small>
         </div>
 
@@ -6590,18 +6740,18 @@
           </div>
           <div style="font-size:26px;font-weight:800;color:var(--text);line-height:1.1">${totalItems}</div>
           <small class="muted" style="font-size:11px;margin-top:5px;display:block">
-            ${totalClosed} resueltas Â· ${activeItems} en proceso
+            ${totalClosed} resueltas · ${activeItems} en proceso
           </small>
         </div>
 
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px;border-left:4px solid #a78bfa">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Tiempo de ResoluciÃ³n</span>
+            <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Tiempo de Resolución</span>
             <span class="badge" style="background:rgba(167,139,250,0.15);color:#a78bfa;font-size:10px;font-weight:700">Promedio</span>
           </div>
           <div style="font-size:26px;font-weight:800;color:#f0f6fc;line-height:1.1">${escapeHtml(kpis.avg_resolution_str || '0m')}</div>
           <small class="muted" style="font-size:11px;margin-top:5px;display:block">
-            DuraciÃ³n media desde apertura hasta cierre
+            Duración media desde apertura hasta cierre
           </small>
         </div>
 
@@ -6656,17 +6806,17 @@
         return;
       }
 
-      // GeometrÃ­a del GrÃ¡fico de Torta SVG grande
+      // Geometría del Gráfico de Torta SVG grande
       const cx = 115;
       const cy = 115;
       const r = 95;
 
       const segments = [
         { label: 'Cerradas / Resueltas', count: cerradosOk, color: '#10b981', desc: 'Finalizadas dentro de SLA' },
-        { label: 'En Curso / AtenciÃ³n', count: enCursoOk, color: '#3b82f6', desc: 'Activas dentro de plazo' },
+        { label: 'En Curso / Atención', count: enCursoOk, color: '#3b82f6', desc: 'Activas dentro de plazo' },
         { label: 'Pendientes / Por Iniciar', count: pendientesOk, color: '#06b6d4', desc: 'En cola dentro de plazo' },
         { label: 'En Espera', count: esperaOk, color: '#f59e0b', desc: 'Pausadas por tercero' },
-        { label: 'Fuera de SLA / Atrasadas', count: fueraSla, color: '#ef4444', desc: 'Excedieron el tiempo lÃ­mite' }
+        { label: 'Fuera de SLA / Atrasadas', count: fueraSla, color: '#ef4444', desc: 'Excedieron el tiempo límite' }
       ].filter(s => s.count > 0);
 
       let pieSvg = '';
@@ -6713,10 +6863,10 @@
 
       const allItems = [
         { label: 'Cerradas / Resueltas', count: cerradosOk, color: '#10b981', desc: 'Finalizadas dentro de SLA' },
-        { label: 'En Curso / AtenciÃ³n', count: enCursoOk, color: '#3b82f6', desc: 'Activas dentro de plazo' },
+        { label: 'En Curso / Atención', count: enCursoOk, color: '#3b82f6', desc: 'Activas dentro de plazo' },
         { label: 'Pendientes / Por Iniciar', count: pendientesOk, color: '#06b6d4', desc: 'En cola dentro de plazo' },
         { label: 'En Espera', count: esperaOk, color: '#f59e0b', desc: 'Pausadas por cliente/proveedor' },
-        { label: 'Fuera de SLA / Atrasadas', count: fueraSla, color: '#ef4444', desc: 'Excedieron el tiempo lÃ­mite' }
+        { label: 'Fuera de SLA / Atrasadas', count: fueraSla, color: '#ef4444', desc: 'Excedieron el tiempo límite' }
       ];
 
       const legendsHtml = allItems.map(item => {
@@ -6740,7 +6890,7 @@
 
       container.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:20px;width:100%;padding:10px 0">
-          <!-- GrÃ¡fico de Torta SVG (Gran tamaÃ±o) -->
+          <!-- Gráfico de Torta SVG (Gran tamaño) -->
           <div style="position:relative;width:230px;height:230px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <svg viewBox="0 0 230 230" width="230" height="230" style="filter:drop-shadow(0 6px 18px rgba(0,0,0,0.4))">
               ${pieSvg}
@@ -6751,7 +6901,7 @@
           <div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:7px">
             ${legendsHtml}
             <div style="padding:9px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:space-between;margin-top:2px">
-              <span class="muted" style="font-size:11.5px">Total evaluadas en este perÃ­odo:</span>
+              <span class="muted" style="font-size:11.5px">Total evaluadas en este período:</span>
               <strong style="color:var(--text);font-size:13px">${total} actividades (${kpis.total_dentro_sla != null ? kpis.total_dentro_sla : (total - fueraSla)} dentro de SLA)</strong>
             </div>
           </div>
@@ -6765,16 +6915,16 @@
       if (!container) return;
 
       if (!list || !list.length) {
-        container.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted)">Sin datos de especialistas en este perÃ­odo.</div>`;
+        container.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted)">Sin datos de especialistas en este período.</div>`;
         return;
       }
 
       if (countEl) countEl.textContent = `${list.length} perfiles evaluados`;
 
       const maxTotal = Math.max(...list.map(x => x.total), 1);
-      const MAX_BAR_H = 80; // Altura mÃ¡xima estricta para garantizar 0 desbordamiento
+      const MAX_BAR_H = 80; // Altura máxima estricta para garantizar 0 desbordamiento
 
-      // 1. Plot de las Barras (solo nÃºmeros y barras verticales sobre la lÃ­nea base)
+      // 1. Plot de las Barras (solo números y barras verticales sobre la línea base)
       const barsPlotHtml = list.map(s => {
         const isBolsa = (s.name || '').toLowerCase().includes('sin asignar');
         // Altura proporcional calculada con tope estricto de 80px
@@ -6785,7 +6935,7 @@
 
         return `
           <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:55px;max-width:92px">
-            <!-- Valor numÃ©rico superior con espaciado controlado -->
+            <!-- Valor numérico superior con espaciado controlado -->
             <div style="font-size:12px;font-weight:800;color:${s.total > 0 ? '#ffffff' : 'var(--muted)'};margin-bottom:6px;line-height:1">
               ${s.total}
             </div>
@@ -6801,7 +6951,7 @@
         `;
       }).join('');
 
-      // 2. Eje X independiente (Nombres, roles y porcentaje de SLA alineados bajo la lÃ­nea base)
+      // 2. Eje X independiente (Nombres, roles y porcentaje de SLA alineados bajo la línea base)
       const barsAxisHtml = list.map(s => {
         const sla = Number(s.cumplimiento_pct) || 0;
         const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
@@ -6826,7 +6976,7 @@
         `;
       }).join('');
 
-      // 3. Resumen numÃ©rico inferior por especialista
+      // 3. Resumen numérico inferior por especialista
       const detailsHtml = list.map(s => {
         const sla = Number(s.cumplimiento_pct) || 0;
         const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
@@ -6850,7 +7000,7 @@
 
       container.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:14px">
-          <!-- GrÃ¡fico de Barras Columnar con Eje Separado -->
+          <!-- Gráfico de Barras Columnar con Eje Separado -->
           <div style="background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.05);border-radius:10px;overflow:hidden">
             <!-- Zona de Trazado de Barras (Altura fija controlada con 0 desbordamiento) -->
             <div style="height:125px;padding:12px 6px 0 6px;display:flex;align-items:flex-end;justify-content:space-around;gap:8px;border-bottom:1.5px solid rgba(255,255,255,0.12)">
@@ -6875,7 +7025,7 @@
             </span>
           </div>
 
-          <!-- Desglose numÃ©rico por especialista -->
+          <!-- Desglose numérico por especialista -->
           <div style="display:flex;flex-direction:column;gap:5px">
             ${detailsHtml}
           </div>
@@ -6990,7 +7140,7 @@
     }
 
     // =========================================================================
-    // MÃDULO DE ESCALAMIENTOS - GESTIÃN Y REPOSITORIO DOCUMENTAL (GOOGLE DOCS)
+    // MÓDULO DE ESCALAMIENTOS - GESTIÓN Y REPOSITORIO DOCUMENTAL (GOOGLE DOCS)
     // =========================================================================
     const IBP_INVENTORY = [
       { code: '0000', name: 'BTC', label: '0000 - BTC' },
@@ -7001,7 +7151,7 @@
       { code: '0108', name: 'PROVINCIAL', label: '0108 - PROVINCIAL' },
       { code: '0114', name: 'BANCARIBE', label: '0114 - BANCARIBE' },
       { code: '0115', name: 'EXTERIOR', label: '0115 - EXTERIOR' },
-      { code: '0128', name: 'CARONÃ', label: '0128 - CARONÃ' },
+      { code: '0128', name: 'CARONÍ', label: '0128 - CARONÍ' },
       { code: '0134', name: 'BANESCO', label: '0134 - BANESCO' },
       { code: '0137', name: 'SOFITASA', label: '0137 - SOFITASA' },
       { code: '0138', name: 'PLAZA', label: '0138 - PLAZA' },
@@ -7012,7 +7162,7 @@
       { code: '0156', name: '100%BANCO', label: '0156 - 100%BANCO' },
       { code: '0157', name: 'DELSUR', label: '0157 - DELSUR' },
       { code: '0163', name: 'TESORO', label: '0163 - TESORO' },
-      { code: '0166', name: 'AGRÃCOLA', label: '0166 - AGRÃCOLA' },
+      { code: '0166', name: 'AGRÍCOLA', label: '0166 - AGRÍCOLA' },
       { code: '0168', name: 'BANCRECER', label: '0168 - BANCRECER' },
       { code: '0169', name: 'R4', label: '0169 - R4' },
       { code: '0171', name: 'ACTIVO', label: '0171 - ACTIVO' },
@@ -7030,6 +7180,7 @@
     ];
 
     let ESCALATIONS_LIST = [];
+    const EXPANDED_ESCALATION_IDS = new Set();
     let IBP_LIST = IBP_INVENTORY.slice();
     const ESCALATION_CATEGORIES = ['CPU', 'RAM', 'Disco', 'Antivirus', 'PostgreSQL', 'Servicios', 'Infraestructura'];
 
@@ -7044,7 +7195,7 @@
           populateIbpFilter();
         }
       } catch (err) {
-        console.warn('Error cargando catÃ¡logo de IBPs:', err);
+        console.warn('Error cargando catálogo de IBPs:', err);
       }
     }
 
@@ -7125,12 +7276,51 @@
         if (tbody) {
           tbody.innerHTML = `
             <tr>
-              <td colspan="9" style="text-align:center;padding:24px;color:var(--red)">
+              <td colspan="7" style="text-align:center;padding:24px;color:var(--red)">
                 Error al cargar repositorio de escalamientos: ${escapeHtml(err.message)}
               </td>
             </tr>
           `;
         }
+      }
+    }
+
+    function toggleEscalationRow(id, event) {
+      if (event) {
+        const interactive = event.target && event.target.closest ? event.target.closest('a, button, input, select, textarea') : null;
+        if (interactive) return;
+        if (event.type === 'keydown') {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+        }
+        if (event.type === 'click' && typeof window !== 'undefined' && typeof window.getSelection === 'function') {
+          const sel = window.getSelection();
+          if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+            return;
+          }
+        }
+      }
+      const numId = Number(id);
+      const mainRow = document.getElementById(`esc-row-${numId}`);
+      const detailRow = document.getElementById(`esc-detail-${numId}`);
+      if (!detailRow) return;
+
+      if (EXPANDED_ESCALATION_IDS.has(numId)) {
+        EXPANDED_ESCALATION_IDS.delete(numId);
+        if (mainRow) {
+          mainRow.classList.remove('expanded');
+          mainRow.setAttribute('aria-expanded', 'false');
+        }
+        detailRow.style.display = 'none';
+        detailRow.classList.remove('expanded');
+      } else {
+        EXPANDED_ESCALATION_IDS.add(numId);
+        if (mainRow) {
+          mainRow.classList.add('expanded');
+          mainRow.setAttribute('aria-expanded', 'true');
+        }
+        detailRow.style.display = 'table-row';
+        detailRow.classList.add('expanded');
       }
     }
 
@@ -7183,7 +7373,7 @@
       if (!list || !list.length) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="9" style="text-align:center;padding:36px 20px;color:var(--muted)">
+            <td colspan="7" style="text-align:center;padding:36px 20px;color:var(--muted)">
               <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4;display:block;margin:0 auto 10px auto">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
@@ -7200,8 +7390,14 @@
       }
 
       tbody.innerHTML = list.map(d => {
+        const numId = Number(d.id);
+        const isExpanded = EXPANDED_ESCALATION_IDS.has(numId);
         const targetUrl = d.doc_url || '#';
         const hasValidUrl = targetUrl && targetUrl !== '#';
+        const safeJsUrl = escapeHtml(targetUrl).replace(/\\/g, '\\\\').replace(/&#039;/g, "\\'");
+        const hasNotes = Boolean(d.notes && String(d.notes).trim());
+        const hasRecs = Boolean(d.recommendations && String(d.recommendations).trim());
+
         const docIconSvg = `
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -7213,9 +7409,9 @@
         `;
 
         const typeBadge = hasValidUrl ? `
-          <a href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer" 
+          <a href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
             style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:rgba(66,133,244,0.12);border:1px solid rgba(66,133,244,0.3);color:#60a5fa;text-decoration:none;font-size:11px;font-weight:600"
-            title="Abrir enlace de Google Docs en pestaÃ±a nueva">
+            title="Abrir enlace de Google Docs en pestaña nueva">
             <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
             <span>Google Docs</span>
           </a>
@@ -7225,14 +7421,7 @@
           </span>
         `;
 
-        const titleContent = hasValidUrl ? `
-          <a href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer" 
-            style="font-size:13px;font-weight:700;color:var(--text);text-decoration:none;display:inline-flex;align-items:center;gap:5px" 
-            title="Abrir ${escapeHtml(d.title)} en una pestaÃ±a nueva">
-            <span>${escapeHtml(d.title)}</span>
-            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          </a>
-        ` : `<span style="font-size:13px;font-weight:700;color:var(--text)">${escapeHtml(d.title)}</span>`;
+        const titleContent = `<span style="font-size:13px;font-weight:700;color:var(--text);line-height:1.3">${escapeHtml(d.title)}</span>`;
 
         const ibpText = d.ibp || d.ibp_name || '';
         const ibpCellContent = ibpText ? `
@@ -7243,13 +7432,18 @@
         ` : `<span class="muted" style="font-size:11px;font-style:italic">Sin IBP</span>`;
 
         return `
-          <tr>
+          <tr id="esc-row-${numId}" class="escalation-row ${isExpanded ? 'expanded' : ''}" data-escalation-id="${numId}" tabindex="0" aria-expanded="${isExpanded ? 'true' : 'false'}" onclick="toggleEscalationRow(${numId}, event)" onkeydown="toggleEscalationRow(${numId}, event)" title="Haz clic en la fila para ver u ocultar Observaciones y Recomendaciones">
             <td>
-              <div style="display:flex;align-items:flex-start;gap:10px">
-                <div style="background:rgba(66,133,244,0.12);border:1px solid rgba(66,133,244,0.25);border-radius:6px;padding:6px;display:flex;align-items:center;justify-content:center;margin-top:2px;flex-shrink:0" title="Documento de Google Docs">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span class="esc-chevron" title="Desplegar Observaciones y Recomendaciones">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </span>
+                <div style="background:rgba(66,133,244,0.12);border:1px solid rgba(66,133,244,0.25);border-radius:6px;padding:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0" title="Documento de Google Docs">
                   ${docIconSvg}
                 </div>
-                <div>
+                <div style="min-width:0">
                   ${titleContent}
                   <span class="muted" style="font-size:11px;display:block;margin-top:2px;font-family:monospace">
                     ${d.doc_url ? escapeHtml(d.doc_url.replace(/https?:\/\//, '').slice(0, 48) + '...') : 'Google Docs'}
@@ -7271,43 +7465,61 @@
               <small class="muted" style="font-size:10.5px">${escapeHtml(d.uploaded_by_role || 'Coordinador')}</small>
             </td>
             <td>
-              <div style="font-size:12px;color:var(--text);white-space:nowrap">${escapeHtml(d.created_at_caracas || 'â')}</div>
-            </td>
-            <td>
-              <div style="font-size:11.5px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(d.notes || '')}">
-                ${escapeHtml(d.notes || 'â')}
-              </div>
-            </td>
-            <td>
-              <div style="font-size:11.5px;color:#a7f3d0;max-width:260px;max-height:80px;overflow-y:auto;white-space:pre-wrap;background:rgba(16,185,129,0.06);padding:4px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.15)" title="${escapeHtml(d.recommendations || '')}">
-                ${d.recommendations ? escapeHtml(d.recommendations) : '<span class="muted" style="color:var(--muted)">â</span>'}
-              </div>
+              <div style="font-size:12px;color:var(--text);white-space:nowrap">${escapeHtml(d.created_at_caracas || '—')}</div>
             </td>
             <td style="text-align:center">
               <div style="display:inline-flex;align-items:center;gap:5px">
-                <button type="button" class="btn" onclick="openEscalationLink('${escapeHtml(targetUrl)}')"
+                <button type="button" class="btn" onclick="event.stopPropagation(); openEscalationLink('${safeJsUrl}')"
                   style="padding:5px 8px;font-size:11px;background:rgba(79,140,255,0.15);color:var(--accent);border-color:rgba(79,140,255,0.3);display:inline-flex;align-items:center;gap:4px"
-                  title="Abrir documento en una nueva pestaÃ±a">
+                  title="Abrir documento en una nueva pestaña">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                   <span>Abrir</span>
                 </button>
-                <button type="button" class="btn" onclick="copyEscalationLink('${escapeHtml(targetUrl)}')"
+                <button type="button" class="btn" onclick="event.stopPropagation(); copyEscalationLink('${safeJsUrl}')"
                   style="padding:5px 7px;font-size:11px;background:rgba(255,255,255,0.05);color:var(--text);border-color:rgba(255,255,255,0.14);display:inline-flex;align-items:center;gap:4px"
                   title="Copiar enlace directo al portapapeles">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                   <span>Copiar</span>
                 </button>
-                <button type="button" class="btn" onclick="openEscalationModal(${d.id})"
+                <button type="button" class="btn" onclick="event.stopPropagation(); openEscalationModal(${numId})"
                   style="padding:5px 8px;font-size:11px;background:rgba(243,156,18,0.15);color:#f39c12;border-color:rgba(243,156,18,0.35);display:inline-flex;align-items:center;gap:4px"
                   title="Editar datos, categoría o recomendaciones del escalamiento">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   <span>Editar</span>
                 </button>
-                <button type="button" class="btn" onclick="deleteEscalation(${d.id}, '${escapeHtml(d.title)}')"
+                <button type="button" class="btn" onclick="event.stopPropagation(); deleteEscalation(${numId})"
                   style="padding:5px 7px;font-size:11px;color:#f87171;background:rgba(255,93,93,0.1);border-color:rgba(255,93,93,0.25)"
                   title="Eliminar este escalamiento del repositorio">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                 </button>
+              </div>
+            </td>
+          </tr>
+          <tr id="esc-detail-${numId}" class="escalation-detail-row ${isExpanded ? 'expanded' : ''}" style="display:${isExpanded ? 'table-row' : 'none'}">
+            <td colspan="7" class="escalation-detail-cell">
+              <div class="escalation-detail-grid">
+                <div class="escalation-detail-box notes-box">
+                  <div class="escalation-detail-header">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                      <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    <span>Observaciones</span>
+                  </div>
+                  <div class="escalation-detail-content">${hasNotes ? escapeHtml(d.notes) : '<span class="muted" style="font-style:italic">Sin observaciones registradas.</span>'}</div>
+                </div>
+                <div class="escalation-detail-box recs-box">
+                  <div class="escalation-detail-header">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#34d399">
+                      <path d="M9 11l3 3L22 4"/>
+                      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                    </svg>
+                    <span>Recomendaciones</span>
+                  </div>
+                  <div class="escalation-detail-content">${hasRecs ? escapeHtml(d.recommendations) : '<span class="muted" style="font-style:italic">Sin recomendaciones registradas.</span>'}</div>
+                </div>
               </div>
             </td>
           </tr>
@@ -7324,7 +7536,7 @@
       if (!url || url === '#') return;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(() => {
-          showToast('Â¡Enlace Copiado!', 'El enlace del documento fue copiado al portapapeles.');
+          showToast('¡Enlace Copiado!', 'El enlace del documento fue copiado al portapapeles.');
         }).catch(() => fallbackCopy(url));
       } else {
         fallbackCopy(url);
@@ -7340,7 +7552,7 @@
       ta.select();
       try {
         document.execCommand('copy');
-        showToast('Â¡Enlace Copiado!', 'El enlace del documento fue copiado al portapapeles.');
+        showToast('¡Enlace Copiado!', 'El enlace del documento fue copiado al portapapeles.');
       } catch (e) {
         prompt('Copia manualmente este enlace:', text);
       }
@@ -7381,16 +7593,16 @@
         </div>
 
         <form id="formEscalation" onsubmit="event.preventDefault(); submitEscalationForm(${isEditing ? existingDoc.id : 'null'});">
-          <!-- 1. CÃ³digo / TÃ­tulo -->
+          <!-- 1. Código / Título -->
           <div style="margin-bottom:14px">
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
-              CÃ³digo / TÃ­tulo del Escalamiento <span style="color:var(--red)">*</span>
+              Código / Título del Escalamiento <span style="color:var(--red)">*</span>
             </label>
             <input type="text" id="escalationTitleInput" class="form-input" 
               placeholder="ej: SIMF-ES-5260 88920 Venezolano" 
               value="${escapeHtml(titleVal)}"
               style="width:100%;font-size:13px;font-weight:600" required>
-            <small class="muted" style="font-size:11px;margin-top:3px;display:block">Identificador formal para bÃºsqueda y auditorÃ­a (ej: SIMF-ES-5260 88920 Venezolano)</small>
+            <small class="muted" style="font-size:11px;margin-top:3px;display:block">Identificador formal para búsqueda y auditoría (ej: SIMF-ES-5260 88920 Venezolano)</small>
           </div>
 
           <!-- 2. Categoría -->
@@ -7431,7 +7643,7 @@
                 }).join('');
               })()}
             </select>
-            <small class="muted" style="font-size:11px;margin-top:3px;display:block">IdentificaciÃ³n Bancaria del Participante segÃºn el catÃ¡logo oficial SIMF (34 participantes bancarios/consorcios)</small>
+            <small class="muted" style="font-size:11px;margin-top:3px;display:block">Identificación Bancaria del Participante según el catálogo oficial SIMF (34 participantes bancarios/consorcios)</small>
           </div>
 
           <!-- 4. Enlace Google Docs -->
@@ -7462,9 +7674,9 @@
               Recomendaciones del Escalamiento <span class="muted" style="font-weight:400">(Opcional)</span>
             </label>
             <textarea id="escalationRecommendationsInput" class="form-input" rows="3" 
-              placeholder="Recomendaciones tÃ©cnicas consolidadas, pasos correctivos, acciones preventivas..." 
+              placeholder="Recomendaciones técnicas consolidadas, pasos correctivos, acciones preventivas..." 
               style="width:100%;font-size:12px;resize:vertical">${escapeHtml(recsVal)}</textarea>
-            <small class="muted" style="font-size:11px;margin-top:3px;display:block">Este campo tambiÃ©n se alimenta automÃ¡ticamente cuando se cierran actividades vinculadas a este escalamiento.</small>
+            <small class="muted" style="font-size:11px;margin-top:3px;display:block">Este campo también se alimenta automáticamente cuando se cierran actividades vinculadas a este escalamiento.</small>
           </div>
 
           <!-- Info de autor -->
@@ -7473,7 +7685,7 @@
             <span style="font-weight:600;color:var(--text)">${escapeHtml(authorName)} <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:10px">${escapeHtml(authorRole)}</span></span>
           </div>
 
-          <!-- Botones de AcciÃ³n -->
+          <!-- Botones de Acción -->
           <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
             <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
             <button type="submit" class="btn primary" id="btnSubmitEscalation"
@@ -7510,7 +7722,7 @@
 
       const title = titleInput ? titleInput.value.trim() : '';
       if (!title) {
-        alert('Debes indicar un cÃ³digo o tÃ­tulo para el escalamiento (ej: SIMF-ES-5260 88920 Venezolano).');
+        alert('Debes indicar un código o título para el escalamiento (ej: SIMF-ES-5260 88920 Venezolano).');
         if (titleInput) titleInput.focus();
         return;
       }
@@ -7569,8 +7781,8 @@
         closeModal();
         await loadEscalations();
         showToast(
-          isEditing ? 'Â¡Escalamiento Actualizado!' : 'Â¡Escalamiento Registrado!',
-          `El escalamiento "${title}" fue ${isEditing ? 'actualizado' : 'vinculado'} con Ã©xito.`
+          isEditing ? '¡Escalamiento Actualizado!' : '¡Escalamiento Registrado!',
+          `El escalamiento "${title}" fue ${isEditing ? 'actualizado' : 'vinculado'} con éxito.`
         );
       } catch (err) {
         console.error('Error guardando escalamiento:', err);
@@ -7584,7 +7796,11 @@
     }
 
     async function deleteEscalation(id, title) {
-      if (!confirm(`Â¿EstÃ¡s seguro de que deseas eliminar permanentemente el escalamiento "${title}" del repositorio?`)) {
+      if (title === undefined || title === null) {
+        const doc = (ESCALATIONS_LIST || []).find(x => Number(x.id) === Number(id));
+        title = doc ? doc.title : `#${id}`;
+      }
+      if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente el escalamiento "${title}" del repositorio?`)) {
         return;
       }
 
@@ -7597,6 +7813,7 @@
           const err = await res.json().catch(() => ({}));
           throw new Error(err.detail || `Error ${res.status}`);
         }
+        EXPANDED_ESCALATION_IDS.delete(Number(id));
         await loadEscalations();
         showToast('Escalamiento Eliminado', `El escalamiento "${title}" fue eliminado del repositorio.`);
       } catch (err) {

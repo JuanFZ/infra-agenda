@@ -229,5 +229,168 @@ function simulateDeepLink(opts) {
   assert.strictEqual(toasts[0].t, 'Actividad no encontrada');
 
   console.log('✓ Test 3: Deep link lifecycle (auth check, item lookup, fallback fetch, modal opening, debounce) verified');
+
+  // 5. Test Escalation Expandable Rows & Clean Table Headers
+  const tblMatch = content.match(/<table id="tblEscalations">([\s\S]*?)<\/table>/);
+  assert(tblMatch, '#tblEscalations table not found in index.html');
+  const theadMatch = tblMatch[1].match(/<thead>([\s\S]*?)<\/thead>/);
+  assert(theadMatch, '#tblEscalations thead not found');
+  const thList = theadMatch[1].match(/<th\b[^>]*>[\s\S]*?<\/th>/g) || [];
+  assert.strictEqual(thList.length, 7, `Expected 7 <th> columns in #tblEscalations, found ${thList.length}`);
+  assert(!theadMatch[1].includes('Observaciones'), 'Observaciones column should not be in #tblEscalations thead');
+  assert(!theadMatch[1].includes('Recomendaciones'), 'Recomendaciones column should not be in #tblEscalations thead');
+  assert(tblMatch[1].includes('colspan="7"'), 'Initial #tblEscalationsBody state should use colspan="7"');
+
+  // Verify no UTF-8 mojibake or emojis remain in index.html
+  assert(!/[\u00c2\u00c3]/.test(content), 'UTF-8 mojibake (Ã / Â) found in frontend/index.html');
+  assert(!content.includes('â€”'), 'Mojibake em-dash found in frontend/index.html');
+  assert(!/[\u{1F300}-\u{1FAFF}]/u.test(content), 'Emoji characters found in frontend/index.html');
+
+  // Extract escalation table functions and test DOM rendering + accordion toggle
+  const escHtmlFnMatch = content.match(/function escapeHtml\(str\)[\s\S]*?\n    \}/);
+  const catBadgeFnMatch = content.match(/function getCategoryBadge\(cat\)[\s\S]*?\n    \}/);
+  const toggleFnMatch = content.match(/function toggleEscalationRow\(id, event\)[\s\S]*?\n    \}/);
+  const renderFnMatch = content.match(/function renderEscalationsTable\(list\)[\s\S]*?\n    \}/);
+  assert(escHtmlFnMatch && catBadgeFnMatch && toggleFnMatch && renderFnMatch, 'Escalation functions missing in index.html');
+
+  const elementsById = {};
+  const mockTbody = { innerHTML: '' };
+  elementsById['tblEscalationsBody'] = mockTbody;
+
+  const escRunner = new Function(
+    'document',
+    `
+    const EXPANDED_ESCALATION_IDS = new Set();
+    ${escHtmlFnMatch[0]}
+    ${catBadgeFnMatch[0]}
+    ${toggleFnMatch[0]}
+    ${renderFnMatch[0]}
+    return { renderEscalationsTable, toggleEscalationRow, EXPANDED_ESCALATION_IDS };
+    `
+  );
+
+  const mockDoc = {
+    getElementById: (id) => elementsById[id] || null
+  };
+  const escModule = escRunner(mockDoc);
+
+  // Empty state check
+  escModule.renderEscalationsTable([]);
+  assert(mockTbody.innerHTML.includes('colspan="7"'), 'Empty state should use colspan="7"');
+  assert(mockTbody.innerHTML.includes('No se encontraron escalamientos registrados.'), 'Empty state message missing');
+
+  // Populated state check with edge cases (empty notes/recs, single quotes, multiline recommendations)
+  const sampleEscalations = [
+    {
+      id: 101,
+      title: "SIMF-ES-5260 Caso 'A'",
+      category: 'PostgreSQL',
+      ibp: '0134 - BANESCO',
+      doc_url: 'https://docs.google.com/document/d/101',
+      uploaded_by: 'Adonis Lozada',
+      uploaded_by_role: 'Coordinador',
+      created_at_caracas: '10/11/2026 09:00',
+      notes: 'Observación detallada línea 1\nLínea 2',
+      recommendations: 'Recomendación 1: Ajustar work_mem\nRecomendación 2: Vacuum'
+    },
+    {
+      id: 102,
+      title: 'SIMF-ES-5261 Sin Notas',
+      category: 'CPU',
+      ibp: '',
+      doc_url: '',
+      uploaded_by: '',
+      uploaded_by_role: '',
+      created_at_caracas: '',
+      notes: '   ',
+      recommendations: null
+    }
+  ];
+
+  escModule.renderEscalationsTable(sampleEscalations);
+  assert(mockTbody.innerHTML.includes('id="esc-row-101"'), 'Main row for 101 not rendered');
+  assert(mockTbody.innerHTML.includes('id="esc-detail-101"'), 'Detail row for 101 not rendered');
+  assert(mockTbody.innerHTML.includes('style="display:none"'), 'Detail row should be hidden by default');
+  assert(mockTbody.innerHTML.includes('Observación detallada línea 1'), 'Notes should be inside detail row');
+  assert(mockTbody.innerHTML.includes('Recomendación 1: Ajustar work_mem'), 'Recommendations should be inside detail row');
+  assert(mockTbody.innerHTML.includes('Sin observaciones registradas.'), 'Fallback for empty notes missing');
+  assert(mockTbody.innerHTML.includes('Sin recomendaciones registradas.'), 'Fallback for empty recommendations missing');
+
+  // Set up mock DOM nodes for row 101 to test toggleEscalationRow
+  function makeMockRow(initialDisplay) {
+    const classes = new Set();
+    const attrs = {};
+    return {
+      style: { display: initialDisplay },
+      classList: {
+        add: (c) => classes.add(c),
+        remove: (c) => classes.delete(c),
+        has: (c) => classes.has(c)
+      },
+      setAttribute: (k, v) => { attrs[k] = v; },
+      getAttribute: (k) => attrs[k]
+    };
+  }
+  elementsById['esc-row-101'] = makeMockRow('table-row');
+  elementsById['esc-detail-101'] = makeMockRow('none');
+
+  // Clicking an interactive button/link inside the row must NOT toggle
+  escModule.toggleEscalationRow(101, {
+    target: { closest: (sel) => sel.includes('button') ? {} : null }
+  });
+  assert.strictEqual(escModule.EXPANDED_ESCALATION_IDS.has(101), false, 'Interactive click should not expand row');
+  assert.strictEqual(elementsById['esc-detail-101'].style.display, 'none');
+
+  // Clicking non-interactive area of row expands detail downward
+  escModule.toggleEscalationRow(101, {
+    target: { closest: () => null }
+  });
+  assert.strictEqual(escModule.EXPANDED_ESCALATION_IDS.has(101), true, 'Row click should expand row');
+  assert.strictEqual(elementsById['esc-detail-101'].style.display, 'table-row');
+  assert.strictEqual(elementsById['esc-row-101'].classList.has('expanded'), true);
+  assert.strictEqual(elementsById['esc-row-101'].getAttribute('aria-expanded'), 'true');
+
+  // Re-rendering while expanded preserves expanded state
+  escModule.renderEscalationsTable(sampleEscalations);
+  assert(mockTbody.innerHTML.includes('id="esc-detail-101" class="escalation-detail-row expanded" style="display:table-row"'));
+
+  // Clicking row again collapses detail
+  escModule.toggleEscalationRow(101, {
+    target: { closest: () => null }
+  });
+  assert.strictEqual(escModule.EXPANDED_ESCALATION_IDS.has(101), false, 'Second row click should collapse row');
+  assert.strictEqual(elementsById['esc-detail-101'].style.display, 'none');
+  assert.strictEqual(elementsById['esc-row-101'].classList.has('expanded'), false);
+
+  // Keyboard navigation: non-Enter/Space keys do not toggle
+  escModule.toggleEscalationRow(101, {
+    type: 'keydown',
+    key: 'Tab',
+    target: { closest: () => null }
+  });
+  assert.strictEqual(escModule.EXPANDED_ESCALATION_IDS.has(101), false, 'Tab key should not expand row');
+
+  // Keyboard navigation: Enter key expands row, Space key collapses row
+  let prevented = false;
+  escModule.toggleEscalationRow(101, {
+    type: 'keydown',
+    key: 'Enter',
+    preventDefault: () => { prevented = true; },
+    target: { closest: () => null }
+  });
+  assert.strictEqual(prevented, true, 'Enter key should preventDefault');
+  assert.strictEqual(escModule.EXPANDED_ESCALATION_IDS.has(101), true, 'Enter key should expand row');
+  assert.strictEqual(elementsById['esc-detail-101'].style.display, 'table-row');
+
+  escModule.toggleEscalationRow(101, {
+    type: 'keydown',
+    key: ' ',
+    preventDefault: () => {},
+    target: { closest: () => null }
+  });
+  assert.strictEqual(escModule.EXPANDED_ESCALATION_IDS.has(101), false, 'Space key should collapse row');
+  assert.strictEqual(elementsById['esc-detail-101'].style.display, 'none');
+
+  console.log('✓ Test 4: Escalation table clean 7-column layout, expandable downward detail row, and UTF-8 integrity verified');
   console.log('ALL FRONTEND TESTS PASSED SUCCESSFULLY!');
 })();
