@@ -978,6 +978,80 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertEqual(cu_simf.status, "curso")
         db.close()
 
+    def test_19_escalation_dual_sla_inheritance_and_sycom_overdue(self):
+        """Test that EscalationDocument stores received_at & escalated_at, linked Items inherit them,
+        and main overdue status is governed by Sycom SLA while Team SLA is tracked in parallel."""
+        from datetime import datetime, timedelta
+        now_utc = datetime.utcnow()
+        # Sycom received 26h ago (Overdue for Alta = 24h), Team escalated 2h ago (On time for Alta = 24h)
+        rec_dt = (now_utc - timedelta(hours=26)).replace(microsecond=0)
+        esc_dt = (now_utc - timedelta(hours=2)).replace(microsecond=0)
+
+        esc_res = self.client.post("/api/escalations", json={
+            "title": "SIMF-ES-7700 Dual SLA Test",
+            "category": "PostgreSQL",
+            "ibp": "0105 - Banco Mercantil",
+            "doc_url": "https://docs.google.com/document/d/dualsla7700",
+            "received_at": rec_dt.isoformat() + "Z",
+            "escalated_at": esc_dt.isoformat() + "Z",
+        }, headers={"X-User-Role": "Coordinador"})
+        self.assertEqual(esc_res.status_code, 200)
+        esc_doc = esc_res.json()["document"]
+        esc_id = esc_doc["id"]
+        self.assertTrue(esc_doc["received_at"].startswith(rec_dt.isoformat()))
+        self.assertTrue(esc_doc["escalated_at"].startswith(esc_dt.isoformat()))
+
+        # Create an activity with priority 'Alta' (24h) and link it via PATCH
+        db = TestingSessionLocal()
+        item = Item(
+            source="ClickUp",
+            external_id="cu_dual_sla_1",
+            title="Optimización índice PostgreSQL",
+            priority="Alta",
+            status="curso",
+            assignee_name="Adonis Lozada"
+        )
+        db.add(item)
+        db.commit()
+        item_id = item.id
+        db.close()
+
+        patch_res = self.client.patch(f"/api/items/{item_id}", json={
+            "escalation_id": esc_id
+        }, headers={"X-User-Role": "Coordinador"})
+        self.assertEqual(patch_res.status_code, 200)
+        patched_item = patch_res.json()["item"]
+
+        # Inherited timestamps from escalation
+        self.assertTrue(patched_item["received_at"].startswith(rec_dt.isoformat()))
+        self.assertTrue(patched_item["escalated_at"].startswith(esc_dt.isoformat()))
+
+        # Rule 1 & 2: Both use 24h window; main overdue is governed by Sycom (received_at + 24h -> overdue),
+        # while Team SLA (escalated_at + 24h -> on time) is calculated in parallel
+        self.assertEqual(patched_item["sla_hours_window"], 24)
+        self.assertTrue(patched_item["is_overdue"])
+        self.assertEqual(patched_item["semaphore"], "rojo")
+        self.assertGreaterEqual(patched_item["sla_percent"], 100)
+
+        self.assertFalse(patched_item["team_is_overdue"])
+        self.assertEqual(patched_item["team_semaphore"], "verde")
+        self.assertLess(patched_item["team_sla_percent"], 25)
+
+        # Updating escalation dates propagates to linked items
+        new_rec_dt = (now_utc - timedelta(hours=3)).replace(microsecond=0)
+        new_esc_dt = (now_utc - timedelta(hours=1)).replace(microsecond=0)
+        put_res = self.client.put(f"/api/escalations/{esc_id}", json={
+            "received_at": new_rec_dt.isoformat() + "Z",
+            "escalated_at": new_esc_dt.isoformat() + "Z",
+        }, headers={"X-User-Role": "Coordinador"})
+        self.assertEqual(put_res.status_code, 200)
+
+        items_res = self.client.get("/api/items")
+        self.assertEqual(items_res.status_code, 200)
+        updated_item = next(x for x in items_res.json() if x["id"] == item_id)
+        self.assertFalse(updated_item["is_overdue"])
+        self.assertEqual(updated_item["semaphore"], "verde")
+
 
 if __name__ == "__main__":
     unittest.main()

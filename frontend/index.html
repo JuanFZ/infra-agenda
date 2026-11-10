@@ -3413,10 +3413,18 @@
       return `${day}-${month}-${year} ${hours}:${mins}`;
     }
 
+    function isoToDateTimeLocal(dateStr) {
+      if (!dateStr) return formatDateTimeLocal(new Date());
+      const s = (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+')) ? dateStr + 'Z' : dateStr;
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return formatDateTimeLocal(new Date());
+      return formatDateTimeLocal(d);
+    }
+
     function getItemTimeLabel(it) {
       if (it.time_sla_label) return it.time_sla_label;
       if (!it.created_at) return (it.status === 'cerrado' ? 'Cerrado' : 'Activo');
-      const startRef = it.escalated_at || it.created_at;
+      const startRef = it.received_at || it.created_at;
       const created = new Date(startRef).getTime();
       const ref = (it.status === 'cerrado' && it.closed_at) ? new Date(it.closed_at).getTime() : Date.now();
       const diffSec = Math.max(0, Math.floor((ref - created) / 1000));
@@ -3451,6 +3459,13 @@
       else if (hours > 0) str = `${hours}h ${mins % 60}m`;
       else str = `${mins}m`;
       return diffSec >= 0 ? `Restan ${str}` : `+${str} excedido`;
+    }
+
+    function getTeamSlaBadgeHtml(it) {
+      const tPct = (it.team_sla_percent !== undefined && it.team_sla_percent !== null) ? it.team_sla_percent : it.sla_percent;
+      const tSem = it.team_semaphore || it.semaphore || 'verde';
+      const tRem = it.team_sla_remaining_human || '';
+      return `<div class="muted" style="font-size:10.5px;margin-top:2px;display:flex;align-items:center;gap:4px" title="SLA Interno del Equipo Infra & BD"><span class="sem ${tSem}" style="width:6px;height:6px;display:inline-block;flex-shrink:0"></span><span>SLA Equipo: <b style="color:var(--text)">${tPct}%</b>${tRem ? ' · ' + tRem : ''}</span></div>`;
     }
 
     async function loadData() {
@@ -3680,9 +3695,13 @@
         <td>${it.status_origin || it.status}</td>
         <td>
           <div style="font-weight:600;font-size:12px;color:var(--text)">${getItemTimeLabel(it)}</div>
-          <div class="muted" style="font-size:11px">${it.sla_percent}% consumido${getItemSlaRemaining(it) ? ' · ' + getItemSlaRemaining(it) : ''}</div>
+          <div class="muted" style="font-size:11px">SLA Sycom: <b style="color:var(--text)">${it.sla_percent}%</b>${getItemSlaRemaining(it) ? ' · ' + getItemSlaRemaining(it) : ''}</div>
+          ${getTeamSlaBadgeHtml(it)}
         </td>
-        <td class="${it.is_overdue ? 'txt-red' : 'muted'}">${formatDate(it.due_at)}</td>
+        <td class="${it.is_overdue ? 'txt-red' : 'muted'}">
+          <div>${formatDate(it.due_at)}</div>
+          ${it.team_due_at ? `<div class="muted" style="font-size:10px" title="Vencimiento SLA Equipo">Eq: ${formatDate(it.team_due_at)}</div>` : ''}
+        </td>
       </tr>
     `).join('');
       }
@@ -3700,7 +3719,8 @@
       <td>${it.priority}</td>
       <td style="color:var(--red)">
         <div style="font-weight:600;font-size:12px">${getItemTimeLabel(it)}</div>
-        <div style="font-size:11px">${it.sla_percent}% consumido (${getItemSlaRemaining(it) || ('Vence: ' + formatDate(it.due_at))})</div>
+        <div style="font-size:11px">SLA Sycom: <b>${it.sla_percent}%</b> consumido (${getItemSlaRemaining(it) || ('Vence: ' + formatDate(it.due_at))})</div>
+        ${getTeamSlaBadgeHtml(it)}
       </td>
     </tr>
   `).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">Sin asuntos fuera de SLA.</td></tr>';
@@ -3940,7 +3960,11 @@
             </div>
             <div style="font-size:11px;font-weight:600;color:var(--accent);margin-top:4px;display:flex;justify-content:space-between;align-items:center">
               <span>${getItemTimeLabel(it)}</span>
-              <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA</span>
+              <span class="${it.is_overdue ? 'txt-red' : 'muted'}">SLA Sycom: ${it.sla_percent}%</span>
+            </div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px;display:flex;justify-content:space-between;align-items:center">
+              <span>Vence Sycom: ${formatDate(it.due_at, true)}</span>
+              <span class="${it.team_is_overdue ? 'txt-red' : ''}">SLA Equipo: ${it.team_sla_percent !== undefined ? it.team_sla_percent : it.sla_percent}%</span>
             </div>
           </div>
         `;
@@ -4152,6 +4176,29 @@
       }
     }
 
+    function onCreateEscalationChange(escId) {
+      const recInput = document.getElementById('createReceivedAt');
+      const escInput = document.getElementById('createEscalatedAt');
+      const escHelp = document.getElementById('createEscalationSlaHint');
+      if (!escId) {
+        if (escHelp) escHelp.style.display = 'none';
+        updateCreateSlaSuggestion();
+        return;
+      }
+      const doc = (ESCALATIONS_LIST || []).find(e => Number(e.id) === Number(escId));
+      if (doc) {
+        const recLocal = isoToDateTimeLocal(doc.received_at || doc.created_at);
+        const escLocal = isoToDateTimeLocal(doc.escalated_at || doc.received_at || doc.created_at);
+        if (recInput && recLocal) recInput.value = recLocal;
+        if (escInput && escLocal) escInput.value = escLocal;
+        if (escHelp) {
+          escHelp.style.display = 'block';
+          escHelp.innerHTML = `<span style="color:#34d399;font-weight:600">Fechas de SLA heredadas del Escalamiento #${doc.id}</span> (Recibido Sycom: <b>${escapeHtml(doc.received_at_caracas || doc.created_at_caracas || '')}</b> · Escalado Infra: <b>${escapeHtml(doc.escalated_at_caracas || doc.created_at_caracas || '')}</b>)`;
+        }
+      }
+      updateCreateSlaSuggestion();
+    }
+
     function updateCreateSlaSuggestion() {
       const prioSelect = document.getElementById('createPriority');
       const escInput = document.getElementById('createEscalatedAt');
@@ -4162,22 +4209,32 @@
       const hoursMap = { 'Crítica': 4, 'Alta': 24, 'Media': 72, 'Baja': 120 };
       const h = hoursMap[prio] || 72;
 
-      let baseDate = new Date();
+      let sycomBase = new Date();
+      if (recInput && recInput.value) {
+        const parsed = new Date(recInput.value);
+        if (!isNaN(parsed.getTime())) sycomBase = parsed;
+      }
+      let teamBase = new Date(sycomBase.getTime());
       if (escInput && escInput.value) {
         const parsed = new Date(escInput.value);
-        if (!isNaN(parsed.getTime())) baseDate = parsed;
-      } else if (recInput && recInput.value) {
-        const parsed = new Date(recInput.value);
-        if (!isNaN(parsed.getTime())) baseDate = parsed;
+        if (!isNaN(parsed.getTime())) teamBase = parsed;
       }
-      const targetDate = new Date(baseDate.getTime() + h * 3600 * 1000);
+
+      const sycomTarget = new Date(sycomBase.getTime() + h * 3600 * 1000);
+      const teamTarget = new Date(teamBase.getTime() + h * 3600 * 1000);
       if (badge) {
         const pad = n => String(n).padStart(2, '0');
-        const formattedTarget = `${pad(targetDate.getDate())}-${pad(targetDate.getMonth() + 1)}-${targetDate.getFullYear()} ${pad(targetDate.getHours())}:${pad(targetDate.getMinutes())}`;
+        const fmt = d => `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
         badge.innerHTML = `
-          <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(79,140,255,0.12);color:var(--accent);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid rgba(79,140,255,0.25)">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span>SLA Interno del Equipo: <b style="color:#ffffff">+${h}h</b> &nbsp;·&nbsp; Vence: <b style="color:#ffffff">${formattedTarget}</b></span>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(79,140,255,0.12);color:var(--accent);padding:6px 10px;border-radius:6px;font-size:11.5px;font-weight:600;border:1px solid rgba(79,140,255,0.25)">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>SLA Sycom (Empresa): <b style="color:#ffffff">+${h}h</b> · Vence: <b style="color:#ffffff">${fmt(sycomTarget)}</b></span>
+            </div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,0.12);color:#34d399;padding:6px 10px;border-radius:6px;font-size:11.5px;font-weight:600;border:1px solid rgba(16,185,129,0.25)">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>SLA Equipo (Infra & BD): <b style="color:#ffffff">+${h}h</b> · Vence: <b style="color:#ffffff">${fmt(teamTarget)}</b></span>
+            </div>
           </div>
         `;
       }
@@ -4529,12 +4586,13 @@
 
       <!-- 8. Vincular a Escalamiento -->
       <div class="form-group">
-        <label class="form-label" for="createEscalationId">Vincular a Escalamiento: <span class="muted" style="font-weight:400;text-transform:none">(Opcional)</span></label>
-        <select id="createEscalationId" class="form-input" style="cursor:pointer">
+        <label class="form-label" for="createEscalationId">Vincular a Escalamiento: <span class="muted" style="font-weight:400;text-transform:none">(Opcional - hereda fechas de SLA)</span></label>
+        <select id="createEscalationId" class="form-input" onchange="onCreateEscalationChange(this.value)" style="cursor:pointer">
           <option value="">-- Sin escalamiento vinculado --</option>
           ${ESCALATIONS_LIST.map(esc => `<option value="${esc.id}">${formatEscalationOption(esc)}</option>`).join('')}
         </select>
-        <small class="muted" style="font-size:11px;margin-top:3px;display:block">Si la actividad deriva de un escalamiento, selecciónalo para relacionarlo y añadir recomendaciones al cerrar.</small>
+        <div id="createEscalationSlaHint" style="display:none;font-size:11px;margin-top:5px;padding:6px 10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:6px"></div>
+        <small class="muted" style="font-size:11px;margin-top:3px;display:block">Al seleccionar un escalamiento, las fechas de Recibimiento en Sycom y Escalada al Equipo se heredan automáticamente del escalamiento.</small>
       </div>
 
       <!-- Botones de Acción -->
@@ -4679,9 +4737,19 @@
       <dt>Creado el:</dt><dd>${formatDate(it.created_at, true)}</dd>
       ${it.received_at ? `<dt>Recibido en Sycom (SLA Empresa):</dt><dd><b>${formatDate(it.received_at, true)}</b></dd>` : ''}
       ${it.escalated_at ? `<dt>Escalado a Infra (SLA Equipo):</dt><dd><b>${formatDate(it.escalated_at, true)}</b></dd>` : ''}
-      <dt>Tiempo registrado:</dt><dd><b>${getItemTimeLabel(it)}</b></dd>
-      <dt>Vencimiento SLA Equipo:</dt><dd>${formatDate(it.due_at, true)}</dd>
-      <dt>SLA / Plazo Equipo:</dt><dd><b>${it.sla_percent}%</b> consumido (${it.semaphore.toUpperCase()}) ${getItemSlaRemaining(it) ? '· <b>' + getItemSlaRemaining(it) + '</b>' : ''}</dd>
+      <dt>SLA Sycom (Empresa):</dt>
+      <dd>
+        <span class="sem ${it.semaphore}"></span> <b>${it.sla_percent}%</b> consumido (${it.semaphore.toUpperCase()})
+        · Vence: <b>${formatDate(it.company_due_at || it.due_at, true)}</b>
+        ${getItemSlaRemaining(it) ? '· <b class="' + (it.is_overdue ? 'txt-red' : '') + '">' + getItemSlaRemaining(it) + '</b>' : ''}
+      </dd>
+      <dt>SLA Equipo (Infra & BD):</dt>
+      <dd>
+        <span class="sem ${it.team_semaphore || it.semaphore}"></span> <b>${it.team_sla_percent !== undefined ? it.team_sla_percent : it.sla_percent}%</b> consumido (${(it.team_semaphore || it.semaphore).toUpperCase()})
+        · Vence: <b>${formatDate(it.team_due_at || it.due_at, true)}</b>
+        ${it.team_sla_remaining_human ? '· <b class="' + (it.team_is_overdue ? 'txt-red' : '') + '">' + it.team_sla_remaining_human + '</b>' : ''}
+      </dd>
+      <dt>Tiempo registrado (Sycom):</dt><dd><b>${getItemTimeLabel(it)}</b></dd>
       <dt>Escalamiento vinculado:</dt>
       <dd>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -5062,9 +5130,8 @@
           alert(`Error al actualizar escalamiento: ${err.detail || 'Error en el servidor'}`);
           return;
         }
-        const it = ALL_ITEMS.find(i => i.id === itemId);
-        if (it) it.escalation_id = escalationId ? parseInt(escalationId) : null;
-        showToast('Escalamiento actualizado', 'El vínculo con el escalamiento se actualizó correctamente.', 'info', 3000);
+        await loadData();
+        showToast('Escalamiento actualizado', 'El vínculo con el escalamiento y sus fechas de SLA se actualizaron correctamente.', 'info', 3000);
         openModal(itemId);
       } catch (err) {
         console.error('Error in changeItemEscalation:', err);
@@ -7664,7 +7731,8 @@
               <small class="muted" style="font-size:10.5px">${escapeHtml(d.uploaded_by_role || 'Coordinador')}</small>
             </td>
             <td>
-              <div style="font-size:12px;color:var(--text);white-space:nowrap">${escapeHtml(d.created_at_caracas || '—')}</div>
+              <div style="font-size:11.5px;color:var(--text);white-space:nowrap"><span class="muted">Sycom:</span> <b>${escapeHtml(d.received_at_caracas || d.created_at_caracas || '—')}</b></div>
+              <div style="font-size:11px;color:var(--muted);white-space:nowrap;margin-top:2px"><span>Equipo:</span> ${escapeHtml(d.escalated_at_caracas || d.received_at_caracas || d.created_at_caracas || '—')}</div>
             </td>
             <td style="text-align:center">
               <div style="display:inline-flex;align-items:center;gap:5px">
@@ -7773,6 +7841,9 @@
       const urlVal = existingDoc ? (existingDoc.doc_url || '') : '';
       const notesVal = existingDoc ? (existingDoc.notes || '') : '';
       const recsVal = existingDoc ? (existingDoc.recommendations || '') : '';
+      const nowLocalStr = formatDateTimeLocal(new Date());
+      const recAtVal = existingDoc ? (isoToDateTimeLocal(existingDoc.received_at || existingDoc.created_at) || nowLocalStr) : nowLocalStr;
+      const escAtVal = existingDoc ? (isoToDateTimeLocal(existingDoc.escalated_at || existingDoc.received_at || existingDoc.created_at) || nowLocalStr) : nowLocalStr;
 
       modal.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:12px">
@@ -7857,6 +7928,24 @@
             <small class="muted" style="font-size:11px;margin-top:3px;display:block">Pega la URL del documento compartido en Google Drive / Docs</small>
           </div>
 
+          <!-- 4.5. Fechas de SLA del Escalamiento (Sycom y Equipo) -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+            <div>
+              <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)" for="escalationReceivedAtInput">
+                Recibimiento en Sycom (SLA Empresa) <span style="color:var(--red)">*</span>
+              </label>
+              <input type="datetime-local" id="escalationReceivedAtInput" class="form-input" value="${recAtVal}" style="width:100%;font-size:12px;cursor:pointer" required>
+              <small class="muted" style="font-size:10.5px;margin-top:3px;display:block">Inicio del SLA principal (Empresa / Sycom)</small>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)" for="escalationEscalatedAtInput">
+                Escalada a Infra & BD (SLA Equipo) <span style="color:var(--red)">*</span>
+              </label>
+              <input type="datetime-local" id="escalationEscalatedAtInput" class="form-input" value="${escAtVal}" style="width:100%;font-size:12px;cursor:pointer" required>
+              <small class="muted" style="font-size:10.5px;margin-top:3px;display:block">Inicio del SLA interno del equipo técnico</small>
+            </div>
+          </div>
+
           <!-- 5. Observaciones -->
           <div style="margin-bottom:14px">
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
@@ -7915,6 +8004,8 @@
       const catInput = document.getElementById('escalationCategoryInput');
       const ibpInput = document.getElementById('escalationIbpInput');
       const urlInput = document.getElementById('escalationUrlInput');
+      const recAtInput = document.getElementById('escalationReceivedAtInput');
+      const escAtInput = document.getElementById('escalationEscalatedAtInput');
       const notesInput = document.getElementById('escalationNotesInput');
       const recsInput = document.getElementById('escalationRecommendationsInput');
       const btn = document.getElementById('btnSubmitEscalation');
@@ -7949,6 +8040,17 @@
       }
 
       try {
+        let receivedAtIso = null;
+        let escalatedAtIso = null;
+        if (recAtInput && recAtInput.value) {
+          const d = new Date(recAtInput.value);
+          if (!isNaN(d.getTime())) receivedAtIso = d.toISOString();
+        }
+        if (escAtInput && escAtInput.value) {
+          const d = new Date(escAtInput.value);
+          if (!isNaN(d.getTime())) escalatedAtIso = d.toISOString();
+        }
+
         const payload = {
           title: title,
           category: category,
@@ -7956,7 +8058,9 @@
           ibp_id: (ibpId && ibpId > 0) ? ibpId : null,
           doc_url: cleanUrl,
           notes: notesInput ? notesInput.value.trim() : '',
-          recommendations: recsInput ? recsInput.value.trim() : ''
+          recommendations: recsInput ? recsInput.value.trim() : '',
+          received_at: receivedAtIso,
+          escalated_at: escalatedAtIso
         };
 
         const isEditing = editId !== null && editId !== undefined;
@@ -7979,6 +8083,7 @@
 
         closeModal();
         await loadEscalations();
+        await loadData();
         showToast(
           isEditing ? '¡Escalamiento Actualizado!' : '¡Escalamiento Registrado!',
           `El escalamiento "${title}" fue ${isEditing ? 'actualizado' : 'vinculado'} con éxito.`

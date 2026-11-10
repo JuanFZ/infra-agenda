@@ -476,6 +476,7 @@ function simulateDeepLink(opts) {
     function isCoordinator() { return true; }
     function isSpecialist() { return false; }
     function getItemTimeLabel() { return '10m'; }
+    function formatDate(d) { return d || '—'; }
     function getAuthHeaders() { return {}; }
     function renderAll() {
       syncKanbanOriginUI();

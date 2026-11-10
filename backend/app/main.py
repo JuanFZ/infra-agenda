@@ -262,6 +262,12 @@ def ensure_db_schema():
                     cursor.execute("ALTER TABLE escalation_documents ADD COLUMN ibp_id INTEGER")
                 if "ibp" not in esc_cols:
                     cursor.execute("ALTER TABLE escalation_documents ADD COLUMN ibp VARCHAR(100)")
+                if "received_at" not in esc_cols:
+                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN received_at DATETIME")
+                if "escalated_at" not in esc_cols:
+                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN escalated_at DATETIME")
+                cursor.execute("UPDATE escalation_documents SET received_at = created_at WHERE received_at IS NULL")
+                cursor.execute("UPDATE escalation_documents SET escalated_at = COALESCE(received_at, created_at) WHERE escalated_at IS NULL")
 
             conn.connection.commit()
 
@@ -429,6 +435,22 @@ class UpdateItemRequest(BaseModel):
     recommendations: str | None = None
     project_name: str | None = None
     client_name: str | None = None
+    received_at: str | None = None
+    escalated_at: str | None = None
+
+
+def parse_iso_utc(raw_str: str | None) -> datetime.datetime | None:
+    if not raw_str or not str(raw_str).strip():
+        return None
+    try:
+        clean_val = str(raw_str).strip().replace("Z", "+00:00")
+        dt = datetime.datetime.fromisoformat(clean_val)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        return dt
+    except Exception as e:
+        print(f"[ParseISO] Error parseando '{raw_str}': {e}")
+        return None
 
 class LoginRequest(BaseModel):
     username: str
@@ -529,7 +551,9 @@ def trigger_sync():
     return {"message": "Sincronización completada con éxito"}
 
 def serialize_item(item: Item) -> dict:
-    """Serializa una actividad con sus campos y métricas calculadas de SLA."""
+    """Serializa una actividad con sus campos y métricas calculadas de doble SLA (Sycom y Equipo)."""
+    c_due = item.company_due_at
+    t_due = item.team_due_at
     return {
         "id": item.id,
         "source": item.source,
@@ -546,21 +570,29 @@ def serialize_item(item: Item) -> dict:
         "status_origin": item.status_origin,
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "received_at": item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None),
-        "escalated_at": item.escalated_at.isoformat() if item.escalated_at else (item.created_at.isoformat() if item.created_at else None),
+        "escalated_at": item.escalated_at.isoformat() if item.escalated_at else (item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None)),
         "assigned_at": item.assigned_at.isoformat() if item.assigned_at else None,
-        "due_at": item.due_at.isoformat() if item.due_at else None,
+        "due_at": c_due.isoformat() if c_due else None,
+        "company_due_at": c_due.isoformat() if c_due else None,
+        "team_due_at": t_due.isoformat() if t_due else None,
         "closed_at": item.closed_at.isoformat() if item.closed_at else None,
         "updated_at": item.updated_at.isoformat() if item.updated_at else None,
         "synced_at": item.synced_at.isoformat() if item.synced_at else None,
         "description": item.description,
         "escalation_id": item.escalation_id,
         "recommendations": item.recommendations,
+        "sla_hours_window": item.sla_hours_window,
         "is_overdue": item.is_overdue,
         "sla_percent": item.sla_percent,
         "semaphore": item.semaphore,
         "duration_human": item.duration_human,
         "time_sla_label": item.time_sla_label,
-        "sla_remaining_human": item.sla_remaining_human
+        "sla_remaining_human": item.sla_remaining_human,
+        "team_is_overdue": item.team_is_overdue,
+        "team_sla_percent": item.team_sla_percent,
+        "team_semaphore": item.team_semaphore,
+        "team_duration_human": item.team_duration_human,
+        "team_sla_remaining_human": item.team_sla_remaining_human
     }
 
 @app.get("/api/items")
@@ -1018,6 +1050,17 @@ def update_item_status(
 
     if req.escalation_id is not None:
         item.escalation_id = req.escalation_id if req.escalation_id > 0 else None
+        if item.escalation_id:
+            linked_esc_status = db.query(EscalationDocument).filter(EscalationDocument.id == item.escalation_id).first()
+            if linked_esc_status:
+                esc_rec_dt = linked_esc_status.received_at or linked_esc_status.created_at
+                esc_esc_dt = linked_esc_status.escalated_at or esc_rec_dt
+                if esc_rec_dt:
+                    item.received_at = esc_rec_dt
+                    sla_h = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(item.priority or "Media", 72)
+                    item.due_at = esc_rec_dt + datetime.timedelta(hours=sla_h)
+                if esc_esc_dt:
+                    item.escalated_at = esc_esc_dt
 
     if new_st == "cerrado":
         item.closed_at = now_utc
@@ -1127,47 +1170,30 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
 
     # Procesar fecha de recibimiento en Sycom y fecha de escalada al equipo (Doble SLA)
     now_utc = datetime.datetime.utcnow()
-    
-    received_dt = None
-    if req.received_at:
-        try:
-            clean_rec = req.received_at.replace("Z", "+00:00")
-            received_dt = datetime.datetime.fromisoformat(clean_rec)
-            if received_dt.tzinfo is not None:
-                received_dt = received_dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-        except Exception as e:
-            print(f"[CreateItem] Error parseando received_at '{req.received_at}': {e}")
-            received_dt = None
+    linked_esc = None
+    if req.escalation_id and req.escalation_id > 0:
+        linked_esc = db.query(EscalationDocument).filter(EscalationDocument.id == req.escalation_id).first()
+
+    received_dt = parse_iso_utc(req.received_at)
+    if not received_dt and linked_esc:
+        received_dt = linked_esc.received_at or linked_esc.created_at
     if not received_dt:
         received_dt = now_utc
 
-    escalated_dt = None
-    if req.escalated_at:
-        try:
-            clean_esc = req.escalated_at.replace("Z", "+00:00")
-            escalated_dt = datetime.datetime.fromisoformat(clean_esc)
-            if escalated_dt.tzinfo is not None:
-                escalated_dt = escalated_dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-        except Exception as e:
-            print(f"[CreateItem] Error parseando escalated_at '{req.escalated_at}': {e}")
-            escalated_dt = None
+    escalated_dt = parse_iso_utc(req.escalated_at)
+    if not escalated_dt and linked_esc:
+        escalated_dt = linked_esc.escalated_at or linked_esc.received_at or linked_esc.created_at
     if not escalated_dt:
-        escalated_dt = now_utc
+        escalated_dt = received_dt
 
-    # Cálculo automático del límite SLA del equipo según prioridad a partir de la fecha de escalada
+    # Cálculo automático del límite SLA:
+    # 1. Ambos SLA usan la misma tabla de horas por prioridad (4h, 24h, 72h, 120h)
+    # 2. El SLA principal y el criterio de Atrasadas cuentan desde la llegada a Sycom (received_dt)
     sla_hours = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(priority, 72)
-    due_dt = None
-    if req.due_at:
-        try:
-            clean_due = req.due_at.replace("Z", "+00:00")
-            due_dt = datetime.datetime.fromisoformat(clean_due)
-            if due_dt.tzinfo is not None:
-                due_dt = due_dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
-        except Exception as e:
-            print(f"[CreateItem] Error parseando due_at '{req.due_at}': {e}")
-            due_dt = None
+    due_dt = parse_iso_utc(req.due_at)
     if not due_dt:
-        due_dt = escalated_dt + datetime.timedelta(hours=sla_hours)
+        due_dt = received_dt + datetime.timedelta(hours=sla_hours)
+    team_due_dt = escalated_dt + datetime.timedelta(hours=sla_hours)
 
     # Identificar especialistas solicitados
     matched_list = []
@@ -1265,6 +1291,7 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
         mentions = ", ".join(f"{html.escape(m['name'])} ({m['telegram']})" for m in matched_list) if matched_list else "⚠️ <b>Sin asignar</b> (Atención: @adonislozada)"
         plural_label = "Responsables" if len(matched_list) > 1 else "Responsable"
         due_str = format_caracas_time(due_dt, '%d-%m-%Y %I:%M %p') if due_dt else "Sin límite"
+        team_due_str = format_caracas_time(team_due_dt, '%d-%m-%Y %I:%M %p') if team_due_dt else "Sin límite"
         now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
         safe_title = html.escape(title)
         safe_source = html.escape(source)
@@ -1281,8 +1308,9 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
             f"{prio_icon} <b>Prioridad:</b> {priority}\n"
             f"🎯 <b>{plural_label}:</b> {mentions}\n"
             f"📥 <b>Recibido en Sycom (Empresa):</b> {rec_str}\n"
+            f"⏳ <b>Límite SLA Sycom (+{sla_hours}h):</b> {due_str}\n"
             f"🚀 <b>Escalado a Infra (Equipo):</b> {esc_str}\n"
-            f"⏳ <b>Límite SLA Equipo (+{sla_hours}h):</b> {due_str}\n"
+            f"🛡 <b>Límite SLA Equipo (+{sla_hours}h):</b> {team_due_str}\n"
             f"🕒 <b>Hora registro:</b> {now_str}\n"
             f"{safe_desc}"
             f"{link_html}"
@@ -1303,19 +1331,7 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
     return {
         "status": "OK",
         "message": "Actividad creada con éxito",
-        "item": {
-            "id": item.id,
-            "external_id": item.external_id,
-            "source": item.source,
-            "title": item.title,
-            "client_name": item.client_name,
-            "project_name": getattr(item, "project_name", item.client_name),
-            "assignee_name": item.assignee_name,
-            "priority": item.priority,
-            "status": item.status,
-            "url": item.url,
-            "escalation_id": item.escalation_id
-        }
+        "item": serialize_item(item)
     }
 
 
@@ -1339,11 +1355,13 @@ def update_item_details(
     import urllib.parse
     user_name_clean = urllib.parse.unquote(user_name_raw).strip().lower()
 
+    recalc_due = False
     if role in ("coordinador", "admin", "administrador"):
         if req.title is not None and req.title.strip():
             item.title = req.title.strip()
         if req.priority is not None and req.priority.strip():
             item.priority = req.priority.strip()
+            recalc_due = True
         if req.description is not None:
             item.description = req.description.strip()
         if req.project_name is not None and req.project_name.strip():
@@ -1352,6 +1370,15 @@ def update_item_details(
         elif req.client_name is not None and req.client_name.strip():
             item.client_name = req.client_name.strip()
             item.project_name = req.client_name.strip()
+        if req.received_at is not None:
+            parsed_rec = parse_iso_utc(req.received_at)
+            if parsed_rec:
+                item.received_at = parsed_rec
+                recalc_due = True
+        if req.escalated_at is not None:
+            parsed_esc = parse_iso_utc(req.escalated_at)
+            if parsed_esc:
+                item.escalated_at = parsed_esc
     elif role == "especialista":
         assignee_clean = (item.assignee_name or "").lower()
         first_name = user_name_clean.split()[0] if user_name_clean else ""
@@ -1360,7 +1387,7 @@ def update_item_details(
                 status_code=403,
                 detail="Permiso denegado: Como Especialista, solo puedes actualizar actividades asignadas a ti."
             )
-        if req.title is not None or req.priority is not None or req.description is not None or req.project_name is not None or req.client_name is not None:
+        if req.title is not None or req.priority is not None or req.description is not None or req.project_name is not None or req.client_name is not None or req.received_at is not None or req.escalated_at is not None:
             raise HTTPException(
                 status_code=403,
                 detail="Permiso denegado: Como Especialista, solo puedes vincular escalamientos o registrar recomendaciones."
@@ -1373,6 +1400,22 @@ def update_item_details(
 
     if req.escalation_id is not None:
         item.escalation_id = req.escalation_id if req.escalation_id > 0 else None
+        if item.escalation_id:
+            linked_esc_status = db.query(EscalationDocument).filter(EscalationDocument.id == item.escalation_id).first()
+            if linked_esc_status:
+                esc_rec_dt = linked_esc_status.received_at or linked_esc_status.created_at
+                esc_esc_dt = linked_esc_status.escalated_at or esc_rec_dt
+                if esc_rec_dt and req.received_at is None:
+                    item.received_at = esc_rec_dt
+                    recalc_due = True
+                if esc_esc_dt and req.escalated_at is None:
+                    item.escalated_at = esc_esc_dt
+
+    if recalc_due:
+        sla_h = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(item.priority or "Media", 72)
+        base_rec = item.received_at or item.created_at
+        if base_rec:
+            item.due_at = base_rec + datetime.timedelta(hours=sla_h)
 
     if req.recommendations is not None:
         rec_clean = req.recommendations.strip()
@@ -1398,16 +1441,7 @@ def update_item_details(
     return {
         "status": "OK",
         "message": "Actividad actualizada con éxito",
-        "item": {
-            "id": item.id,
-            "escalation_id": item.escalation_id,
-            "recommendations": item.recommendations,
-            "title": item.title,
-            "priority": item.priority,
-            "description": item.description,
-            "client_name": item.client_name,
-            "project_name": getattr(item, "project_name", item.client_name)
-        }
+        "item": serialize_item(item)
     }
 
 
@@ -1779,6 +1813,8 @@ class CreateEscalationRequest(BaseModel):
     ibp_id: int | None = None
     notes: str | None = None
     recommendations: str | None = None
+    received_at: str | None = None
+    escalated_at: str | None = None
 
 
 class UpdateEscalationRequest(BaseModel):
@@ -1789,6 +1825,8 @@ class UpdateEscalationRequest(BaseModel):
     doc_url: str | None = None
     notes: str | None = None
     recommendations: str | None = None
+    received_at: str | None = None
+    escalated_at: str | None = None
 
 
 class CreateIBPRequest(BaseModel):
@@ -1870,7 +1908,7 @@ def api_create_ibp(
 
 @app.get("/api/escalations")
 def api_get_escalations(db: Session = Depends(get_db)):
-    """Lista todos los documentos de escalamiento registrados (con fecha, autor e IBP asociada)."""
+    """Lista todos los documentos de escalamiento registrados (con fecha de recibimiento, escalada, autor e IBP asociada)."""
     docs = db.query(EscalationDocument).order_by(EscalationDocument.created_at.desc()).all()
     ibp_map = {i.id: i for i in db.query(IBP).all()}
     result = []
@@ -1878,6 +1916,8 @@ def api_get_escalations(db: Session = Depends(get_db)):
         is_gdoc = bool(d.doc_url) or not d.stored_filename
         ibp_obj = ibp_map.get(d.ibp_id) if d.ibp_id else None
         ibp_val = d.ibp or (ibp_obj.name if ibp_obj else "") or ""
+        rec_dt = d.received_at or d.created_at
+        esc_dt = d.escalated_at or rec_dt
         result.append({
             "id": d.id,
             "title": d.title,
@@ -1896,6 +1936,10 @@ def api_get_escalations(db: Session = Depends(get_db)):
             "uploaded_by_role": d.uploaded_by_role,
             "notes": d.notes or "",
             "recommendations": d.recommendations or "",
+            "received_at": rec_dt.isoformat() if rec_dt else None,
+            "escalated_at": esc_dt.isoformat() if esc_dt else None,
+            "received_at_caracas": format_caracas_time(rec_dt, "%d-%m-%Y %I:%M %p") if rec_dt else "—",
+            "escalated_at_caracas": format_caracas_time(esc_dt, "%d-%m-%Y %I:%M %p") if esc_dt else "—",
             "created_at": d.created_at.isoformat() if d.created_at else None,
             "created_at_caracas": format_caracas_time(d.created_at, "%d-%m-%Y %I:%M %p") if d.created_at else "—",
             "view_url": d.doc_url or f"/api/escalations/{d.id}/view",
@@ -1939,6 +1983,10 @@ def api_create_escalation(
     clean_ibp, ibp_id = resolve_ibp(db, req.ibp, req.ibp_id)
     ibp_obj = db.query(IBP).filter(IBP.id == ibp_id).first() if ibp_id else None
 
+    now_utc = datetime.datetime.utcnow()
+    rec_dt = parse_iso_utc(req.received_at) or now_utc
+    esc_dt = parse_iso_utc(req.escalated_at) or rec_dt
+
     doc = EscalationDocument(
         title=title,
         category=category,
@@ -1953,7 +2001,9 @@ def api_create_escalation(
         uploaded_by_role=role,
         notes=(req.notes or "").strip() or None,
         recommendations=(req.recommendations or "").strip() or None,
-        created_at=datetime.datetime.utcnow()
+        received_at=rec_dt,
+        escalated_at=esc_dt,
+        created_at=now_utc
     )
     db.add(doc)
     db.commit()
@@ -1964,6 +2014,8 @@ def api_create_escalation(
         import html
         from .notifications.telegram_notifier import send_telegram_message, now_caracas_str
         now_str = now_caracas_str("%d-%m-%Y %I:%M %p")
+        rec_str = format_caracas_time(rec_dt, "%d-%m-%Y %I:%M %p")
+        esc_str = format_caracas_time(esc_dt, "%d-%m-%Y %I:%M %p")
         safe_title = html.escape(title)
         safe_cat = html.escape(category)
         safe_author = html.escape(user_name)
@@ -1979,8 +2031,10 @@ def api_create_escalation(
             f"📌 <b>Código / Caso:</b> <code>{safe_title}</code>\n"
             f"📂 <b>Categoría:</b> {safe_cat}"
             f"{safe_ibp}\n"
+            f"📥 <b>Recibido en Sycom:</b> {rec_str}\n"
+            f"🚀 <b>Escalado a Infra:</b> {esc_str}\n"
             f"👤 <b>Registrado por:</b> {safe_author} ({role})\n"
-            f"🕒 <b>Fecha:</b> {now_str}"
+            f"🕒 <b>Fecha registro:</b> {now_str}"
             f"{safe_notes}"
             f"{safe_recs}"
             f"{link_html}\n\n"
@@ -2008,6 +2062,10 @@ def api_create_escalation(
             "uploaded_by_role": doc.uploaded_by_role,
             "notes": doc.notes or "",
             "recommendations": doc.recommendations or "",
+            "received_at": doc.received_at.isoformat() if doc.received_at else None,
+            "escalated_at": doc.escalated_at.isoformat() if doc.escalated_at else None,
+            "received_at_caracas": format_caracas_time(doc.received_at, "%d-%m-%Y %I:%M %p") if doc.received_at else "—",
+            "escalated_at_caracas": format_caracas_time(doc.escalated_at, "%d-%m-%Y %I:%M %p") if doc.escalated_at else "—",
             "created_at_caracas": format_caracas_time(doc.created_at, "%d-%m-%Y %I:%M %p")
         }
     }
@@ -2024,7 +2082,7 @@ def api_update_escalation(
     role_param: str = Query(None, alias="role"),
     user_param: str = Query(None, alias="user")
 ):
-    """Actualiza los datos, categoría o recomendaciones de un escalamiento."""
+    """Actualiza los datos, fechas de SLA, categoría o recomendaciones de un escalamiento."""
     doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Documento de escalamiento no encontrado.")
@@ -2066,6 +2124,28 @@ def api_update_escalation(
     if "recommendations" in req.model_fields_set:
         doc.recommendations = req.recommendations.strip() if req.recommendations else None
 
+    dates_updated = False
+    if req.received_at is not None:
+        parsed_rec = parse_iso_utc(req.received_at)
+        if parsed_rec:
+            doc.received_at = parsed_rec
+            dates_updated = True
+    if req.escalated_at is not None:
+        parsed_esc = parse_iso_utc(req.escalated_at)
+        if parsed_esc:
+            doc.escalated_at = parsed_esc
+            dates_updated = True
+
+    if dates_updated:
+        linked_items = db.query(Item).filter(Item.escalation_id == doc.id).all()
+        for it in linked_items:
+            if doc.received_at:
+                it.received_at = doc.received_at
+                sla_h = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(it.priority or "Media", 72)
+                it.due_at = doc.received_at + datetime.timedelta(hours=sla_h)
+            if doc.escalated_at:
+                it.escalated_at = doc.escalated_at
+
     db.commit()
     db.refresh(doc)
 
@@ -2101,6 +2181,8 @@ def api_update_escalation(
         print(f"[Telegram Update Escalation Notification Error] {e}")
 
     ibp_obj = db.query(IBP).filter(IBP.id == doc.ibp_id).first() if doc.ibp_id else None
+    rec_dt = doc.received_at or doc.created_at
+    esc_dt = doc.escalated_at or rec_dt
 
     return {
         "status": "OK",
@@ -2119,6 +2201,10 @@ def api_update_escalation(
             "uploaded_by_role": doc.uploaded_by_role,
             "notes": doc.notes or "",
             "recommendations": doc.recommendations or "",
+            "received_at": rec_dt.isoformat() if rec_dt else None,
+            "escalated_at": esc_dt.isoformat() if esc_dt else None,
+            "received_at_caracas": format_caracas_time(rec_dt, "%d-%m-%Y %I:%M %p") if rec_dt else "—",
+            "escalated_at_caracas": format_caracas_time(esc_dt, "%d-%m-%Y %I:%M %p") if esc_dt else "—",
             "created_at_caracas": format_caracas_time(doc.created_at, "%d-%m-%Y %I:%M %p")
         }
     }

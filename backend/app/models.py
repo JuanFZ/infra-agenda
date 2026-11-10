@@ -32,25 +32,56 @@ class Item(Base):
     recommendations = Column(Text, nullable=True)   # Recomendaciones registradas al cerrar o editar
 
     @property
+    def sla_hours_window(self) -> int:
+        return {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(self.priority or "Media", 72)
+
+    @property
+    def company_sla_start(self) -> datetime.datetime | None:
+        return self.received_at or self.created_at
+
+    @property
     def base_sla_start(self) -> datetime.datetime | None:
-        return self.escalated_at or self.created_at
+        # El SLA principal y el criterio de Atrasadas se rigen por la llegada a Sycom (SLA Empresa)
+        return self.company_sla_start
+
+    @property
+    def company_due_at(self) -> datetime.datetime | None:
+        if self.due_at:
+            return self.due_at
+        start = self.company_sla_start
+        if not start:
+            return None
+        return start + datetime.timedelta(hours=self.sla_hours_window)
+
+    @property
+    def team_sla_start(self) -> datetime.datetime | None:
+        return self.escalated_at or self.received_at or self.created_at
+
+    @property
+    def team_due_at(self) -> datetime.datetime | None:
+        start = self.team_sla_start
+        if not start:
+            return self.due_at
+        return start + datetime.timedelta(hours=self.sla_hours_window)
 
     @property
     def is_overdue(self) -> bool:
+        target_due = self.company_due_at
         if self.status == "cerrado":
-            if self.closed_at and self.due_at:
-                return self.closed_at > self.due_at
+            if self.closed_at and target_due:
+                return self.closed_at > target_due
             return False
-        if not self.due_at:
+        if not target_due:
             return False
-        return datetime.datetime.utcnow() > self.due_at
+        return datetime.datetime.utcnow() > target_due
 
     @property
     def sla_percent(self) -> float:
-        start = self.base_sla_start
-        if not self.due_at or not start:
+        start = self.company_sla_start
+        target_due = self.company_due_at
+        if not target_due or not start:
             return 0.0
-        total_time = (self.due_at - start).total_seconds()
+        total_time = (target_due - start).total_seconds()
         if total_time <= 0:
             return 100.0
         reference_time = self.closed_at if self.status == "cerrado" and self.closed_at else datetime.datetime.utcnow()
@@ -68,8 +99,90 @@ class Item(Base):
             return "rojo"
 
     @property
+    def team_is_overdue(self) -> bool:
+        t_due = self.team_due_at
+        if self.status == "cerrado":
+            if self.closed_at and t_due:
+                return self.closed_at > t_due
+            return False
+        if not t_due:
+            return False
+        return datetime.datetime.utcnow() > t_due
+
+    @property
+    def team_sla_percent(self) -> float:
+        start = self.team_sla_start
+        t_due = self.team_due_at
+        if not t_due or not start:
+            return 0.0
+        total_time = (t_due - start).total_seconds()
+        if total_time <= 0:
+            return 100.0
+        reference_time = self.closed_at if self.status == "cerrado" and self.closed_at else datetime.datetime.utcnow()
+        elapsed = (reference_time - start).total_seconds()
+        return round(max(0.0, (elapsed / total_time) * 100.0), 1)
+
+    @property
+    def team_semaphore(self) -> str:
+        pct = self.team_sla_percent
+        if pct < 75.0:
+            return "verde"
+        elif pct < 100.0:
+            return "amarillo"
+        else:
+            return "rojo"
+
+    @property
+    def team_elapsed_seconds(self) -> float:
+        start = self.team_sla_start
+        if not start:
+            return 0.0
+        ref = self.closed_at if self.status == "cerrado" and self.closed_at else datetime.datetime.utcnow()
+        return max(0.0, (ref - start).total_seconds())
+
+    @property
+    def team_duration_human(self) -> str:
+        secs = int(self.team_elapsed_seconds)
+        if secs < 60:
+            return "< 1m"
+        mins = secs // 60
+        hours = mins // 60
+        days = hours // 24
+        if days > 0:
+            rem_hours = hours % 24
+            return f"{days}d {rem_hours}h"
+        if hours > 0:
+            rem_mins = mins % 60
+            return f"{hours}h {rem_mins}m"
+        return f"{mins}m"
+
+    @property
+    def team_sla_remaining_human(self) -> str:
+        t_due = self.team_due_at
+        if not t_due:
+            return ""
+        now = datetime.datetime.utcnow()
+        ref = self.closed_at if self.status == "cerrado" and self.closed_at else now
+        diff = (t_due - ref).total_seconds()
+        abs_secs = int(abs(diff))
+        mins = abs_secs // 60
+        hours = mins // 60
+        days = hours // 24
+        if days > 0:
+            time_str = f"{days}d {hours % 24}h"
+        elif hours > 0:
+            time_str = f"{hours}h {mins % 60}m"
+        else:
+            time_str = f"{mins}m"
+
+        if diff >= 0:
+            return f"Restan {time_str}"
+        else:
+            return f"+{time_str} excedido"
+
+    @property
     def elapsed_seconds(self) -> float:
-        start = self.base_sla_start or self.created_at
+        start = self.company_sla_start
         if not start:
             return 0.0
         ref = self.closed_at if self.status == "cerrado" and self.closed_at else datetime.datetime.utcnow()
@@ -106,11 +219,12 @@ class Item(Base):
 
     @property
     def sla_remaining_human(self) -> str:
-        if not self.due_at:
+        target_due = self.company_due_at
+        if not target_due:
             return ""
         now = datetime.datetime.utcnow()
         ref = self.closed_at if self.status == "cerrado" and self.closed_at else now
-        diff = (self.due_at - ref).total_seconds()
+        diff = (target_due - ref).total_seconds()
         abs_secs = int(abs(diff))
         mins = abs_secs // 60
         hours = mins // 60
@@ -196,6 +310,8 @@ class EscalationDocument(Base):
     recommendations = Column(Text, nullable=True)
     ibp_id = Column(Integer, nullable=True)                   # Vínculo a ibps.id
     ibp = Column(String(100), nullable=True)                  # Identificación Bancaria del Participante (ej. "0134 - BANESCO")
+    received_at = Column(DateTime, nullable=True)             # Fecha de llegada del escalamiento a Sycom (SLA Empresa)
+    escalated_at = Column(DateTime, nullable=True)            # Fecha de escalada al equipo Infra & BD (SLA Equipo)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
