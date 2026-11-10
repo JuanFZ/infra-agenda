@@ -1195,34 +1195,42 @@
     }
 
     .modal {
-      background: rgba(18, 26, 38, 0.78);
+      background: rgba(18, 26, 38, 0.84);
       backdrop-filter: blur(24px) saturate(160%);
       -webkit-backdrop-filter: blur(24px) saturate(160%);
       border: 1px solid rgba(255, 255, 255, .12);
       box-shadow: 0 20px 50px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .15);
       border-radius: 18px;
-      width: min(100%, 540px);
-      max-height: 88vh;
+      width: min(94vw, 820px);
+      max-height: 90vh;
       overflow-y: auto;
-      padding: 24px;
+      overflow-x: hidden;
+      padding: 26px 32px;
     }
 
     body.light .modal {
-      background: rgba(255, 255, 255, .9);
+      background: rgba(255, 255, 255, .92);
       border: 1px solid rgba(255, 255, 255, .95);
       box-shadow: 0 20px 50px rgba(31, 38, 135, .15);
     }
 
     .modal dl {
       display: grid;
-      grid-template-columns: 140px 1fr;
-      gap: 8px 12px;
+      grid-template-columns: 190px minmax(0, 1fr);
+      gap: 10px 18px;
       margin: 16px 0;
-      font-size: 13px
+      font-size: 13px;
+      align-items: start;
     }
 
     .modal dt {
-      color: var(--muted)
+      color: var(--muted);
+      padding-top: 2px;
+    }
+
+    .modal dd {
+      min-width: 0;
+      overflow-wrap: break-word;
     }
 
     .modal .actions {
@@ -4754,7 +4762,7 @@
       <dd>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           ${(isCoordinator() || canUserEditItem(it)) ? `
-            <select id="modalItemEscalationSelect" onchange="changeItemEscalation(${it.id}, this.value)" style="background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:11.5px;cursor:pointer">
+            <select id="modalItemEscalationSelect" onchange="changeItemEscalation(${it.id}, this.value)" style="background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;max-width:100%;flex:1;min-width:220px">
               <option value="">-- Sin escalamiento vinculado --</option>
               ${ESCALATIONS_LIST.map(esc => `<option value="${esc.id}" ${it.escalation_id === esc.id ? 'selected' : ''}>${formatEscalationOption(esc)}</option>`).join('')}
             </select>
