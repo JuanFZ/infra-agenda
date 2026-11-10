@@ -1,5 +1,7 @@
 import datetime
+import html
 import json
+import os
 import requests
 from sqlalchemy.orm import Session
 from .. import config
@@ -7,6 +9,16 @@ from ..models import Item, AlertLog, User
 
 # Zona Horaria de Venezuela (Caracas: UTC-4)
 CARACAS_TZ = datetime.timezone(datetime.timedelta(hours=-4))
+
+def get_agenda_deep_link(item_or_id: Item | int | str, view: str = "kanban") -> str:
+    """
+    Construye la URL con deep linking a la Agenda de Infraestructura,
+    apuntando a la vista solicitada (por defecto 'kanban') y activando el modal de la actividad.
+    """
+    item_id = getattr(item_or_id, "id", item_or_id)
+    base_url = (getattr(config, "AGENDA_BASE_URL", None) or os.getenv("AGENDA_BASE_URL") or os.getenv("APP_URL") or "http://localhost:8000").rstrip("/")
+    return f"{base_url}/?view={view}&item_id={item_id}"
+
 
 def format_caracas_time(dt: datetime.datetime | datetime.date | str | None, format_str: str = "%d-%m-%Y %I:%M %p") -> str:
     """Convierte cualquier fecha UTC, local o cadena ISO a la zona horaria oficial de Caracas (UTC-4)."""
@@ -114,7 +126,7 @@ def resolve_assignee_mention(db: Session, assignee_name: str, is_critical: bool 
     coord_tag = coord.telegram_username if coord and coord.telegram_username else "@adonislozada"
 
     if not assignee_name or assignee_name.strip() in ("Sin asignar", "Sin Asignar", "Técnico GLPI"):
-        return f"⚠️ *Sin asignar* (Atención Coordinador: {coord_tag})"
+        return f"⚠️ <b>Sin asignar</b> (Atención Coordinador: {coord_tag})"
 
     users = db.query(User).filter(User.is_active == 1).all()
     matched_tags = []
@@ -128,7 +140,7 @@ def resolve_assignee_mention(db: Session, assignee_name: str, is_critical: bool 
             (u.username and u.username.lower() in assignee_lower) or
             (u.email and u.email.lower() in assignee_lower)):
             tag = u.telegram_username if u.telegram_username else u.full_name
-            matched_tags.append(f"{u.full_name} ({tag})")
+            matched_tags.append(f"{html.escape(u.full_name)} ({html.escape(tag)})")
 
     if matched_tags:
         res = ", ".join(matched_tags)
@@ -137,7 +149,7 @@ def resolve_assignee_mention(db: Session, assignee_name: str, is_critical: bool 
             res += f" · 📢 CC: {coord_tag}"
         return res
 
-    return f"{assignee_name}" + (f" · 📢 CC: {coord_tag}" if is_critical else "")
+    return f"{html.escape(assignee_name)}" + (f" · 📢 CC: {coord_tag}" if is_critical else "")
 
 
 def check_and_notify_alerts(db: Session):
@@ -165,18 +177,24 @@ def check_and_notify_alerts(db: Session):
             if not new_alerted:
                 assignee_str = resolve_assignee_mention(db, item.assignee_name, is_critical=False)
                 due_str = format_caracas_time(item.due_at, "%d-%m-%Y %I:%M %p") if item.due_at else "No especificada"
-                ticket_url = item.url or "http://200.74.215.44:7070/"
+                agenda_url = get_agenda_deep_link(item.id, view="kanban")
+                safe_title = html.escape(item.title or "")
+                safe_source = html.escape(item.source or "")
+                safe_ext_id = html.escape(str(item.external_id or ""))
+                safe_client = html.escape(item.client_name or "")
+                safe_priority = html.escape(item.priority or "")
+
                 msg_nuevo = (
-                    f"🆕 *NUEVO REQUERIMIENTO ASIGNADO ({item.source.upper()})*\n"
+                    f"🆕 <b>NUEVO REQUERIMIENTO ASIGNADO ({safe_source.upper()})</b>\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"📋 *{item.source} #{item.external_id}:* {item.title}\n"
-                    f"🏢 *Cliente / Espacio:* {item.client_name}\n"
-                    f"👤 *Responsable:* {assignee_str}\n"
-                    f"⚡ *Prioridad:* {item.priority}\n"
-                    f"⏰ *Vence:* {due_str}\n"
-                    f"🔗 [Abrir en {item.source}]({ticket_url})"
+                    f"📋 <b>{safe_source} #{safe_ext_id}:</b> {safe_title}\n"
+                    f"🏢 <b>Cliente / Espacio:</b> {safe_client}\n"
+                    f"👤 <b>Responsable:</b> {assignee_str}\n"
+                    f"⚡ <b>Prioridad:</b> {safe_priority}\n"
+                    f"⏰ <b>Vence:</b> {due_str}\n"
+                    f"🔗 <a href=\"{agenda_url}\"><b>Abrir Agenda</b></a>"
                 )
-                ok = send_telegram_message(msg_nuevo)
+                ok = send_telegram_message(msg_nuevo, parse_mode="HTML")
                 if ok:
                     log_nuevo = AlertLog(item_id=item.id, semaphore="nuevo")
                     db.add(log_nuevo)
@@ -199,36 +217,42 @@ def check_and_notify_alerts(db: Session):
         is_critical = (sem == "rojo")
         assignee_str = resolve_assignee_mention(db, item.assignee_name, is_critical=is_critical)
         due_str = format_caracas_time(item.due_at, "%d-%m-%Y %I:%M %p") if item.due_at else "No especificada"
-        ticket_url = item.url or "http://200.74.215.44:7070/"
+        agenda_url = get_agenda_deep_link(item.id, view="kanban")
+        safe_title = html.escape(item.title or "")
+        safe_source = html.escape(item.source or "")
+        safe_ext_id = html.escape(str(item.external_id or ""))
+        safe_client = html.escape(item.client_name or "")
+        safe_priority = html.escape(item.priority or "")
 
         if sem == "amarillo":
             msg = (
-                f"🟡 *ALERTA PREVENTIVA · SLA al {item.sla_percent}%*\n"
+                f"🟡 <b>ALERTA PREVENTIVA · SLA al {item.sla_percent}%</b>\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"📋 *{item.source} #{item.external_id}:* {item.title}\n"
-                f"🏢 *Cliente / Entidad:* {item.client_name}\n"
-                f"👤 *Responsable:* {assignee_str}\n"
-                f"⚡ *Prioridad:* {item.priority}\n"
-                f"⏰ *Vence:* {due_str}\n"
-                f"🔗 [Abrir en {item.source}]({ticket_url})"
+                f"📋 <b>{safe_source} #{safe_ext_id}:</b> {safe_title}\n"
+                f"🏢 <b>Cliente / Entidad:</b> {safe_client}\n"
+                f"👤 <b>Responsable:</b> {assignee_str}\n"
+                f"⚡ <b>Prioridad:</b> {safe_priority}\n"
+                f"⏰ <b>Vence:</b> {due_str}\n"
+                f"🔗 <a href=\"{agenda_url}\"><b>Abrir Agenda</b></a>"
             )
         else: # rojo
             msg = (
-                f"🚨 *¡ATENCIÓN! TICKET FUERA DE SLA ({item.sla_percent}%)*\n"
+                f"🚨 <b>¡ATENCIÓN! TICKET FUERA DE SLA ({item.sla_percent}%)</b>\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"📋 *{item.source} #{item.external_id}:* {item.title}\n"
-                f"🏢 *Cliente / Entidad:* {item.client_name}\n"
-                f"👤 *Responsable:* {assignee_str}\n"
-                f"⚡ *Prioridad:* {item.priority}\n"
-                f"⏰ *Venció:* {due_str}\n"
-                f"🔗 [Abrir en {item.source}]({ticket_url})"
+                f"📋 <b>{safe_source} #{safe_ext_id}:</b> {safe_title}\n"
+                f"🏢 <b>Cliente / Entidad:</b> {safe_client}\n"
+                f"👤 <b>Responsable:</b> {assignee_str}\n"
+                f"⚡ <b>Prioridad:</b> {safe_priority}\n"
+                f"⏰ <b>Venció:</b> {due_str}\n"
+                f"🔗 <a href=\"{agenda_url}\"><b>Abrir Agenda</b></a>"
             )
 
-        ok = send_telegram_message(msg)
+        ok = send_telegram_message(msg, parse_mode="HTML")
         if ok:
             log = AlertLog(item_id=item.id, semaphore=sem)
             db.add(log)
             db.commit()
             print(f"[Telegram Notifier] Alerta '{sem}' enviada para item #{item.external_id} ({item.source})")
+
 
 

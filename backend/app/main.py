@@ -19,7 +19,7 @@ from .config import SYNC_INTERVAL_MINUTES
 from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
 from .sync.glpi_client import GLPIClient
 from .sync.clickup_client import ClickUpClient
-from .notifications.telegram_notifier import CARACAS_TZ, format_caracas_time, now_caracas_str, test_telegram_connection
+from .notifications.telegram_notifier import CARACAS_TZ, format_caracas_time, now_caracas_str, test_telegram_connection, get_agenda_deep_link
 from .reports.report_generator import get_report_data, generate_excel_report, generate_executive_html
 
 # Directorio de almacenamiento permanente para documentos de escalamiento (PDFs)
@@ -265,14 +265,9 @@ def ensure_db_schema():
 
             conn.connection.commit()
 
-        # Poblar catálogo oficial de las 34 IBPs (Participantes SIMF)
+        # Poblar catálogo oficial de las 34 IBPs (Participantes SIMF) si no existen
         seed_db = SessionLocal()
         try:
-            official_codes = [x["code"] for x in IBP_INVENTORY]
-            # Desactivar y depurar posibles duplicados legacy de pruebas iniciales que no tengan código numérico SIMF
-            seed_db.query(IBP).filter(~IBP.code.in_(official_codes)).delete(synchronize_session=False)
-            seed_db.commit()
-
             existing = seed_db.query(IBP).all()
             existing_codes = {x.code for x in existing if x.code}
             existing_names = {x.name for x in existing if x.name}
@@ -861,12 +856,14 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db),
         now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
         safe_title = html.escape(item.title or "")
         safe_source = html.escape(item.source or "")
+        agenda_url = get_agenda_deep_link(item.id, view="kanban")
         msg = (
             f"{icon} <b>Asignación en vivo</b>\n\n"
             f"📌 <b>Asunto:</b> {safe_title}\n"
             f"🏷 <b>Origen:</b> {safe_source} #{item.external_id}\n"
             f"🎯 <b>{plural_label}:</b> {mentions}\n"
-            f"🕒 <b>Incorporado a la actividad:</b> {now_str}\n"
+            f"🕒 <b>Incorporado a la actividad:</b> {now_str}\n\n"
+            f"🔗 <a href=\"{agenda_url}\"><b>Abrir Agenda</b></a>\n\n"
             f"⚡ <i>Asignado desde la Agenda de Infra</i>"
         )
         send_telegram_message(msg, parse_mode="HTML")
@@ -1009,6 +1006,7 @@ def update_item_status(
         now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
         user_info = f" por {html.escape(x_user_name)}" if x_user_name else ""
         rec_info = f"\n💡 <b>Recomendaciones:</b>\n{html.escape(req.recommendations.strip())}\n" if (new_st == "cerrado" and req.recommendations and req.recommendations.strip()) else ""
+        agenda_url = get_agenda_deep_link(item.id, view="kanban")
         msg = (
             f"📋 <b>Cambio de estado en Tablero Kanban</b>\n\n"
             f"📌 <b>Asunto:</b> {safe_title}\n"
@@ -1016,7 +1014,8 @@ def update_item_status(
             f"📊 <b>Nuevo estado:</b> {status_labels.get(new_st, new_st)} ({safe_status_orig})\n"
             f"👤 <b>Responsable:</b> {safe_assignee}\n"
             f"🕒 <b>Hora:</b> {now_str}\n"
-            f"{rec_info}"
+            f"{rec_info}\n"
+            f"🔗 <a href=\"{agenda_url}\"><b>Abrir Agenda</b></a>\n\n"
             f"⚡ <i>Actualizado{user_info} desde la Agenda</i>"
         )
         send_telegram_message(msg, parse_mode="HTML")
@@ -1203,8 +1202,8 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
         safe_source = html.escape(source)
         safe_desc = f"\n📝 <b>Descripción:</b>\n{html.escape(req.description.strip())}\n" if req.description and req.description.strip() else ""
         prio_icon = "🔥" if priority == "Crítica" else ("⚡" if priority == "Alta" else "📌")
-        safe_url = html.escape(str(url).strip()) if url else ""
-        link_html = f"\n🔗 <a href='{safe_url}'>Abrir en {safe_source}</a>" if safe_url else ""
+        agenda_url = get_agenda_deep_link(item.id, view="kanban")
+        link_html = f"\n🔗 <a href=\"{agenda_url}\"><b>Abrir Agenda</b></a>"
         rec_str = format_caracas_time(received_dt, '%d-%m-%Y %I:%M %p')
         esc_str = format_caracas_time(escalated_dt, '%d-%m-%Y %I:%M %p')
         msg = (
@@ -1701,13 +1700,13 @@ def format_file_size(num_bytes: int) -> str:
         return f"{num_bytes / (1024 * 1024):.2f} MB"
 
 
-VALID_ESCALATION_CATEGORIES = ["CPU", "RAM", "Disco", "Antivirus", "PostgreSQL", "Servicios"]
+VALID_ESCALATION_CATEGORIES = ["CPU", "RAM", "PostgreSQL", "Servicios BD", "Discos", "Procesos"]
 
 
 class CreateEscalationRequest(BaseModel):
     title: str
     doc_url: str
-    category: str = "Servicios"
+    category: str = "Servicios BD"
     ibp: str | None = None
     ibp_id: int | None = None
     notes: str | None = None
@@ -1814,7 +1813,7 @@ def api_get_escalations(db: Session = Depends(get_db)):
         result.append({
             "id": d.id,
             "title": d.title,
-            "category": d.category or "Servicios",
+            "category": d.category or "Servicios BD",
             "ibp": ibp_val,
             "ibp_id": d.ibp_id,
             "ibp_name": ibp_obj.name if ibp_obj else (d.ibp or None),
@@ -1859,12 +1858,12 @@ def api_create_escalation(
         doc_url = "https://" + doc_url
 
     category = (req.category or "").strip()
-    if category == "Servicios BD":
-        category = "Servicios"
-    elif category == "Discos":
-        category = "Disco"
+    if category == "Servicios":
+        category = "Servicios BD"
+    elif category == "Disco":
+        category = "Discos"
     if category not in VALID_ESCALATION_CATEGORIES:
-        category = "Servicios"
+        category = "Servicios BD"
 
     role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "Coordinador")).strip().capitalize()
     user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "Adonis Lozada Figueroa")).strip() or "Adonis Lozada Figueroa"
@@ -1973,10 +1972,10 @@ def api_update_escalation(
 
     if req.category is not None:
         c = req.category.strip()
-        if c == "Servicios BD":
-            c = "Servicios"
-        elif c == "Discos":
-            c = "Disco"
+        if c == "Servicios":
+            c = "Servicios BD"
+        elif c == "Disco":
+            c = "Discos"
         if c in VALID_ESCALATION_CATEGORIES:
             doc.category = c
 
@@ -2117,13 +2116,13 @@ def api_upload_escalation(
     clean_ibp, ibp_id = resolve_ibp(db, req.ibp, req.ibp_id)
     ibp_obj = db.query(IBP).filter(IBP.id == ibp_id).first() if ibp_id else None
 
-    category = (req.category or "").strip() if req.category else "Servicios"
-    if category == "Servicios BD":
-        category = "Servicios"
-    elif category == "Discos":
-        category = "Disco"
+    category = (req.category or "").strip() if req.category else "Servicios BD"
+    if category == "Servicios":
+        category = "Servicios BD"
+    elif category == "Disco":
+        category = "Discos"
     if category not in VALID_ESCALATION_CATEGORIES:
-        category = "Servicios"
+        category = "Servicios BD"
 
     doc = EscalationDocument(
         title=title,

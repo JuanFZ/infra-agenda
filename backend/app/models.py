@@ -184,7 +184,7 @@ class EscalationDocument(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     title = Column(String(250), nullable=False)               # ej. "SIMF-ES-5260 88920 Venezolano"
-    category = Column(String(100), default="Servicios")       # CPU, RAM, Disco, Antivirus, PostgreSQL, Servicios
+    category = Column(String(100), default="Servicios BD")   # CPU, RAM, PostgreSQL, Servicios BD, Discos, Procesos
     doc_url = Column(String(1000), nullable=True)             # Enlace a Google Docs o Drive
     original_filename = Column(String(250), nullable=True)
     stored_filename = Column(String(250), nullable=True)
