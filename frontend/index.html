@@ -3187,7 +3187,8 @@
     function getItemTimeLabel(it) {
       if (it.time_sla_label) return it.time_sla_label;
       if (!it.created_at) return (it.status === 'cerrado' ? 'Cerrado' : 'Activo');
-      const created = new Date(it.created_at).getTime();
+      const startRef = it.escalated_at || it.created_at;
+      const created = new Date(startRef).getTime();
       const ref = (it.status === 'cerrado' && it.closed_at) ? new Date(it.closed_at).getTime() : Date.now();
       const diffSec = Math.max(0, Math.floor((ref - created) / 1000));
       const mins = Math.floor(diffSec / 60);
@@ -3200,7 +3201,7 @@
       else dur = '< 1m';
 
       if (it.status === 'cerrado') return `Duró ${dur}`;
-      if (it.status === 'pendiente') return `Sin atender: ${dur}`;
+      if (it.status === 'pendiente') return `Por iniciar: ${dur}`;
       if (it.status === 'curso') return `En atención: ${dur}`;
       if (it.status === 'espera') return `En espera: ${dur}`;
       return `Transcurrido: ${dur}`;
@@ -3319,7 +3320,7 @@
       const pendientes = items.filter(i => i.status === 'pendiente').length;
       const en_curso = items.filter(i => i.status === 'curso').length;
       const en_espera = items.filter(i => i.status === 'espera').length;
-      const atrasados = items.filter(i => i.is_overdue || i.semaphore === 'rojo').length;
+      const atrasados = items.filter(i => i.status !== 'cerrado' && (i.is_overdue || i.semaphore === 'rojo')).length;
       const cerrados = items.filter(i => i.status === 'cerrado');
       let cumplimiento_sla = 100.0;
       if (cerrados.length > 0) {
@@ -3348,7 +3349,7 @@
         if (ACTIVE_KPI_FILTER === 'pendiente' && it.status !== 'pendiente') return false;
         if (ACTIVE_KPI_FILTER === 'curso' && it.status !== 'curso') return false;
         if (ACTIVE_KPI_FILTER === 'espera' && it.status !== 'espera') return false;
-        if (ACTIVE_KPI_FILTER === 'atrasados' && !(it.is_overdue || it.semaphore === 'rojo')) return false;
+        if (ACTIVE_KPI_FILTER === 'atrasados' && (it.status === 'cerrado' || !(it.is_overdue || it.semaphore === 'rojo'))) return false;
         if (ACTIVE_KPI_FILTER === 'cumplimiento' && (it.is_overdue || it.semaphore === 'rojo')) return false;
         return true;
       });
@@ -3403,7 +3404,7 @@
       renderKanban(list);
 
       // 3. Atrasados
-      const over = list.filter(i => i.is_overdue || i.semaphore === 'rojo');
+      const over = list.filter(i => i.status !== 'cerrado' && (i.is_overdue || i.semaphore === 'rojo'));
       document.querySelector('#tblOverdue tbody').innerHTML = over.map(it => `
     <tr class="click" onclick="openModal(${it.id})">
       <td><span class="sem rojo"></span></td>
@@ -3599,9 +3600,14 @@
             </div>
             <div class="title">${it.title}</div>
             <div class="muted" style="font-size:11px">${it.client_name}</div>
-            <div style="font-size:11px;font-weight:600;margin-top:3px;display:flex;align-items:center;gap:4px;color:var(--text)">
-              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.6"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.assignee_name || 'Sin asignar'}</span>
+            <div style="font-size:11px;font-weight:600;margin-top:4px;display:flex;align-items:center;justify-content:space-between;color:var(--text)">
+              <div style="display:flex;align-items:center;gap:4px;overflow:hidden">
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.6;flex-shrink:0"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.assignee_name || 'Sin asignar'}</span>
+              </div>
+              ${(!it.assignee_name || it.assignee_name.toLowerCase().includes('sin asignar')) && isCoordinator() ? `
+                <button type="button" class="badge" onclick="event.stopPropagation();openModal(${it.id})" style="background:rgba(243,156,18,.15);color:#f39c12;border:1px solid rgba(243,156,18,.35);padding:1px 6px;font-size:10px;font-weight:700;border-radius:4px;cursor:pointer;flex-shrink:0;transition:all .15s" title="Asignar especialista">+ Asignar</button>
+              ` : ''}
             </div>
             <div style="font-size:11px;font-weight:600;color:var(--accent);margin-top:4px;display:flex;justify-content:space-between;align-items:center">
               <span>${getItemTimeLabel(it)}</span>
@@ -3752,7 +3758,7 @@
       const day = pad(d.getDate());
       const h = pad(d.getHours());
       const min = pad(d.getMinutes());
-      return `${y} -${m} -${day}T${h}:${min} `;
+      return `${y}-${m}-${day}T${h}:${min}`;
     }
 
     function setCreateSource(src) {
@@ -3772,14 +3778,28 @@
 
     function updateCreateSlaSuggestion() {
       const prioSelect = document.getElementById('createPriority');
+      const escInput = document.getElementById('createEscalatedAt');
+      const badge = document.getElementById('createSlaBadgePreview');
       if (!prioSelect) return;
       const prio = prioSelect.value;
       const hoursMap = { 'Crítica': 4, 'Alta': 24, 'Media': 72, 'Baja': 120 };
       const h = hoursMap[prio] || 72;
-      const targetDate = new Date(Date.now() + h * 3600 * 1000);
-      const input = document.getElementById('createDueAt');
-      if (input) {
-        input.value = formatDateTimeLocal(targetDate);
+
+      let baseDate = new Date();
+      if (escInput && escInput.value) {
+        const parsed = new Date(escInput.value);
+        if (!isNaN(parsed.getTime())) baseDate = parsed;
+      }
+      const targetDate = new Date(baseDate.getTime() + h * 3600 * 1000);
+      if (badge) {
+        const pad = n => String(n).padStart(2, '0');
+        const formattedTarget = `${pad(targetDate.getDate())}-${pad(targetDate.getMonth() + 1)}-${targetDate.getFullYear()} ${pad(targetDate.getHours())}:${pad(targetDate.getMinutes())}`;
+        badge.innerHTML = `
+          <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(79,140,255,0.12);color:var(--accent);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid rgba(79,140,255,0.25)">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>SLA Interno del Equipo: <b style="color:#ffffff">+${h}h</b> &nbsp;·&nbsp; Vence: <b style="color:#ffffff">${formattedTarget}</b></span>
+          </div>
+        `;
       }
     }
 
@@ -3885,7 +3905,10 @@
       const title = (document.getElementById('createTitle').value || '').trim();
       const desc = (document.getElementById('createDesc').value || '').trim();
       const priority = document.getElementById('createPriority').value;
-      const dueAtVal = document.getElementById('createDueAt').value;
+      const receivedAtInput = document.getElementById('createReceivedAt');
+      const escalatedAtInput = document.getElementById('createEscalatedAt');
+      const receivedAtVal = receivedAtInput ? receivedAtInput.value : '';
+      const escalatedAtVal = escalatedAtInput ? escalatedAtInput.value : '';
       const btn = document.getElementById('btnSubmitCreate');
 
       if (!title) {
@@ -3909,7 +3932,8 @@
           description: desc || null,
           priority: priority,
           specialist_keys: CREATE_SELECTED_KEYS.length ? CREATE_SELECTED_KEYS : null,
-          due_at: dueAtVal ? new Date(dueAtVal).toISOString() : null
+          received_at: receivedAtVal ? new Date(receivedAtVal).toISOString() : null,
+          escalated_at: escalatedAtVal ? new Date(escalatedAtVal).toISOString() : null
         };
 
         const res = await fetch(`${API_URL}/items`, {
@@ -4031,21 +4055,29 @@
         <textarea id="createDesc" class="form-input" rows="3" placeholder="Detalles técnicos, comandos, alcance o requerimientos específicos..."></textarea>
       </div>
 
-      <!-- 4. Prioridad y Fecha Límite (SLA) -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <!-- 4. Prioridad y Doble SLA (Empresa y Equipo) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label" for="createPriority">Prioridad:</label>
           <select id="createPriority" class="form-input" onchange="updateCreateSlaSuggestion()" style="cursor:pointer">
-            <option value="Media" selected>Media (SLA: 72h)</option>
-            <option value="Baja">Baja (SLA: 120h)</option>
-            <option value="Alta">Alta (SLA: 24h)</option>
-            <option value="Crítica">Crítica (SLA: 4h)</option>
+            <option value="Media" selected>Media (SLA Equipo: 72h)</option>
+            <option value="Baja">Baja (SLA Equipo: 120h)</option>
+            <option value="Alta">Alta (SLA Equipo: 24h)</option>
+            <option value="Crítica">Crítica (SLA Equipo: 4h)</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" for="createDueAt">Fecha y Hora Límite (SLA):</label>
-          <input type="datetime-local" id="createDueAt" class="form-input" style="cursor:pointer">
+          <label class="form-label" for="createReceivedAt">Recibimiento en Sycom (SLA Empresa):</label>
+          <input type="datetime-local" id="createReceivedAt" class="form-input" style="cursor:pointer">
         </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div class="form-group" style="margin-bottom:6px">
+          <label class="form-label" for="createEscalatedAt">Escalada al Equipo de Infra & BD (SLA Equipo):</label>
+          <input type="datetime-local" id="createEscalatedAt" class="form-input" onchange="updateCreateSlaSuggestion()" style="cursor:pointer">
+        </div>
+        <div id="createSlaBadgePreview" style="margin-top:4px"></div>
       </div>
 
       <!-- 5. Responsable(s) con Buscador corporativo -->
@@ -4083,6 +4115,11 @@
   `;
 
       renderCreateAssigneeChips();
+      const nowLocal = formatDateTimeLocal(new Date());
+      const rec = document.getElementById('createReceivedAt');
+      const esc = document.getElementById('createEscalatedAt');
+      if (rec) rec.value = nowLocal;
+      if (esc) esc.value = nowLocal;
       updateCreateSlaSuggestion();
       document.getElementById('modalBg').classList.add('show');
       setTimeout(() => {
@@ -4202,9 +4239,11 @@
       <dt>Prioridad:</dt><dd><span class="prio prio-${it.priority}">${it.priority}</span></dd>
       <dt>Cliente / Entidad:</dt><dd>${it.client_name}</dd>
       <dt>Creado el:</dt><dd>${formatDate(it.created_at, true)}</dd>
+      ${it.received_at ? `<dt>Recibido en Sycom (SLA Empresa):</dt><dd><b>${formatDate(it.received_at, true)}</b></dd>` : ''}
+      ${it.escalated_at ? `<dt>Escalado a Infra (SLA Equipo):</dt><dd><b>${formatDate(it.escalated_at, true)}</b></dd>` : ''}
       <dt>Tiempo registrado:</dt><dd><b>${getItemTimeLabel(it)}</b></dd>
-      <dt>Vencimiento SLA:</dt><dd>${formatDate(it.due_at, true)}</dd>
-      <dt>SLA / Plazo:</dt><dd><b>${it.sla_percent}%</b> consumido (${it.semaphore.toUpperCase()}) ${getItemSlaRemaining(it) ? '· <b>' + getItemSlaRemaining(it) + '</b>' : ''}</dd>
+      <dt>Vencimiento SLA Equipo:</dt><dd>${formatDate(it.due_at, true)}</dd>
+      <dt>SLA / Plazo Equipo:</dt><dd><b>${it.sla_percent}%</b> consumido (${it.semaphore.toUpperCase()}) ${getItemSlaRemaining(it) ? '· <b>' + getItemSlaRemaining(it) + '</b>' : ''}</dd>
     </dl>
     <div class="actions" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       ${isCoordinator() ? `
@@ -4282,7 +4321,11 @@
           return false;
         }
         await loadData();
-        showToast('Asignación guardada', 'Especialista(s) asignados y notificados por Telegram.', 'success', 3500);
+        if (data.sync_warning) {
+          showToast('Asignado con advertencia de sincronización', data.sync_warning, 'warning', 7000);
+        } else {
+          showToast('Asignación guardada', 'Especialista(s) asignados y notificados por Telegram.', 'success', 3500);
+        }
         return true;
       } catch (err) {
         console.error('Error in assignItem:', err);

@@ -85,6 +85,12 @@ def sync_glpi(db: Session):
                     if item.assigned_at:
                         norm["assigned_at"] = item.assigned_at
 
+                # Preservar fechas de recibimiento y escalada si ya existen
+                if item.received_at:
+                    norm["received_at"] = item.received_at
+                if item.escalated_at:
+                    norm["escalated_at"] = item.escalated_at
+
                 # Si tiene responsable y no tenía fecha de asignación o cambió de responsable
                 has_assignee = norm.get("assignee_name") and "sin asignar" not in norm["assignee_name"].lower()
                 if has_assignee:
@@ -99,6 +105,8 @@ def sync_glpi(db: Session):
                 has_assignee = norm.get("assignee_name") and "sin asignar" not in norm["assignee_name"].lower()
                 if has_assignee:
                     norm["assigned_at"] = norm.get("updated_at") or norm.get("created_at") or datetime.datetime.utcnow()
+                norm.setdefault("received_at", norm.get("created_at"))
+                norm.setdefault("escalated_at", norm.get("created_at"))
                 item = Item(**norm)
                 db.add(item)
             count += 1
@@ -164,6 +172,12 @@ def sync_clickup(db: Session):
                     if item.assigned_at:
                         norm["assigned_at"] = item.assigned_at
 
+                # Preservar fechas de recibimiento y escalada si ya existen
+                if item.received_at:
+                    norm["received_at"] = item.received_at
+                if item.escalated_at:
+                    norm["escalated_at"] = item.escalated_at
+
                 # Si tiene responsable y no tenía fecha de asignación o cambió de responsable
                 has_assignee = norm.get("assignee_name") and "sin asignar" not in norm["assignee_name"].lower()
                 if has_assignee:
@@ -178,6 +192,8 @@ def sync_clickup(db: Session):
                 has_assignee = norm.get("assignee_name") and "sin asignar" not in norm["assignee_name"].lower()
                 if has_assignee:
                     norm["assigned_at"] = norm.get("updated_at") or norm.get("created_at") or datetime.datetime.utcnow()
+                norm.setdefault("received_at", norm.get("created_at"))
+                norm.setdefault("escalated_at", norm.get("created_at"))
                 item = Item(**norm)
                 db.add(item)
             count += 1

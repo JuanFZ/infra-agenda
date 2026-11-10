@@ -47,6 +47,10 @@ def ensure_db_schema():
             cols = [row[1] for row in cursor.fetchall()]
             if "assigned_at" not in cols:
                 cursor.execute("ALTER TABLE items ADD COLUMN assigned_at DATETIME")
+            if "received_at" not in cols:
+                cursor.execute("ALTER TABLE items ADD COLUMN received_at DATETIME")
+            if "escalated_at" not in cols:
+                cursor.execute("ALTER TABLE items ADD COLUMN escalated_at DATETIME")
             
             cursor.execute("PRAGMA table_info(users)")
             u_cols = [row[1] for row in cursor.fetchall()]
@@ -148,7 +152,9 @@ class CreateItemRequest(BaseModel):
     description: str | None = None
     priority: str = "Media"
     specialist_keys: list[str] | None = None
-    due_at: str | None = None
+    received_at: str | None = None   # Fecha y hora en que la solicitud llegó a Sycom (SLA Empresa)
+    escalated_at: str | None = None  # Fecha y hora en que fue escalada a Infra & BD (SLA Equipo)
+    due_at: str | None = None        # Opcional, calculado automáticamente por prioridad a partir de escalated_at
 
 class LoginRequest(BaseModel):
     username: str
@@ -330,6 +336,8 @@ def get_items(
             "status": item.status,
             "status_origin": item.status_origin,
             "created_at": item.created_at.isoformat() if item.created_at else None,
+            "received_at": item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None),
+            "escalated_at": item.escalated_at.isoformat() if item.escalated_at else (item.created_at.isoformat() if item.created_at else None),
             "assigned_at": item.assigned_at.isoformat() if item.assigned_at else None,
             "due_at": item.due_at.isoformat() if item.due_at else None,
             "closed_at": item.closed_at.isoformat() if item.closed_at else None,
@@ -364,7 +372,8 @@ def get_kpis(db: Session = Depends(get_db)):
     espera = sum(1 for i in all_items if i.status == "espera")
     cerrados = [i for i in all_items if i.status == "cerrado"]
     
-    atrasados = sum(1 for i in all_items if i.is_overdue)
+    # Atrasadas: únicamente actividades abiertas cuyo tiempo de SLA ha vencido
+    atrasados = sum(1 for i in all_items if i.status != "cerrado" and i.is_overdue)
     vencen_hoy = sum(1 for i in all_items if i.status != "cerrado" and i.due_at and today_start <= i.due_at <= today_end)
     cerrados_7d = sum(1 for i in cerrados if i.closed_at and i.closed_at >= seven_days_ago)
 
@@ -553,6 +562,7 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db),
         raise HTTPException(status_code=400, detail="Ninguno de los especialistas indicados fue reconocido.")
 
     success = False
+    sync_warning = None
     source = item.source
     ext_id = item.external_id
 
@@ -560,21 +570,23 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db),
         client = GLPIClient()
         glpi_ids = [m["glpi_id"] for m in matched_list if m.get("glpi_id")]
         success = client.assign_ticket(ext_id, glpi_ids)
+        if not success:
+            sync_warning = "Asignado en Agenda de Infra. Aviso GLPI: No se pudo sincronizar el técnico directamente en GLPI."
     elif source == "ClickUp":
         client = ClickUpClient()
         clickup_ids = [m["clickup_id"] for m in matched_list if m.get("clickup_id")]
         if clickup_ids:
             success = client.assign_task(ext_id, clickup_ids)
+            if not success:
+                sync_warning = (
+                    "Asignado en Agenda de Infra y notificado por Telegram. "
+                    "Aviso ClickUp: El espacio o lista en ClickUp es privado; para que ClickUp también lo refleje en su web, "
+                    "el administrador debe añadir al especialista como miembro del espacio en ClickUp."
+                )
         else:
             success = True
 
-    if not success:
-        raise HTTPException(
-            status_code=500, 
-            detail=f"No se pudo sincronizar la asignación en {source}. Si es ClickUp, asegúrate de que el especialista haya sido añadido al espacio o lista correspondiente."
-        )
-
-    # Actualizar estado y responsable en la base de datos operativa
+    # Actualizar estado y responsable de forma garantizada en la base de datos operativa
     combined_names = ", ".join(m["name"] for m in matched_list)
     now_utc = datetime.datetime.utcnow()
     item.assignee_name = combined_names
@@ -766,8 +778,37 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
     if priority not in ["Baja", "Media", "Alta", "Crítica"]:
         priority = "Media"
 
-    # Procesar fecha límite (SLA)
+    # Procesar fecha de recibimiento en Sycom y fecha de escalada al equipo (Doble SLA)
     now_utc = datetime.datetime.utcnow()
+    
+    received_dt = None
+    if req.received_at:
+        try:
+            clean_rec = req.received_at.replace("Z", "+00:00")
+            received_dt = datetime.datetime.fromisoformat(clean_rec)
+            if received_dt.tzinfo is not None:
+                received_dt = received_dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        except Exception as e:
+            print(f"[CreateItem] Error parseando received_at '{req.received_at}': {e}")
+            received_dt = None
+    if not received_dt:
+        received_dt = now_utc
+
+    escalated_dt = None
+    if req.escalated_at:
+        try:
+            clean_esc = req.escalated_at.replace("Z", "+00:00")
+            escalated_dt = datetime.datetime.fromisoformat(clean_esc)
+            if escalated_dt.tzinfo is not None:
+                escalated_dt = escalated_dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        except Exception as e:
+            print(f"[CreateItem] Error parseando escalated_at '{req.escalated_at}': {e}")
+            escalated_dt = None
+    if not escalated_dt:
+        escalated_dt = now_utc
+
+    # Cálculo automático del límite SLA del equipo según prioridad a partir de la fecha de escalada
+    sla_hours = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(priority, 72)
     due_dt = None
     if req.due_at:
         try:
@@ -778,10 +819,8 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
         except Exception as e:
             print(f"[CreateItem] Error parseando due_at '{req.due_at}': {e}")
             due_dt = None
-
     if not due_dt:
-        sla_hours = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(priority, 72)
-        due_dt = now_utc + datetime.timedelta(hours=sla_hours)
+        due_dt = escalated_dt + datetime.timedelta(hours=sla_hours)
 
     # Identificar especialistas solicitados
     matched_list = []
@@ -844,6 +883,7 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
         external_id=external_id,
         url=url,
         title=title,
+        description=req.description,
         category=category,
         client_name=client_name,
         client_type="Interno",
@@ -852,6 +892,8 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
         status="pendiente",
         status_origin=status_origin,
         created_at=now_utc,
+        received_at=received_dt,
+        escalated_at=escalated_dt,
         assigned_at=now_utc if matched_list else None,
         due_at=due_dt,
         updated_at=now_utc,
@@ -875,13 +917,17 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
         prio_icon = "🔥" if priority == "Crítica" else ("⚡" if priority == "Alta" else "📌")
         safe_url = html.escape(str(url).strip()) if url else ""
         link_html = f"\n🔗 <a href='{safe_url}'>Abrir en {safe_source}</a>" if safe_url else ""
+        rec_str = format_caracas_time(received_dt, '%d-%m-%Y %I:%M %p')
+        esc_str = format_caracas_time(escalated_dt, '%d-%m-%Y %I:%M %p')
         msg = (
             f"✨ <b>Nueva Actividad Creada</b>\n\n"
             f"📌 <b>Asunto:</b> {safe_title}\n"
             f"🏷 <b>Origen:</b> {safe_source} #{external_id}\n"
             f"{prio_icon} <b>Prioridad:</b> {priority}\n"
             f"🎯 <b>{plural_label}:</b> {mentions}\n"
-            f"⏳ <b>Límite SLA:</b> {due_str}\n"
+            f"📥 <b>Recibido en Sycom (Empresa):</b> {rec_str}\n"
+            f"🚀 <b>Escalado a Infra (Equipo):</b> {esc_str}\n"
+            f"⏳ <b>Límite SLA Equipo (+{sla_hours}h):</b> {due_str}\n"
             f"🕒 <b>Hora registro:</b> {now_str}\n"
             f"{safe_desc}"
             f"{link_html}"

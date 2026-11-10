@@ -19,6 +19,8 @@ class Item(Base):
     status_origin = Column(String(100), nullable=True) # Estado original en origen
     
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    received_at = Column(DateTime, nullable=True)   # Fecha de Recibimiento en Sycom (SLA Empresa)
+    escalated_at = Column(DateTime, nullable=True)  # Fecha de Escalada al equipo Infra & BD (SLA Equipo)
     assigned_at = Column(DateTime, nullable=True)
     due_at = Column(DateTime, nullable=True)
     closed_at = Column(DateTime, nullable=True)
@@ -26,20 +28,29 @@ class Item(Base):
     synced_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     @property
+    def base_sla_start(self) -> datetime.datetime | None:
+        return self.escalated_at or self.created_at
+
+    @property
     def is_overdue(self) -> bool:
-        if self.status == "cerrado" or not self.due_at:
+        if self.status == "cerrado":
+            if self.closed_at and self.due_at:
+                return self.closed_at > self.due_at
+            return False
+        if not self.due_at:
             return False
         return datetime.datetime.utcnow() > self.due_at
 
     @property
     def sla_percent(self) -> float:
-        if not self.due_at or not self.created_at:
+        start = self.base_sla_start
+        if not self.due_at or not start:
             return 0.0
-        total_time = (self.due_at - self.created_at).total_seconds()
+        total_time = (self.due_at - start).total_seconds()
         if total_time <= 0:
             return 100.0
         reference_time = self.closed_at if self.status == "cerrado" and self.closed_at else datetime.datetime.utcnow()
-        elapsed = (reference_time - self.created_at).total_seconds()
+        elapsed = (reference_time - start).total_seconds()
         return round(max(0.0, (elapsed / total_time) * 100.0), 1)
 
     @property
@@ -54,10 +65,11 @@ class Item(Base):
 
     @property
     def elapsed_seconds(self) -> float:
-        if not self.created_at:
+        start = self.base_sla_start or self.created_at
+        if not start:
             return 0.0
         ref = self.closed_at if self.status == "cerrado" and self.closed_at else datetime.datetime.utcnow()
-        return max(0.0, (ref - self.created_at).total_seconds())
+        return max(0.0, (ref - start).total_seconds())
 
     @property
     def duration_human(self) -> str:
@@ -81,7 +93,7 @@ class Item(Base):
         if self.status == "cerrado":
             return f"Duró {dur}"
         elif self.status == "pendiente":
-            return f"Sin atender: {dur}"
+            return f"Por iniciar: {dur}"
         elif self.status == "curso":
             return f"En atención: {dur}"
         elif self.status == "espera":
