@@ -29,7 +29,16 @@ DEFAULT_SLA_HOURS = {
     "Baja": 120
 }
 
+DEFAULT_ENTITIES_MAP = {
+    0: "SYCOM",
+    1: "SYCOM",
+    2: "Microfilms Center"
+}
+
 class GLPIClient:
+    _shared_entities_cache = dict(DEFAULT_ENTITIES_MAP)
+    _entities_fetched = False
+
     def __init__(self):
         self.base_url = GLPI_URL.rstrip("/")
         self.app_token = GLPI_APP_TOKEN
@@ -37,7 +46,103 @@ class GLPIClient:
         self.password = GLPI_PASS
         self.session_token = None
         self._categories_cache = {}
-        self._entities_cache = {}
+        self._entities_cache = dict(GLPIClient._shared_entities_cache)
+
+    @staticmethod
+    def clean_entity_name(raw_name: str | None) -> str:
+        if not raw_name:
+            return ""
+        text = str(raw_name).strip()
+        if ">" in text:
+            text = text.split(">")[-1].strip()
+        low = text.lower()
+        if "microfilm" in low:
+            return "Microfilms Center"
+        if "sycom" in low or low in ("root entity", "entidad raíz", "entidad raiz", "root", "entidad #1", "entidad #0"):
+            return "SYCOM"
+        return text
+
+    def fetch_entities_map(self) -> dict:
+        """Obtiene el diccionario {entity_id: 'Nombre Entidad'} desde GLPI (/Entity)."""
+        mapping = dict(DEFAULT_ENTITIES_MAP)
+        try:
+            url = f"{self.base_url}/Entity?range=0-200"
+            headers = self.get_session_headers()
+            res = requests.get(url, headers=headers, timeout=10)
+            if res.status_code == 200 and isinstance(res.json(), list):
+                for ent in res.json():
+                    if not isinstance(ent, dict):
+                        continue
+                    eid = ent.get("id")
+                    if eid is None:
+                        continue
+                    raw_name = ent.get("name") or ent.get("completename") or ""
+                    clean_name = self.clean_entity_name(raw_name)
+                    if clean_name:
+                        mapping[int(eid)] = clean_name
+                GLPIClient._entities_fetched = True
+        except Exception as e:
+            print(f"[GLPI] Error consultando catálogo de entidades: {e}")
+        self._entities_cache = mapping
+        GLPIClient._shared_entities_cache = dict(mapping)
+        return mapping
+
+    def resolve_entity_name(self, raw_ticket: dict, entities_map: dict = None) -> str:
+        """Resuelve el nombre real de la entidad GLPI (ej. SYCOM o Microfilms Center)."""
+        lookup = entities_map if isinstance(entities_map, dict) and entities_map else self._entities_cache
+        raw_entity = raw_ticket.get("entities_id")
+
+        for field in ("entity_name", "entities_name", "completename"):
+            val = raw_ticket.get(field)
+            if val and isinstance(val, str):
+                cleaned = self.clean_entity_name(val)
+                if cleaned:
+                    return cleaned
+
+        if isinstance(raw_entity, str) and not raw_entity.strip().isdigit():
+            cleaned = self.clean_entity_name(raw_entity)
+            if cleaned:
+                return cleaned
+
+        try:
+            eid = int(raw_entity) if raw_entity is not None else 1
+        except (ValueError, TypeError):
+            eid = 1
+
+        title_and_content = f"{raw_ticket.get('name') or ''} {raw_ticket.get('content') or ''}".lower()
+        if "microfilm" in title_and_content:
+            return "Microfilms Center"
+
+        if lookup and eid in lookup:
+            return lookup[eid]
+        if lookup and str(eid) in lookup:
+            return lookup[str(eid)]
+        return DEFAULT_ENTITIES_MAP.get(eid, f"Entidad #{eid}")
+
+    def resolve_entity_id(self, client_name: str | None, entities_map: dict = None) -> int | None:
+        """Resuelve el ID numérico de entidad en GLPI a partir del nombre del cliente/entidad."""
+        if not client_name or not str(client_name).strip():
+            return None
+        clean_target = self.clean_entity_name(client_name)
+        target_low = clean_target.lower()
+
+        lookup = entities_map if isinstance(entities_map, dict) and entities_map else self._entities_cache
+        for eid, ename in (lookup or {}).items():
+            try:
+                eid_int = int(eid)
+            except (ValueError, TypeError):
+                continue
+            if eid_int == 0 and 1 in (lookup or {}):
+                continue
+            ename_low = str(ename).lower()
+            if ename_low == target_low or ("microfilm" in target_low and "microfilm" in ename_low) or ("sycom" in target_low and "sycom" in ename_low):
+                return eid_int
+
+        if "microfilm" in target_low:
+            return 2
+        if "sycom" in target_low:
+            return 1
+        return None
 
     def get_auth_headers(self):
         b64_cred = base64.b64encode(f"{self.user}:{self.password}".encode()).decode()
@@ -115,7 +220,7 @@ class GLPIClient:
             print(f"[GLPI] Error consultando asignaciones Ticket_User: {e}")
         return {}
 
-    def normalize_ticket(self, raw_ticket: dict, assignees_map: dict = None) -> dict:
+    def normalize_ticket(self, raw_ticket: dict, assignees_map: dict = None, entities_map: dict = None) -> dict:
         ticket_id = str(raw_ticket.get("id"))
         raw_status = int(raw_ticket.get("status", 1))
         status_unif, status_orig = STATUS_MAP.get(raw_status, ("pendiente", f"Estado {raw_status}"))
@@ -149,13 +254,16 @@ class GLPIClient:
         if assignees_map and ticket_id in assignees_map:
             assignee = assignees_map[ticket_id]
 
+        entity_name = self.resolve_entity_name(raw_ticket, entities_map)
+
         return {
             "source": "GLPI",
             "external_id": ticket_id,
             "url": ticket_url,
             "title": raw_ticket.get("name") or f"Ticket #{ticket_id}",
             "category": "Soporte TI / Infraestructura",
-            "client_name": f"Entidad #{raw_ticket.get('entities_id', 1)}",
+            "client_name": entity_name,
+            "project_name": entity_name,
             "client_type": "Interno",
             "assignee_name": assignee,
             "priority": prio_unif,
@@ -241,7 +349,7 @@ class GLPIClient:
             print(f"[GLPIClient] Error actualizando estado de ticket {ticket_id} a {new_status}: {e}")
             return False
 
-    def create_ticket(self, title: str, description: str = "", priority: str = "Media", due_at: datetime.datetime | None = None, user_ids: list[int] | None = None) -> dict | None:
+    def create_ticket(self, title: str, description: str = "", priority: str = "Media", due_at: datetime.datetime | None = None, user_ids: list[int] | None = None, client_name: str | None = None, entities_id: int | None = None) -> dict | None:
         """
         Crea un ticket en GLPI mediante la API REST.
         """
@@ -263,6 +371,10 @@ class GLPIClient:
         if due_at:
             input_data["time_to_resolve"] = due_at.strftime("%Y-%m-%d %H:%M:%S")
 
+        resolved_eid = entities_id if entities_id is not None else self.resolve_entity_id(client_name)
+        if resolved_eid is not None:
+            input_data["entities_id"] = int(resolved_eid)
+
         try:
             headers = self.get_session_headers()
             url = f"{self.base_url}/Ticket"
@@ -271,6 +383,9 @@ class GLPIClient:
                 self.init_session()
                 headers = self.get_session_headers()
                 res = requests.post(url, headers=headers, json={"input": input_data}, timeout=12)
+            if res.status_code in (400, 403) and "entities_id" in input_data:
+                fallback_input = {k: v for k, v in input_data.items() if k != "entities_id"}
+                res = requests.post(url, headers=headers, json={"input": fallback_input}, timeout=12)
             
             res.raise_for_status()
             data = res.json()

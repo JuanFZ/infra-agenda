@@ -300,7 +300,7 @@ def ensure_db_schema():
 ensure_db_schema()
 
 def _repair_clickup_assignees():
-    """Restaura la asignación histórica de especialistas en tareas de ClickUp si fueron sobreescritas por sincronizaciones anteriores."""
+    """Restaura la asignación histórica de especialistas en tareas de ClickUp y normaliza estados 'espera' en ClickUp y nombres de entidades GLPI."""
     try:
         db = SessionLocal()
         repaired = False
@@ -312,6 +312,37 @@ def _repair_clickup_assignees():
                 if not it.assigned_at:
                     it.assigned_at = it.created_at or datetime.datetime.utcnow()
                 repaired = True
+
+        # ClickUp no maneja el estado 'espera'; normalizar cualquier registro residual a 'curso'
+        cu_espera = db.query(Item).filter(Item.source == "ClickUp", Item.status == "espera").all()
+        for it in cu_espera:
+            it.status = "curso"
+            if not it.status_origin or it.status_origin.lower() in ("espera", "en espera", "waiting"):
+                it.status_origin = "in progress"
+            repaired = True
+
+        # Normalizar tickets GLPI que tengan 'Entidad #1' / 'Entidad #0' / 'Entidad #2' o menciones de Microfilms
+        glpi_items = db.query(Item).filter(Item.source == "GLPI").all()
+        for it in glpi_items:
+            raw_ent = (it.client_name or "").strip()
+            text_blob = f"{it.title or ''} {it.description or ''}".lower()
+            if "microfilm" in text_blob or "microfilm" in raw_ent.lower() or raw_ent == "Entidad #2":
+                resolved_ent = "Microfilms Center"
+            elif raw_ent.startswith("Entidad #"):
+                resolved_ent = GLPIClient.clean_entity_name(raw_ent)
+                if resolved_ent == raw_ent and raw_ent in ("Entidad #0", "Entidad #1"):
+                    resolved_ent = "SYCOM"
+            else:
+                resolved_ent = raw_ent
+            if resolved_ent and resolved_ent != raw_ent:
+                it.client_name = resolved_ent
+                if not it.project_name or it.project_name.startswith("Entidad #"):
+                    it.project_name = resolved_ent
+                repaired = True
+            elif resolved_ent and not it.project_name:
+                it.project_name = resolved_ent
+                repaired = True
+
         if repaired:
             db.commit()
         db.close()
@@ -964,7 +995,7 @@ def update_item_status(
     if source == "ClickUp" and new_st == "espera":
         raise HTTPException(
             status_code=400, 
-            detail="ClickUp no admite el estado 'En espera'. Solo admite: Pendiente (TO DO), En curso (IN PROGRESS) y Cerrado (COMPLETE). 'En espera' es exclusivo de GLPI."
+            detail="El estado 'En espera' no aplica para tareas de ClickUp. Solo admite: Pendiente (TO DO), En curso (IN PROGRESS) y Cerrado (COMPLETE). 'En espera' es exclusivo de GLPI."
         )
 
     success = False
@@ -1191,7 +1222,8 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
             description=req.description or "",
             priority=priority,
             due_at=due_dt,
-            user_ids=glpi_ids
+            user_ids=glpi_ids,
+            client_name=client_name
         )
         if not ticket_data or not ticket_data.get("id"):
             raise HTTPException(status_code=500, detail="Error creando el ticket en la API de GLPI")

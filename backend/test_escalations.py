@@ -852,6 +852,132 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertEqual(doc["ibp_name"], "Banco Central de Integración")
         self.assertEqual(doc["category"], "Infraestructura")
 
+    @patch("app.sync.glpi_client.GLPIClient.update_ticket_status")
+    def test_17_clickup_rejects_espera_status_while_glpi_allows_it(self, mock_glpi_status):
+        """Test that ClickUp tasks cannot be set to 'espera' (HTTP 400), while GLPI tickets can."""
+        mock_glpi_status.return_value = True
+
+        db = TestingSessionLocal()
+        cu_item = Item(
+            source="ClickUp",
+            external_id="cu_no_espera",
+            title="Tarea ClickUp sin espera",
+            status="curso",
+            assignee_name="Adonis Lozada"
+        )
+        glpi_item = Item(
+            source="GLPI",
+            external_id="glpi_ok_espera",
+            title="Ticket GLPI con espera",
+            status="curso",
+            assignee_name="Adonis Lozada"
+        )
+        db.add_all([cu_item, glpi_item])
+        db.commit()
+        cu_id = cu_item.id
+        glpi_id = glpi_item.id
+        db.close()
+
+        # Attempt to set ClickUp task to 'espera' -> must fail with 400
+        res_cu = self.client.post(f"/api/items/{cu_id}/status", json={
+            "status": "espera"
+        }, headers={"X-User-Role": "Coordinador"})
+        self.assertEqual(res_cu.status_code, 400)
+        self.assertIn("El estado 'En espera' no aplica para tareas de ClickUp", res_cu.json()["detail"])
+
+        # GLPI ticket can be set to 'espera' -> 200 OK
+        res_glpi = self.client.post(f"/api/items/{glpi_id}/status", json={
+            "status": "espera"
+        }, headers={"X-User-Role": "Coordinador"})
+        self.assertEqual(res_glpi.status_code, 200)
+
+        # ClickUpClient.normalize_task maps any waiting/espera status to 'curso'
+        from app.sync.clickup_client import ClickUpClient
+        cu_client = ClickUpClient()
+        norm_cu = cu_client.normalize_task({
+            "id": "cu_raw_wait",
+            "name": "Tarea con estado waiting",
+            "status": {"status": "en espera"},
+            "priority": {"priority": "normal"}
+        })
+        self.assertEqual(norm_cu["status"], "curso")
+
+    def test_18_glpi_entity_resolution(self):
+        """Test GLPIClient entity mapping for SYCOM and Microfilms Center."""
+        from app.sync.glpi_client import GLPIClient
+        glpi = GLPIClient()
+
+        # Default entity ID 1 -> SYCOM
+        norm_sycom = glpi.normalize_ticket({
+            "id": 236,
+            "name": "Revisión servidor",
+            "status": 2,
+            "priority": 3,
+            "entities_id": 1
+        })
+        self.assertEqual(norm_sycom["client_name"], "SYCOM")
+        self.assertEqual(norm_sycom["project_name"], "SYCOM")
+
+        # Default entity ID 2 -> Microfilms Center
+        norm_mc = glpi.normalize_ticket({
+            "id": 237,
+            "name": "Escaneo lote documental",
+            "status": 2,
+            "priority": 3,
+            "entities_id": 2
+        })
+        self.assertEqual(norm_mc["client_name"], "Microfilms Center")
+        self.assertEqual(norm_mc["project_name"], "Microfilms Center")
+
+        # Hierarchical string from GLPI -> cleaned entity name
+        norm_hier = glpi.normalize_ticket({
+            "id": 238,
+            "name": "Soporte scanner",
+            "status": 4,
+            "priority": 4,
+            "entities_id": "Root entity > SYCOM > Microfilms Center"
+        })
+        self.assertEqual(norm_hier["client_name"], "Microfilms Center")
+
+        # Dynamic entities_map override
+        norm_custom = glpi.normalize_ticket(
+            {"id": 239, "name": "Ticket custom", "status": 1, "priority": 2, "entities_id": 5},
+            entities_map={5: "Microfilms Center"}
+        )
+        self.assertEqual(norm_custom["client_name"], "Microfilms Center")
+
+        # Reverse resolution for ticket creation
+        self.assertEqual(glpi.resolve_entity_id("Sycom", {1: "SYCOM", 2: "Microfilms Center"}), 1)
+        self.assertEqual(glpi.resolve_entity_id("MicroFilms Center", {1: "SYCOM", 2: "Microfilms Center"}), 2)
+
+        # Verify sync_clickup preserves SIMF / SGLPAR subproject instead of overwriting with Gestión Sycom
+        from app.sync.synchronizer import sync_clickup
+        db = TestingSessionLocal()
+        cu_simf = Item(
+            source="ClickUp",
+            external_id="cu_simf_sync_1",
+            title="Tarea SIMF",
+            client_name="SGLPAR",
+            project_name="SGLPAR",
+            status="pendiente",
+            assignee_name="Adonis Lozada"
+        )
+        db.add(cu_simf)
+        db.commit()
+        with patch("app.sync.clickup_client.ClickUpClient.fetch_tasks", return_value=[{
+            "id": "cu_simf_sync_1",
+            "name": "Tarea SIMF",
+            "status": {"status": "in progress"},
+            "priority": {"priority": "high"},
+            "assignees": [{"username": "Adonis Lozada"}]
+        }]):
+            sync_clickup(db)
+        db.refresh(cu_simf)
+        self.assertEqual(cu_simf.client_name, "SGLPAR")
+        self.assertEqual(cu_simf.project_name, "SGLPAR")
+        self.assertEqual(cu_simf.status, "curso")
+        db.close()
+
 
 if __name__ == "__main__":
     unittest.main()

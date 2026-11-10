@@ -37,6 +37,7 @@ def sync_glpi(db: Session):
     try:
         users_map = client.fetch_users_map()
         assignees_map = client.fetch_ticket_assignees_map(users_map)
+        entities_map = client.fetch_entities_map()
         raw_tickets = client.fetch_tickets()
         count = 0
         active_ids = set()
@@ -53,7 +54,7 @@ def sync_glpi(db: Session):
                     db.delete(existing_del)
                 continue
 
-            norm = client.normalize_ticket(raw, assignees_map)
+            norm = client.normalize_ticket(raw, assignees_map, entities_map)
             ext_id = norm["external_id"]
 
             # Política de cerrados: no guardar ni mostrar cerrados anteriores al día de ayer
@@ -90,6 +91,15 @@ def sync_glpi(db: Session):
                     norm["received_at"] = item.received_at
                 if item.escalated_at:
                     norm["escalated_at"] = item.escalated_at
+
+                # Preservar subproyecto / entidad específica si el ticket ya tenía una asignada en Agenda
+                # y GLPI reporta la entidad raíz por defecto (0 o 1)
+                existing_client = (item.client_name or "").strip()
+                if existing_client and not existing_client.lower().startswith("entidad #"):
+                    raw_ent_id = raw.get("entities_id")
+                    if raw_ent_id in (0, 1, None, "0", "1") and "microfilm" in existing_client.lower():
+                        norm["client_name"] = existing_client
+                        norm["project_name"] = item.project_name or existing_client
 
                 # Si tiene responsable y no tenía fecha de asignación o cambió de responsable
                 has_assignee = norm.get("assignee_name") and "sin asignar" not in norm["assignee_name"].lower()
@@ -177,6 +187,15 @@ def sync_clickup(db: Session):
                     norm["received_at"] = item.received_at
                 if item.escalated_at:
                     norm["escalated_at"] = item.escalated_at
+
+                # Preservar subproyecto de ClickUp (ej. SIMF, SGLPAR) si fue asignado desde la Agenda
+                existing_client = (item.client_name or "").strip()
+                if existing_client and existing_client != "Gestión Sycom":
+                    if not norm.get("client_name") or norm.get("client_name") == "Gestión Sycom":
+                        norm["client_name"] = existing_client
+                        norm["project_name"] = item.project_name or existing_client
+                elif item.project_name and not norm.get("project_name"):
+                    norm["project_name"] = item.project_name
 
                 # Si tiene responsable y no tenía fecha de asignación o cambió de responsable
                 has_assignee = norm.get("assignee_name") and "sin asignar" not in norm["assignee_name"].lower()

@@ -392,5 +392,180 @@ function simulateDeepLink(opts) {
   assert.strictEqual(elementsById['esc-detail-101'].style.display, 'none');
 
   console.log('✓ Test 4: Escalation table clean 7-column layout, expandable downward detail row, and UTF-8 integrity verified');
+
+  // =========================================================================
+  // 5. Verify Kanban Origin Selector, No Duplicate Subtitle, and ClickUp 'En Espera' Hiding
+  // =========================================================================
+  const vKanbanMatch = content.match(/<div class="view" id="v-kanban">[\s\S]*?<div class="kanban-grid" id="kanbanGrid"><\/div>\s*<\/div>/);
+  assert(vKanbanMatch, '#v-kanban view block not found');
+  const vKanbanHtml = vKanbanMatch[0];
+
+  // Ensure subtitle is NOT duplicated inside #v-kanban
+  const subMatches = vKanbanHtml.match(/Arrastra actividades entre columnas para sincronizar su\s*estado/g) || [];
+  assert.strictEqual(subMatches.length, 1, `Expected exactly 1 subtitle in #v-kanban, found ${subMatches.length}`);
+  assert(vKanbanHtml.includes('id="kanbanOriginSelector"'), '#kanbanOriginSelector missing in #v-kanban');
+  assert(vKanbanHtml.includes('id="kanbanOriginBadge"'), '#kanbanOriginBadge missing in #v-kanban');
+  assert(vKanbanHtml.includes('onclick="setOriginFilter(\'ClickUp\')"'), 'ClickUp origin button missing in #v-kanban');
+  assert(vKanbanHtml.includes('onclick="setOriginFilter(\'GLPI\')"'), 'GLPI origin button missing in #v-kanban');
+
+  // Extract setOriginFilter, syncKanbanOriginUI, renderKPIs, handleDragOver, handleDrop, renderKanban
+  const setOriginFn = (content.match(/function setOriginFilter\(src\)[\s\S]*?\n    \}/) || [])[0];
+  const syncOriginFn = (content.match(/function syncKanbanOriginUI\(srcVal\)[\s\S]*?\n    \}/) || [])[0];
+  const renderKpisFn = (content.match(/function renderKPIs\(k\)[\s\S]*?\n    \}/) || [])[0];
+  const handleDragOverFn = (content.match(/function handleDragOver\(e\)[\s\S]*?\n    \}/) || [])[0];
+  const handleDropFn = (content.match(/async function handleDrop\(e, targetStatus\)[\s\S]*?\n    \}/) || [])[0];
+  const renderKanbanFn = (content.match(/function renderKanban\(list\)[\s\S]*?\n    \}/) || [])[0];
+
+  assert(setOriginFn, 'setOriginFilter function not found');
+  assert(syncOriginFn, 'syncKanbanOriginUI function not found');
+  assert(renderKpisFn, 'renderKPIs function not found');
+  assert(handleDropFn, 'handleDrop function not found');
+  assert(renderKanbanFn, 'renderKanban function not found');
+
+  const pillButtons = ['', 'ClickUp', 'GLPI'].map(origin => {
+    const classes = new Set(origin === '' ? ['kanban-origin-pill', 'active'] : ['kanban-origin-pill']);
+    return {
+      getAttribute: (k) => k === 'data-origin' ? origin : null,
+      classList: {
+        toggle: (c, force) => { if (force) classes.add(c); else classes.delete(c); },
+        has: (c) => classes.has(c)
+      }
+    };
+  });
+
+  const kanbanGridClasses = new Set();
+  const mockKanbanEls = {
+    fSrc: { value: '' },
+    fPrio: { value: '' },
+    fResp: { value: '' },
+    fSearch: { value: '' },
+    kanbanOriginSelector: {
+      querySelectorAll: () => pillButtons
+    },
+    kanbanOriginBadge: { textContent: '', style: {} },
+    kanbanSubText: { textContent: '' },
+    kpisContainer: { innerHTML: '' },
+    navOver: { textContent: '' },
+    kanbanGrid: {
+      innerHTML: '',
+      classList: {
+        toggle: (c, force) => { if (force) kanbanGridClasses.add(c); else kanbanGridClasses.delete(c); },
+        has: (c) => kanbanGridClasses.has(c)
+      }
+    }
+  };
+
+  const kanbanToasts = [];
+  const kanbanItems = [
+    { id: 1, source: 'ClickUp', external_id: 'cu-1', title: 'Tarea ClickUp 1', status: 'pendiente', priority: 'Alta', semaphore: 'verde', sla_percent: 20 },
+    { id: 2, source: 'ClickUp', external_id: 'cu-2', title: 'Tarea ClickUp 2', status: 'curso', priority: 'Media', semaphore: 'verde', sla_percent: 40 },
+    { id: 3, source: 'GLPI', external_id: '236', title: 'Ticket GLPI 236', status: 'espera', priority: 'Alta', semaphore: 'amarillo', sla_percent: 75, client_name: 'SYCOM' },
+    { id: 4, source: 'GLPI', external_id: '237', title: 'Ticket GLPI 237', status: 'cerrado', priority: 'Baja', semaphore: 'verde', sla_percent: 10, client_name: 'Microfilms Center' }
+  ];
+
+  const kanbanRunner = new Function(
+    'document', 'escapeHtml', 'showToast', 'ALL_ITEMS',
+    `
+    let ACTIVE_KPI_FILTER = 'espera';
+    let DRAGGED_ITEM_ID = null;
+    let IS_DRAGGING = false;
+    let HIGHLIGHT_ITEM_ID = null;
+    let TV_MODE_ACTIVE = false;
+    const API_URL = 'http://localhost:8000/api';
+    function canUserEditItem() { return true; }
+    function isCoordinator() { return true; }
+    function isSpecialist() { return false; }
+    function getItemTimeLabel() { return '10m'; }
+    function getAuthHeaders() { return {}; }
+    function renderAll() {
+      syncKanbanOriginUI();
+      renderKPIs({ pendientes: 1, en_curso: 1, en_espera: 1, atrasados: 0, cumplimiento_sla: 100, total_registrados: 4 });
+      const src = document.getElementById('fSrc').value;
+      const filtered = src ? ALL_ITEMS.filter(i => i.source === src) : ALL_ITEMS;
+      renderKanban(filtered);
+    }
+    ${setOriginFn}
+    ${syncOriginFn}
+    ${renderKpisFn}
+    ${handleDragOverFn}
+    ${handleDropFn}
+    const onDrop = handleDrop;
+    ${renderKanbanFn}
+    return {
+      setOriginFilter,
+      syncKanbanOriginUI,
+      renderKPIs,
+      renderKanban,
+      handleDragOver,
+      handleDrop,
+      onDrop,
+      getActiveKpi: () => ACTIVE_KPI_FILTER,
+      setDraggedId: (id) => { DRAGGED_ITEM_ID = id; }
+    };
+    `
+  )(
+    { getElementById: (id) => mockKanbanEls[id] || null },
+    (s) => String(s || ''),
+    (title, message, type) => { kanbanToasts.push({ title, message, type }); },
+    kanbanItems
+  );
+
+  // 5A: Switch origin to 'ClickUp' -> hides 'espera' column (3 columns), adds .cols-3, hides 'espera' KPI, resets ACTIVE_KPI_FILTER from 'espera'
+  kanbanRunner.setOriginFilter('ClickUp');
+  assert.strictEqual(mockKanbanEls.fSrc.value, 'ClickUp', '#fSrc should be updated to ClickUp');
+  assert.strictEqual(kanbanRunner.getActiveKpi(), null, 'ACTIVE_KPI_FILTER should reset when switching to ClickUp if it was espera');
+  assert.strictEqual(pillButtons[1].classList.has('active'), true, 'ClickUp pill should be active');
+  assert.strictEqual(pillButtons[0].classList.has('active'), false, 'Todos pill should not be active');
+  assert(mockKanbanEls.kanbanOriginBadge.textContent.includes('ClickUp'), 'Badge should show ClickUp origin');
+  assert.strictEqual(kanbanGridClasses.has('cols-3'), true, '#kanbanGrid should have cols-3 class for ClickUp');
+  assert(!mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="espera"'), 'Kanban must NOT render En espera column for ClickUp');
+  assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="pendiente"'), 'Kanban must render Pendientes column');
+  assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="curso"'), 'Kanban must render En curso column');
+  assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="cerrado"'), 'Kanban must render Cerrados column');
+  assert(!mockKanbanEls.kpisContainer.innerHTML.includes('data-kpi="espera"'), 'KPIs must NOT render En Espera card for ClickUp');
+
+  // 5B: Switch origin to 'GLPI' -> shows all 4 columns including 'espera' and removes .cols-3
+  kanbanRunner.setOriginFilter('GLPI');
+  assert.strictEqual(mockKanbanEls.fSrc.value, 'GLPI');
+  assert.strictEqual(pillButtons[2].classList.has('active'), true, 'GLPI pill should be active');
+  assert.strictEqual(kanbanGridClasses.has('cols-3'), false, '#kanbanGrid should not have cols-3 for GLPI');
+  assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="espera"'), 'Kanban must render En espera column for GLPI');
+  assert(mockKanbanEls.kpisContainer.innerHTML.includes('data-kpi="espera"'), 'KPIs must render En Espera card for GLPI');
+
+  // 5C: Switch origin to '' (Todos) and test dragging a ClickUp item onto 'espera' column -> blocked with toast
+  kanbanRunner.setOriginFilter('');
+  assert.strictEqual(mockKanbanEls.fSrc.value, '');
+  assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="espera"'), 'Kanban must render 4 columns for Todos');
+
+  kanbanRunner.setDraggedId(1); // Item 1 is ClickUp
+  await kanbanRunner.onDrop({
+    preventDefault: () => {},
+    currentTarget: { classList: { remove: () => {} } },
+    dataTransfer: { getData: () => '1' }
+  }, 'espera');
+  assert.strictEqual(kanbanItems[0].status, 'pendiente', 'ClickUp item status must remain unchanged when dropped on espera');
+  assert.strictEqual(kanbanToasts.length, 1, 'Toast should be shown when dropping ClickUp item on espera');
+  assert(kanbanToasts[0].message.includes('En espera'), 'Toast message should explain En espera does not apply to ClickUp');
+
+  // 5D: Verify dropping a ClickUp item onto 'curso' while filtered by ClickUp preserves ClickUp filter (does not leak GLPI cards)
+  kanbanRunner.setOriginFilter('ClickUp');
+  kanbanRunner.setDraggedId(1);
+  global.fetch = async () => ({ ok: false, json: async () => ({ detail: 'Simulated error' }) });
+  global.alert = () => {};
+  await kanbanRunner.onDrop({
+    preventDefault: () => {},
+    currentTarget: { classList: { remove: () => {} } },
+    dataTransfer: { getData: () => '1' }
+  }, 'curso');
+  assert(!mockKanbanEls.kanbanGrid.innerHTML.includes('Ticket GLPI 236'), 'GLPI items must not leak into ClickUp-filtered Kanban after drop/rollback');
+  assert(!mockKanbanEls.kanbanGrid.innerHTML.includes('Ticket GLPI 237'), 'GLPI items must not leak into ClickUp-filtered Kanban after drop/rollback');
+
+  // 5E: Verify openModal template omits 'espera' option for ClickUp and includes it only for GLPI
+  assert(
+    content.includes("${it.source === 'GLPI' ? `<option value=\"espera\""),
+    'openModal must only render the espera status option when it.source === GLPI'
+  );
+
+  console.log('✓ Test 5: Kanban Origin selector, 3-column ClickUp layout (En Espera hidden), and drag-and-drop toast protection verified');
   console.log('ALL FRONTEND TESTS PASSED SUCCESSFULLY!');
 })();
