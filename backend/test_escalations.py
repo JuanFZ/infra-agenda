@@ -51,7 +51,7 @@ class TestEscalationFeatures(unittest.TestCase):
             db.close()
 
     def test_01_categories_validation(self):
-        expected_cats = ["CPU", "RAM", "PostgreSQL", "Servicios BD", "Discos", "Procesos"]
+        expected_cats = ["CPU", "RAM", "Disco", "Antivirus", "PostgreSQL", "Servicios", "Infraestructura"]
         self.assertEqual(VALID_ESCALATION_CATEGORIES, expected_cats)
 
         # Test creating escalation with each category
@@ -75,24 +75,24 @@ class TestEscalationFeatures(unittest.TestCase):
             "doc_url": "https://docs.google.com/document/d/xyz"
         })
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json()["document"]["category"], "Servicios BD")
+        self.assertEqual(res.json()["document"]["category"], "Servicios")
 
-        # Test legacy category normalization ("Servicios" -> "Servicios BD", "Disco" -> "Discos")
+        # Test legacy category normalization ("Servicios BD" -> "Servicios", "Discos" -> "Disco")
         res_serv = self.client.post("/api/escalations", json={
             "title": "Escalamiento Legacy Servicios",
-            "category": "Servicios",
+            "category": "Servicios BD",
             "doc_url": "https://docs.google.com/document/d/serv1"
         })
         self.assertEqual(res_serv.status_code, 200)
-        self.assertEqual(res_serv.json()["document"]["category"], "Servicios BD")
+        self.assertEqual(res_serv.json()["document"]["category"], "Servicios")
 
         res_disc = self.client.post("/api/escalations", json={
             "title": "Escalamiento Legacy Disco",
-            "category": "Disco",
+            "category": "Discos",
             "doc_url": "https://docs.google.com/document/d/disc1"
         })
         self.assertEqual(res_disc.status_code, 200)
-        self.assertEqual(res_disc.json()["document"]["category"], "Discos")
+        self.assertEqual(res_disc.json()["document"]["category"], "Disco")
 
     def test_02_update_escalation(self):
         # Create an escalation
@@ -809,7 +809,7 @@ class TestEscalationFeatures(unittest.TestCase):
 
     def test_15_frontend_category_and_ibp_consistency(self):
         """Verify that categories and IBP structures in frontend/index.html match backend specs."""
-        expected_cats = ["CPU", "RAM", "PostgreSQL", "Servicios BD", "Discos", "Procesos"]
+        expected_cats = ["CPU", "RAM", "Disco", "Antivirus", "PostgreSQL", "Servicios", "Infraestructura"]
         self.assertEqual(VALID_ESCALATION_CATEGORIES, expected_cats)
 
         # Check frontend/index.html content
@@ -819,7 +819,7 @@ class TestEscalationFeatures(unittest.TestCase):
             html = f.read()
 
         # Categories list in JS
-        self.assertIn("const ESCALATION_CATEGORIES = ['CPU', 'RAM', 'PostgreSQL', 'Servicios BD', 'Discos', 'Procesos'];", html)
+        self.assertIn("const ESCALATION_CATEGORIES = ['CPU', 'RAM', 'Disco', 'Antivirus', 'PostgreSQL', 'Servicios', 'Infraestructura'];", html)
 
         # Category filter dropdown options
         for cat in VALID_ESCALATION_CATEGORIES:
@@ -842,7 +842,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # Create escalation with this custom IBP ID
         esc_res = self.client.post("/api/escalations", json={
             "title": "SIMF-ES-9901 Caso Especial BCI",
-            "category": "Procesos",
+            "category": "Infraestructura",
             "ibp_id": custom_ibp["id"],
             "doc_url": "https://docs.google.com/document/d/bci9901"
         }, headers={"X-User-Role": "Coordinador"})
@@ -850,7 +850,7 @@ class TestEscalationFeatures(unittest.TestCase):
         doc = esc_res.json()["document"]
         self.assertEqual(doc["ibp_id"], custom_ibp["id"])
         self.assertEqual(doc["ibp_name"], "Banco Central de Integración")
-        self.assertEqual(doc["category"], "Procesos")
+        self.assertEqual(doc["category"], "Infraestructura")
 
 
 if __name__ == "__main__":

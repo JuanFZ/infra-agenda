@@ -2631,10 +2631,11 @@
               <option value="">Todas las Categorías</option>
               <option value="CPU">CPU</option>
               <option value="RAM">RAM</option>
+              <option value="Disco">Disco</option>
+              <option value="Antivirus">Antivirus</option>
               <option value="PostgreSQL">PostgreSQL</option>
-              <option value="Servicios BD">Servicios BD</option>
-              <option value="Discos">Discos</option>
-              <option value="Procesos">Procesos</option>
+              <option value="Servicios">Servicios</option>
+              <option value="Infraestructura">Infraestructura</option>
             </select>
             <select id="fIbpEscalations" onchange="filterEscalationsTable()"
               style="font-size:12px;padding:7px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none;cursor:pointer;max-width:210px"
@@ -7030,7 +7031,7 @@
 
     let ESCALATIONS_LIST = [];
     let IBP_LIST = IBP_INVENTORY.slice();
-    const ESCALATION_CATEGORIES = ['CPU', 'RAM', 'PostgreSQL', 'Servicios BD', 'Discos', 'Procesos'];
+    const ESCALATION_CATEGORIES = ['CPU', 'RAM', 'Disco', 'Antivirus', 'PostgreSQL', 'Servicios', 'Infraestructura'];
 
     async function loadIbps() {
       try {
@@ -7087,6 +7088,7 @@
         'PostgreSQL': 'background:rgba(99,102,241,0.15);color:#818cf8;border:1px solid rgba(99,102,241,0.3)',
         'Servicios': 'background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid rgba(148,163,184,0.3)',
         'Servicios BD': 'background:rgba(20,184,166,0.15);color:#2dd4bf;border:1px solid rgba(20,184,166,0.3)',
+        'Infraestructura': 'background:rgba(14,165,233,0.15);color:#38bdf8;border:1px solid rgba(14,165,233,0.3)',
         'Procesos': 'background:rgba(244,63,94,0.15);color:#fb7185;border:1px solid rgba(244,63,94,0.3)'
       };
       const style = styles[c] || styles['Servicios'];
@@ -7399,7 +7401,7 @@
             <select id="escalationCategoryInput" class="form-input" style="width:100%;font-size:12.5px;cursor:pointer">
               ${ESCALATION_CATEGORIES.map(c => `<option value="${c}" ${catVal === c ? 'selected' : ''}>${c}</option>`).join('')}
             </select>
-            <small class="muted" style="font-size:11px;margin-top:3px;display:block">Clasificación operativa (CPU, RAM, PostgreSQL, Servicios BD, Discos, Procesos)</small>
+            <small class="muted" style="font-size:11px;margin-top:3px;display:block">Clasificación operativa (CPU, RAM, Disco, Antivirus, PostgreSQL, Servicios, Infraestructura)</small>
           </div>
 
           <!-- 3. IBP / Banco Participante SIMF -->

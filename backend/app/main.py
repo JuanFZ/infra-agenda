@@ -1736,13 +1736,13 @@ def format_file_size(num_bytes: int) -> str:
         return f"{num_bytes / (1024 * 1024):.2f} MB"
 
 
-VALID_ESCALATION_CATEGORIES = ["CPU", "RAM", "PostgreSQL", "Servicios BD", "Discos", "Procesos"]
+VALID_ESCALATION_CATEGORIES = ["CPU", "RAM", "Disco", "Antivirus", "PostgreSQL", "Servicios", "Infraestructura"]
 
 
 class CreateEscalationRequest(BaseModel):
     title: str
     doc_url: str
-    category: str = "Servicios BD"
+    category: str = "Servicios"
     ibp: str | None = None
     ibp_id: int | None = None
     notes: str | None = None
@@ -1849,7 +1849,7 @@ def api_get_escalations(db: Session = Depends(get_db)):
         result.append({
             "id": d.id,
             "title": d.title,
-            "category": d.category or "Servicios BD",
+            "category": d.category or "Servicios",
             "ibp": ibp_val,
             "ibp_id": d.ibp_id,
             "ibp_name": ibp_obj.name if ibp_obj else (d.ibp or None),
@@ -1894,12 +1894,12 @@ def api_create_escalation(
         doc_url = "https://" + doc_url
 
     category = (req.category or "").strip()
-    if category == "Servicios":
-        category = "Servicios BD"
-    elif category == "Disco":
-        category = "Discos"
+    if category == "Servicios BD":
+        category = "Servicios"
+    elif category == "Discos":
+        category = "Disco"
     if category not in VALID_ESCALATION_CATEGORIES:
-        category = "Servicios BD"
+        category = "Servicios"
 
     role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "Coordinador")).strip().capitalize()
     user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "Adonis Lozada Figueroa")).strip() or "Adonis Lozada Figueroa"
@@ -2008,10 +2008,10 @@ def api_update_escalation(
 
     if req.category is not None:
         c = req.category.strip()
-        if c == "Servicios":
-            c = "Servicios BD"
-        elif c == "Disco":
-            c = "Discos"
+        if c == "Servicios BD":
+            c = "Servicios"
+        elif c == "Discos":
+            c = "Disco"
         if c in VALID_ESCALATION_CATEGORIES:
             doc.category = c
 
@@ -2152,13 +2152,13 @@ def api_upload_escalation(
     clean_ibp, ibp_id = resolve_ibp(db, req.ibp, req.ibp_id)
     ibp_obj = db.query(IBP).filter(IBP.id == ibp_id).first() if ibp_id else None
 
-    category = (req.category or "").strip() if req.category else "Servicios BD"
-    if category == "Servicios":
-        category = "Servicios BD"
-    elif category == "Disco":
-        category = "Discos"
+    category = (req.category or "").strip() if req.category else "Servicios"
+    if category == "Servicios BD":
+        category = "Servicios"
+    elif category == "Discos":
+        category = "Disco"
     if category not in VALID_ESCALATION_CATEGORIES:
-        category = "Servicios BD"
+        category = "Servicios"
 
     doc = EscalationDocument(
         title=title,
