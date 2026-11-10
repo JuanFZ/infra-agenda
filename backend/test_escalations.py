@@ -1146,6 +1146,59 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertIsNotNone(luis_item)
         self.assertEqual(luis_item["assignee_name"], "Juan Fernández, Luis Acosta")
 
+    def test_21_reports_filter_by_ibp_and_category_and_pdf_charts(self):
+        """Test filtering reports by IBP and Category and verify PDF print-view contains KPIs and SVG charts."""
+        # Create an escalation for Banesco (0134) + PostgreSQL
+        esc_res = self.client.post("/api/escalations", json={
+            "title": "SIMF-ES-7701 Saturación de conexiones PostgreSQL en 0134 - BANESCO",
+            "category": "PostgreSQL",
+            "ibp": "0134 - BANESCO",
+            "doc_url": "https://docs.google.com/document/d/banesco7701",
+            "recommendations": "Incrementar max_connections y ajustar PgBouncer."
+        }, headers={"X-User-Role": "Coordinador"})
+        self.assertEqual(esc_res.status_code, 200)
+        esc_id = esc_res.json()["document"]["id"]
+
+        db = TestingSessionLocal()
+        item_pg = Item(
+            source="ClickUp",
+            external_id="cu_pg_7701",
+            title="Tuning PostgreSQL 0134 Banesco",
+            priority="Crítica",
+            status="cerrado",
+            assignee_name="Juan Fernández",
+            escalation_id=esc_id
+        )
+        db.add(item_pg)
+        db.commit()
+        db.close()
+
+        # 1. Query /api/reports/data filtered by ibp=0134 and category=PostgreSQL
+        rep_res = self.client.get(
+            "/api/reports/data?ibp=0134&category=PostgreSQL",
+            headers={"X-User-Role": "Coordinador"}
+        )
+        self.assertEqual(rep_res.status_code, 200)
+        rep_data = rep_res.json()
+        self.assertGreaterEqual(rep_data["kpis"]["total_items"], 1)
+        self.assertGreaterEqual(rep_data["kpis"]["total_escalamientos"], 1)
+        self.assertTrue(any("0134" in r["ibp"] for r in rep_data["por_ibp"]))
+        self.assertTrue(any(r["category"] == "PostgreSQL" and r["total"] >= 1 for r in rep_data["por_categoria"]))
+
+        # 2. Query /api/reports/print-view filtered by ibp and category
+        pdf_res = self.client.get(
+            "/api/reports/print-view?ibp=0134%20-%20BANESCO&category=PostgreSQL",
+            headers={"X-User-Role": "Coordinador"}
+        )
+        self.assertEqual(pdf_res.status_code, 200)
+        html = pdf_res.text
+        self.assertIn("IBP: 0134 - BANESCO", html)
+        self.assertIn("Categoría: PostgreSQL", html)
+        self.assertIn("Gráfico por Categoría Técnica", html)
+        self.assertIn("Gráfico por IBP / Banco Participante", html)
+        self.assertIn("<svg viewBox=\"0 0 130 130\"", html)
+        self.assertIn("Incrementar max_connections y ajustar PgBouncer.", html)
+
 
 if __name__ == "__main__":
     unittest.main()

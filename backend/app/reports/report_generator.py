@@ -5,17 +5,65 @@ Soporta exportación en Excel (.xlsx) con openpyxl y vista ejecutiva imprimible 
 """
 
 import io
+import math
 import datetime
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
 
-from app.models import Item
+from app.models import Item, EscalationDocument, IBP
 from app.notifications.telegram_notifier import CARACAS_TZ, format_caracas_time
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+
+TECH_CATEGORIES = [
+    "CPU",
+    "RAM",
+    "Disco",
+    "Antivirus",
+    "PostgreSQL",
+    "Servicios",
+    "Infraestructura",
+]
+
+
+def _infer_tech_category(text: str, fallback: str = "") -> str:
+    """Infiere la categoría técnica del texto o usa el fallback."""
+    t = (text or "").lower()
+    if any(k in t for k in ["postgres", "postgresql", "pg_", "base de datos", "bd ", "vacuum", "query"]):
+        return "PostgreSQL"
+    if any(k in t for k in ["cpu", "procesador", "carga de cpu", "load average"]):
+        return "CPU"
+    if any(k in t for k in ["ram", "memoria", "memory", "swap", "oom"]):
+        return "RAM"
+    if any(k in t for k in ["disco", "disk", "filesystem", "partición", "particion", "almacenamiento", "espacio"]):
+        return "Disco"
+    if any(k in t for k in ["antivirus", "edr", "kaspersky", "defender", "malware", "crowdstrike"]):
+        return "Antivirus"
+    if any(k in t for k in ["servicio", "daemon", "systemd", "nginx", "apache", "api", "puerto", "tomcat"]):
+        return "Servicios"
+    if fallback and fallback in TECH_CATEGORIES:
+        return fallback
+    if any(k in t for k in ["servidor", "red", "switch", "firewall", "vm", "virtual", "infraestructura", "backup"]):
+        return "Infraestructura"
+    return fallback or "Infraestructura"
+
+
+def _infer_ibp_label(text: str, ibp_rows: List[IBP]) -> Optional[str]:
+    """Busca coincidencia de código o nombre de IBP en un texto."""
+    if not text:
+        return None
+    upper_t = text.upper()
+    for row in ibp_rows:
+        lbl = f"{row.code} - {row.name}" if (row.code and row.code not in (row.name or "")) else (row.name or row.code or "")
+        if row.code and row.code.upper() in upper_t:
+            return lbl
+        if row.name and len(row.name) >= 3 and row.name.upper() in upper_t:
+            return lbl
+    return None
 
 
 def format_duration_seconds(seconds: float) -> str:
@@ -37,12 +85,16 @@ def get_report_data(
     db: Session,
     start_date: Optional[Any] = None,
     end_date: Optional[Any] = None,
-    specialist_filter: Optional[Any] = None
+    specialist_filter: Optional[Any] = None,
+    ibp_filter: Optional[Any] = None,
+    category_filter: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
-    Obtiene y procesa las métricas consolidadas para reportes ejecutivos.
+    Obtiene y procesa las métricas consolidadas para reportes ejecutivos,
+    incluyendo filtrado y desglose por IBP (Banco Participante) y Categoría Técnica.
     """
     query = db.query(Item)
+    esc_query = db.query(EscalationDocument)
 
     # Sanitizar filtros de fecha y especialista interpretados en hora Caracas (UTC-4)
     clean_start = None
@@ -84,6 +136,8 @@ def get_report_data(
             clean_end = None
 
     clean_spec = specialist_filter.strip() if isinstance(specialist_filter, str) and specialist_filter.strip() else None
+    clean_ibp = ibp_filter.strip() if isinstance(ibp_filter, str) and ibp_filter.strip() else None
+    clean_cat = category_filter.strip() if isinstance(category_filter, str) and category_filter.strip() else None
 
     if clean_start:
         query = query.filter(
@@ -93,8 +147,15 @@ def get_report_data(
                 Item.updated_at >= clean_start
             )
         )
+        esc_query = esc_query.filter(
+            or_(
+                EscalationDocument.created_at >= clean_start,
+                EscalationDocument.received_at >= clean_start
+            )
+        )
     if clean_end:
         query = query.filter(Item.created_at <= clean_end)
+        esc_query = esc_query.filter(EscalationDocument.created_at <= clean_end)
 
     if clean_spec:
         s_clean = clean_spec.lower()
@@ -110,7 +171,64 @@ def get_report_data(
         else:
             query = query.filter(Item.assignee_name.ilike(f"%{s_clean}%"))
 
-    items: List[Item] = query.order_by(Item.created_at.desc()).all()
+    raw_items: List[Item] = query.order_by(Item.created_at.desc()).all()
+    raw_escalations: List[EscalationDocument] = esc_query.order_by(EscalationDocument.created_at.desc()).all()
+
+    # Catálogo de IBPs y mapa de escalamientos por ID para enriquecer cada actividad
+    ibp_catalog_rows: List[IBP] = db.query(IBP).all()
+    all_escalations_map: Dict[int, EscalationDocument] = {
+        e.id: e for e in db.query(EscalationDocument).all()
+    }
+
+    item_ibp_map: Dict[int, str] = {}
+    item_cat_map: Dict[int, str] = {}
+
+    for it in raw_items:
+        linked_esc = all_escalations_map.get(it.escalation_id) if it.escalation_id else None
+        # 1. Resolver IBP de la actividad
+        resolved_ibp = None
+        if linked_esc and linked_esc.ibp:
+            resolved_ibp = linked_esc.ibp.strip()
+        if not resolved_ibp:
+            resolved_ibp = _infer_ibp_label(
+                f"{it.title or ''} {it.client_name or ''} {it.description or ''}",
+                ibp_catalog_rows
+            )
+        if not resolved_ibp:
+            resolved_ibp = "General / Interno"
+        item_ibp_map[it.id] = resolved_ibp
+
+        # 2. Resolver Categoría Técnica de la actividad
+        resolved_cat = None
+        if linked_esc and linked_esc.category:
+            resolved_cat = linked_esc.category.strip()
+        if not resolved_cat:
+            resolved_cat = _infer_tech_category(
+                f"{it.title or ''} {it.description or ''} {it.category or ''}",
+                fallback=(it.category or "Infraestructura")
+            )
+        item_cat_map[it.id] = resolved_cat
+
+    # Filtrar items y escalamientos por IBP y Categoría si fueron solicitados
+    items: List[Item] = []
+    for it in raw_items:
+        it_ibp = item_ibp_map.get(it.id, "General / Interno")
+        it_cat = item_cat_map.get(it.id, "Infraestructura")
+        if clean_ibp and clean_ibp.lower() not in it_ibp.lower():
+            continue
+        if clean_cat and clean_cat.lower() not in it_cat.lower() and clean_cat.lower() not in (it.category or "").lower():
+            continue
+        items.append(it)
+
+    escalations: List[EscalationDocument] = []
+    for esc in raw_escalations:
+        esc_ibp = (esc.ibp or "General / Interno").strip()
+        esc_cat = (esc.category or "Infraestructura").strip()
+        if clean_ibp and clean_ibp.lower() not in esc_ibp.lower():
+            continue
+        if clean_cat and clean_cat.lower() not in esc_cat.lower():
+            continue
+        escalations.append(esc)
 
     total_items = len(items)
     cerrados = [it for it in items if it.status == "cerrado"]
@@ -118,9 +236,12 @@ def get_report_data(
     pendientes = [it for it in items if it.status == "pendiente"]
     en_espera = [it for it in items if it.status == "espera"]
 
-    # Cálculo de SLA
+    # Cálculo de SLA Sycom (General) y SLA Equipo (Infra)
     dentro_sla = [it for it in items if not (it.is_overdue or it.semaphore == "rojo")]
     fuera_sla = [it for it in items if it.is_overdue or it.semaphore == "rojo"]
+
+    dentro_team_sla = [it for it in items if not (getattr(it, "team_is_overdue", False) or getattr(it, "team_semaphore", "verde") == "rojo")]
+    fuera_team_sla = [it for it in items if getattr(it, "team_is_overdue", False) or getattr(it, "team_semaphore", "verde") == "rojo"]
 
     cerrados_ok = [it for it in cerrados if not (it.is_overdue or it.semaphore == "rojo")]
     cerrados_fuera = [it for it in cerrados if (it.is_overdue or it.semaphore == "rojo")]
@@ -133,10 +254,16 @@ def get_report_data(
 
     cumplimiento_general = 100.0
     if cerrados:
-        cerrados_ok = [it for it in cerrados if not (it.is_overdue or it.semaphore == "rojo")]
         cumplimiento_general = round((len(cerrados_ok) / len(cerrados)) * 100.0, 1)
     elif total_items > 0:
         cumplimiento_general = round((len(dentro_sla) / total_items) * 100.0, 1)
+
+    cumplimiento_equipo = 100.0
+    if cerrados:
+        cerrados_team_ok = [it for it in cerrados if not (getattr(it, "team_is_overdue", False) or getattr(it, "team_semaphore", "verde") == "rojo")]
+        cumplimiento_equipo = round((len(cerrados_team_ok) / len(cerrados)) * 100.0, 1)
+    elif total_items > 0:
+        cumplimiento_equipo = round((len(dentro_team_sla) / total_items) * 100.0, 1)
 
     # Tiempo promedio de resolución de cerrados
     total_dur_cerrados = sum(it.elapsed_seconds for it in cerrados)
@@ -225,6 +352,103 @@ def get_report_data(
             "cumplimiento_pct": c_sla
         })
 
+    # Desglose por Categoría Técnica (incluyendo las 7 categorías oficiales + adicionales activas)
+    cat_items_map: Dict[str, List[Item]] = {c: [] for c in TECH_CATEGORIES}
+    cat_esc_map: Dict[str, List[EscalationDocument]] = {c: [] for c in TECH_CATEGORIES}
+    for it in items:
+        c_lbl = item_cat_map.get(it.id, "Infraestructura")
+        cat_items_map.setdefault(c_lbl, []).append(it)
+    for esc in escalations:
+        c_lbl = (esc.category or "Infraestructura").strip()
+        cat_esc_map.setdefault(c_lbl, []).append(esc)
+
+    all_cat_keys = list(dict.fromkeys(TECH_CATEGORIES + list(cat_items_map.keys()) + list(cat_esc_map.keys())))
+    por_categoria = []
+    for c_lbl in all_cat_keys:
+        if clean_cat and clean_cat.lower() not in c_lbl.lower():
+            continue
+        c_its = cat_items_map.get(c_lbl, [])
+        c_escs = cat_esc_map.get(c_lbl, [])
+        linked_esc_ids = {it.escalation_id for it in c_its if it.escalation_id}
+        unlinked_escs = [e for e in c_escs if e.id not in linked_esc_ids]
+        total_vol = len(c_its) + len(unlinked_escs)
+        c_cerr = [it for it in c_its if it.status == "cerrado"]
+        c_act = [it for it in c_its if it.status != "cerrado"]
+        c_fuera = [it for it in c_its if it.is_overdue or it.semaphore == "rojo"]
+        c_ok = [it for it in c_its if not (it.is_overdue or it.semaphore == "rojo")]
+        c_team_ok = [it for it in c_its if not (getattr(it, "team_is_overdue", False) or getattr(it, "team_semaphore", "verde") == "rojo")]
+        c_sla = round((len(c_ok) / len(c_its)) * 100.0, 1) if c_its else 100.0
+        c_team_sla = round((len(c_team_ok) / len(c_its)) * 100.0, 1) if c_its else 100.0
+        por_categoria.append({
+            "category": c_lbl,
+            "total": total_vol,
+            "total_items": len(c_its),
+            "total_escalamientos": len(c_escs),
+            "cerrados": len(c_cerr),
+            "activos": len(c_act) + len(unlinked_escs),
+            "fuera_sla": len(c_fuera),
+            "cumplimiento_pct": c_sla,
+            "team_cumplimiento_pct": c_team_sla,
+        })
+    por_categoria.sort(key=lambda x: (x["total"], x["total_escalamientos"]), reverse=True)
+
+    # Desglose por IBP (Banco Participante)
+    ibp_items_map: Dict[str, List[Item]] = {}
+    ibp_esc_map: Dict[str, List[EscalationDocument]] = {}
+    for it in items:
+        i_lbl = item_ibp_map.get(it.id, "General / Interno")
+        ibp_items_map.setdefault(i_lbl, []).append(it)
+    for esc in escalations:
+        i_lbl = (esc.ibp or "General / Interno").strip()
+        ibp_esc_map.setdefault(i_lbl, []).append(esc)
+
+    all_ibp_keys = list(dict.fromkeys(list(ibp_esc_map.keys()) + list(ibp_items_map.keys())))
+    if clean_ibp and not all_ibp_keys:
+        all_ibp_keys = [clean_ibp]
+
+    por_ibp = []
+    for i_lbl in all_ibp_keys:
+        i_its = ibp_items_map.get(i_lbl, [])
+        i_escs = ibp_esc_map.get(i_lbl, [])
+        linked_esc_ids = {it.escalation_id for it in i_its if it.escalation_id}
+        unlinked_escs = [e for e in i_escs if e.id not in linked_esc_ids]
+        total_vol = len(i_its) + len(unlinked_escs)
+        i_cerr = [it for it in i_its if it.status == "cerrado"]
+        i_act = [it for it in i_its if it.status != "cerrado"]
+        i_fuera = [it for it in i_its if it.is_overdue or it.semaphore == "rojo"]
+        i_ok = [it for it in i_its if not (it.is_overdue or it.semaphore == "rojo")]
+        i_team_ok = [it for it in i_its if not (getattr(it, "team_is_overdue", False) or getattr(it, "team_semaphore", "verde") == "rojo")]
+        i_sla = round((len(i_ok) / len(i_its)) * 100.0, 1) if i_its else 100.0
+        i_team_sla = round((len(i_team_ok) / len(i_its)) * 100.0, 1) if i_its else 100.0
+        por_ibp.append({
+            "ibp": i_lbl,
+            "total": total_vol,
+            "total_items": len(i_its),
+            "total_escalamientos": len(i_escs),
+            "cerrados": len(i_cerr),
+            "activos": len(i_act) + len(unlinked_escs),
+            "fuera_sla": len(i_fuera),
+            "cumplimiento_pct": i_sla,
+            "team_cumplimiento_pct": i_team_sla,
+        })
+    por_ibp.sort(key=lambda x: (0 if x["ibp"] != "General / Interno" else 1, -x["total"], -x["total_escalamientos"]))
+
+    # Detalle de Escalamientos
+    escalations_detail = []
+    for esc in escalations:
+        escalations_detail.append({
+            "id": esc.id,
+            "title": esc.title or "",
+            "ibp": esc.ibp or "General / Interno",
+            "category": esc.category or "Infraestructura",
+            "received_at_str": format_caracas_time(esc.received_at) if esc.received_at else (format_caracas_time(esc.created_at) if esc.created_at else "—"),
+            "escalated_at_str": format_caracas_time(esc.escalated_at) if esc.escalated_at else (format_caracas_time(esc.created_at) if esc.created_at else "—"),
+            "recommendations": esc.recommendations or "",
+            "notes": esc.notes or "",
+            "google_doc_url": esc.doc_url or "",
+            "created_by": esc.uploaded_by or "Coordinación",
+        })
+
     # Detalle de Items
     items_detail = []
     for it in items:
@@ -239,6 +463,8 @@ def get_report_data(
             "title": it.title or "",
             "client_name": it.client_name or "Interno",
             "client_type": it.client_type or "Interno",
+            "ibp": item_ibp_map.get(it.id, "General / Interno"),
+            "category": item_cat_map.get(it.id, "Infraestructura"),
             "assignee_name": it.assignee_name or "Sin asignar",
             "priority": it.priority or "Media",
             "status": it.status or "pendiente",
@@ -246,6 +472,9 @@ def get_report_data(
             "sla_percent": it.sla_percent,
             "semaphore": it.semaphore,
             "is_overdue": it.is_overdue,
+            "team_sla_percent": getattr(it, "team_sla_percent", it.sla_percent),
+            "team_semaphore": getattr(it, "team_semaphore", it.semaphore),
+            "team_is_overdue": getattr(it, "team_is_overdue", it.is_overdue),
             "duration_str": dur_str,
             "created_at_str": format_caracas_time(it.created_at) if it.created_at else "—",
             "assigned_at_str": format_caracas_time(it.assigned_at) if it.assigned_at else "—",
@@ -267,8 +496,14 @@ def get_report_data(
     return {
         "generated_at": now_caracas.strftime("%d-%m-%Y %I:%M %p"),
         "period_label": period_str,
+        "filters": {
+            "specialist": clean_spec or "Todo el equipo",
+            "ibp": clean_ibp or "Todas las IBPs",
+            "category": clean_cat or "Todas las Categorías",
+        },
         "kpis": {
             "total_items": total_items,
+            "total_escalamientos": len(escalations),
             "total_cerrados": len(cerrados),
             "total_cerrados_ok": len(cerrados_ok),
             "total_cerrados_fuera": len(cerrados_fuera),
@@ -281,12 +516,16 @@ def get_report_data(
             "total_dentro_sla": len(dentro_sla),
             "total_fuera_sla": len(fuera_sla),
             "cumplimiento_general": cumplimiento_general,
+            "cumplimiento_equipo": cumplimiento_equipo,
             "avg_resolution_str": format_duration_seconds(avg_resolution_seconds)
         },
         "por_origen": por_origen,
         "por_prioridad": por_prioridad,
         "por_especialista": por_especialista,
         "por_cliente": por_cliente,
+        "por_ibp": por_ibp,
+        "por_categoria": por_categoria,
+        "escalations": escalations_detail,
         "items": items_detail
     }
 
@@ -642,17 +881,315 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
         col_letter = get_column_letter(col_idx)
         ws_items.column_dimensions[col_letter].width = w
 
+    # ==========================================
+    # HOJA 5: POR IBP Y CATEGORÍA
+    # ==========================================
+    ws_ibp = wb.create_sheet(title="Por IBP y Categoría")
+    ws_ibp.views.sheetView[0].showGridLines = True
+
+    ws_ibp.merge_cells("A1:G1")
+    ws_ibp["A1"] = "DESGLOSE EJECUTIVO POR IBP (BANCO PARTICIPANTE) Y CATEGORÍA TÉCNICA"
+    ws_ibp["A1"].font = font_title
+    ws_ibp["A1"].fill = fill_header
+    ws_ibp["A1"].alignment = align_center
+
+    ws_ibp["A3"] = "1. MÉTRICAS POR IBP (BANCO PARTICIPANTE)"
+    ws_ibp["A3"].font = font_section
+
+    headers_ibp = ["IBP / Entidad Bancaria", "Volumen Total", "Actividades", "Escalamientos", "Cerrados", "SLA Sycom %", "SLA Equipo %"]
+    for col_idx, h in enumerate(headers_ibp, start=1):
+        cell = ws_ibp.cell(row=4, column=col_idx, value=h)
+        cell.font = font_header
+        cell.fill = fill_header
+        cell.alignment = align_center
+        cell.border = border_cell
+
+    row_cursor = 5
+    for ibp_row in data.get("por_ibp", []):
+        ws_ibp.cell(row=row_cursor, column=1, value=ibp_row["ibp"]).alignment = align_left
+        ws_ibp.cell(row=row_cursor, column=2, value=ibp_row["total"]).alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=3, value=ibp_row["total_items"]).alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=4, value=ibp_row["total_escalamientos"]).alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=5, value=ibp_row["cerrados"]).alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=6, value=f"{ibp_row['cumplimiento_pct']:.1f}%").alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=7, value=f"{ibp_row['team_cumplimiento_pct']:.1f}%").alignment = align_center
+        for c_i in range(1, 8):
+            c_cell = ws_ibp.cell(row=row_cursor, column=c_i)
+            c_cell.font = font_body
+            c_cell.border = border_cell
+        row_cursor += 1
+
+    row_cursor += 2
+    ws_ibp.cell(row=row_cursor, column=1, value="2. MÉTRICAS POR CATEGORÍA TÉCNICA").font = font_section
+    row_cursor += 1
+
+    headers_cat = ["Categoría Técnica", "Volumen Total", "Actividades", "Escalamientos", "Cerrados", "SLA Sycom %", "SLA Equipo %"]
+    for col_idx, h in enumerate(headers_cat, start=1):
+        cell = ws_ibp.cell(row=row_cursor, column=col_idx, value=h)
+        cell.font = font_header
+        cell.fill = fill_header
+        cell.alignment = align_center
+        cell.border = border_cell
+
+    row_cursor += 1
+    for cat_row in data.get("por_categoria", []):
+        ws_ibp.cell(row=row_cursor, column=1, value=cat_row["category"]).alignment = align_left
+        ws_ibp.cell(row=row_cursor, column=2, value=cat_row["total"]).alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=3, value=cat_row["total_items"]).alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=4, value=cat_row["total_escalamientos"]).alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=5, value=cat_row["cerrados"]).alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=6, value=f"{cat_row['cumplimiento_pct']:.1f}%").alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=7, value=f"{cat_row['team_cumplimiento_pct']:.1f}%").alignment = align_center
+        for c_i in range(1, 8):
+            c_cell = ws_ibp.cell(row=row_cursor, column=c_i)
+            c_cell.font = font_body
+            c_cell.border = border_cell
+        row_cursor += 1
+
+    for col_idx, w in {1: 30, 2: 15, 3: 15, 4: 16, 5: 14, 6: 16, 7: 16}.items():
+        ws_ibp.column_dimensions[get_column_letter(col_idx)].width = w
+
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
     return output
 
 
+def _build_svg_donut_chart(kpis: Dict[str, Any]) -> str:
+    """Construye un gráfico vectorial SVG tipo Donut para el reporte ejecutivo PDF."""
+    total = kpis.get("total_items", 0)
+    cerrados = kpis.get("total_cerrados", 0)
+    en_curso = kpis.get("total_en_curso", 0)
+    pendientes = kpis.get("total_pendientes", 0)
+    en_espera = kpis.get("total_en_espera", 0)
+    fuera_sla = kpis.get("total_fuera_sla", 0)
+    sla_pct = kpis.get("cumplimiento_general", 100.0)
+    team_sla_pct = kpis.get("cumplimiento_equipo", 100.0)
+
+    r = 46
+    c_len = 2 * math.pi * r
+    slices = [
+        {"label": "Cerrados", "count": cerrados, "color": "#10b981"},
+        {"label": "En Curso", "count": en_curso, "color": "#0ea5e9"},
+        {"label": "Pendientes", "count": pendientes, "color": "#2563eb"},
+        {"label": "En Espera", "count": en_espera, "color": "#f59e0b"},
+    ]
+
+    circles_svg = ""
+    offset = 0.0
+    if total > 0:
+        for s in slices:
+            if s["count"] <= 0:
+                continue
+            dash = (s["count"] / total) * c_len
+            circles_svg += (
+                f'<circle r="{r}" cx="65" cy="65" fill="transparent" stroke="{s["color"]}" '
+                f'stroke-width="18" stroke-dasharray="{dash:.2f} {c_len:.2f}" '
+                f'stroke-dashoffset="-{offset:.2f}" transform="rotate(-90 65 65)" />'
+            )
+            offset += dash
+    else:
+        circles_svg = f'<circle r="{r}" cx="65" cy="65" fill="transparent" stroke="#cbd5e1" stroke-width="18" />'
+
+    legend_rows = ""
+    for s in slices:
+        pct = ((s["count"] / total) * 100.0) if total > 0 else 0.0
+        legend_rows += f"""
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;padding:3px 6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;margin-bottom:4px">
+            <span style="display:flex;align-items:center;gap:6px;font-weight:600;color:#1e293b">
+                <span style="width:9px;height:9px;border-radius:50%;background:{s['color']};display:inline-block"></span>
+                {s['label']}
+            </span>
+            <span style="font-weight:700;color:#0f172a">{s['count']} <small style="color:#64748b">({pct:.0f}%)</small></span>
+        </div>
+        """
+
+    return f"""
+    <div style="display:flex;align-items:center;gap:14px">
+        <div style="position:relative;width:130px;height:130px;flex-shrink:0">
+            <svg viewBox="0 0 130 130" width="130" height="130">
+                <circle r="{r}" cx="65" cy="65" fill="transparent" stroke="#f1f5f9" stroke-width="18" />
+                {circles_svg}
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+                <span style="font-size:15px;font-weight:800;color:#0f172a;line-height:1">{sla_pct:.1f}%</span>
+                <span style="font-size:8px;font-weight:700;color:#64748b;text-transform:uppercase;margin-top:2px">SLA Sycom</span>
+                <span style="font-size:9px;font-weight:700;color:#0ea5e9;margin-top:1px">{team_sla_pct:.0f}% Eq.</span>
+            </div>
+        </div>
+        <div style="flex:1">
+            {legend_rows}
+            <div style="font-size:9.5px;color:#475569;margin-top:4px;text-align:right">
+                Fuera de SLA: <strong style="color:{'#ef4444' if fuera_sla > 0 else '#10b981'}">{fuera_sla}</strong> de <strong>{total}</strong>
+            </div>
+        </div>
+    </div>
+    """
+
+
 def generate_executive_html(data: Dict[str, Any]) -> str:
     """
-    Genera un informe visual ejecutivo imprimible en PDF con formato de alta calidad.
+    Genera un informe visual ejecutivo imprimible en PDF con KPIs, gráficos vectoriales (SVG/Barras)
+    y desglose por IBP (Banco Participante), Categoría Técnica, Especialista y Escalamientos.
     """
     kpis = data["kpis"]
+    filters = data.get("filters", {})
+    ibp_filter_lbl = filters.get("ibp", "Todas las IBPs")
+    cat_filter_lbl = filters.get("category", "Todas las Categorías")
+    spec_filter_lbl = filters.get("specialist", "Todo el equipo")
+
+    # Subtítulo dinámico si el reporte está filtrado por IBP o por Categoría
+    scope_title_parts = []
+    if ibp_filter_lbl and ibp_filter_lbl != "Todas las IBPs":
+        scope_title_parts.append(f"IBP: {ibp_filter_lbl}")
+    if cat_filter_lbl and cat_filter_lbl != "Todas las Categorías":
+        scope_title_parts.append(f"CATEGORÍA: {cat_filter_lbl}")
+    if spec_filter_lbl and spec_filter_lbl != "Todo el equipo":
+        scope_title_parts.append(f"ESPECIALISTA: {spec_filter_lbl}")
+    dynamic_report_heading = " · ".join(scope_title_parts) if scope_title_parts else "MESA DE CONTROL INTEGRADA (GLOBAL)"
+
+    # 1. Gráfico Donut de Estados y SLA
+    donut_svg_html = _build_svg_donut_chart(kpis)
+
+    # 2. Gráfico de Barras por Especialista (compacto para el PDF)
+    spec_list = data.get("por_especialista", [])
+    max_spec_total = max([s["total"] for s in spec_list] + [1])
+    spec_chart_bars = ""
+    for s in spec_list:
+        pct_w = (s["total"] / max_spec_total) * 100.0 if max_spec_total > 0 else 0.0
+        sla_v = s["cumplimiento_pct"]
+        s_color = "#10b981" if sla_v >= 90 else ("#f59e0b" if sla_v >= 75 else "#ef4444")
+        short_name = "Sin asignar" if "sin asignar" in s["name"].lower() else s["name"]
+        spec_chart_bars += f"""
+        <div style="margin-bottom:7px">
+            <div style="display:flex;justify-content:space-between;font-size:10.5px;margin-bottom:2px">
+                <span style="font-weight:700;color:#1e293b">{short_name}</span>
+                <span>
+                    <strong>{s['total']}</strong> casos
+                    (<span style="color:#10b981">{s['cerrados']} c.</span> / <span style="color:#0ea5e9">{s['en_curso']} act.</span>)
+                    · <strong style="color:{s_color}">{sla_v:.0f}% SLA</strong>
+                </span>
+            </div>
+            <div style="background:#e2e8f0;height:7px;border-radius:4px;overflow:hidden">
+                <div style="width:{max(pct_w, 3 if s['total'] > 0 else 0):.1f}%;background:#2563eb;height:100%"></div>
+            </div>
+        </div>
+        """
+
+    # 3. Gráfico Comparativo por Categoría Técnica
+    cat_list = data.get("por_categoria", [])
+    max_cat_total = max([c["total"] for c in cat_list] + [1])
+    cat_colors = {
+        "CPU": "#ef4444",
+        "RAM": "#f97316",
+        "Disco": "#eab308",
+        "Antivirus": "#10b981",
+        "PostgreSQL": "#3b82f6",
+        "Servicios": "#8b5cf6",
+        "Infraestructura": "#06b6d4",
+    }
+    cat_chart_html = ""
+    cat_table_rows = ""
+    for c in cat_list:
+        bar_w = (c["total"] / max_cat_total) * 100.0 if max_cat_total > 0 else 0.0
+        c_col = cat_colors.get(c["category"], "#2563eb")
+        sla_col = "#10b981" if c["cumplimiento_pct"] >= 90 else ("#f59e0b" if c["cumplimiento_pct"] >= 75 else "#ef4444")
+        cat_chart_html += f"""
+        <div style="margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;margin-bottom:2px">
+                <span style="font-weight:700;color:#0f172a;display:flex;align-items:center;gap:5px">
+                    <span style="width:8px;height:8px;border-radius:2px;background:{c_col};display:inline-block"></span>
+                    {c['category']}
+                </span>
+                <span style="font-size:10px;color:#334155">
+                    <strong>{c['total']}</strong> ({c['total_items']} act. / {c['total_escalamientos']} esc.)
+                    · <strong style="color:{sla_col}">{c['cumplimiento_pct']:.0f}% SLA</strong>
+                </span>
+            </div>
+            <div style="background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden">
+                <div style="width:{max(bar_w, 3 if c['total'] > 0 else 0):.1f}%;background:{c_col};height:100%"></div>
+            </div>
+        </div>
+        """
+        cat_table_rows += f"""
+        <tr>
+            <td><strong>{c['category']}</strong></td>
+            <td style="text-align:center;font-weight:700">{c['total']}</td>
+            <td style="text-align:center">{c['total_items']}</td>
+            <td style="text-align:center;color:#2563eb;font-weight:600">{c['total_escalamientos']}</td>
+            <td style="text-align:center;color:#10b981">{c['cerrados']}</td>
+            <td style="text-align:center;color:{'#ef4444' if c['fuera_sla'] > 0 else '#64748b'}">{c['fuera_sla']}</td>
+            <td style="text-align:center;font-weight:700;color:{sla_col}">{c['cumplimiento_pct']:.1f}%</td>
+            <td style="text-align:center;font-weight:700;color:#0ea5e9">{c['team_cumplimiento_pct']:.1f}%</td>
+        </tr>
+        """
+
+    # 4. Gráfico Comparativo por IBP (Banco Participante)
+    ibp_list = data.get("por_ibp", [])
+    max_ibp_total = max([i["total"] for i in ibp_list] + [1])
+    ibp_chart_html = ""
+    ibp_table_rows = ""
+    if ibp_list:
+        for idx, ibp_item in enumerate(ibp_list[:10]):
+            bar_w = (ibp_item["total"] / max_ibp_total) * 100.0 if max_ibp_total > 0 else 0.0
+            sla_col = "#10b981" if ibp_item["cumplimiento_pct"] >= 90 else ("#f59e0b" if ibp_item["cumplimiento_pct"] >= 75 else "#ef4444")
+            ibp_chart_html += f"""
+            <div style="margin-bottom:6px">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;margin-bottom:2px">
+                    <span style="font-weight:700;color:#1b365d">{ibp_item['ibp']}</span>
+                    <span style="font-size:10px;color:#334155">
+                        <strong>{ibp_item['total']}</strong> ({ibp_item['total_items']} act. / {ibp_item['total_escalamientos']} esc.)
+                        · <strong style="color:{sla_col}">{ibp_item['cumplimiento_pct']:.0f}% SLA</strong>
+                    </span>
+                </div>
+                <div style="background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden">
+                    <div style="width:{max(bar_w, 4 if ibp_item['total'] > 0 else 0):.1f}%;background:#1b365d;height:100%"></div>
+                </div>
+            </div>
+            """
+        for ibp_item in ibp_list:
+            sla_col = "#10b981" if ibp_item["cumplimiento_pct"] >= 90 else ("#f59e0b" if ibp_item["cumplimiento_pct"] >= 75 else "#ef4444")
+            ibp_table_rows += f"""
+            <tr>
+                <td><strong>{ibp_item['ibp']}</strong></td>
+                <td style="text-align:center;font-weight:700">{ibp_item['total']}</td>
+                <td style="text-align:center">{ibp_item['total_items']}</td>
+                <td style="text-align:center;color:#2563eb;font-weight:600">{ibp_item['total_escalamientos']}</td>
+                <td style="text-align:center;color:#10b981">{ibp_item['cerrados']}</td>
+                <td style="text-align:center;color:{'#ef4444' if ibp_item['fuera_sla'] > 0 else '#64748b'}">{ibp_item['fuera_sla']}</td>
+                <td style="text-align:center;font-weight:700;color:{sla_col}">{ibp_item['cumplimiento_pct']:.1f}%</td>
+                <td style="text-align:center;font-weight:700;color:#0ea5e9">{ibp_item['team_cumplimiento_pct']:.1f}%</td>
+            </tr>
+            """
+    else:
+        ibp_chart_html = '<div style="padding:14px;text-align:center;color:#64748b;font-size:11px">Sin registros de IBP en este filtro.</div>'
+        ibp_table_rows = '<tr><td colspan="8" style="text-align:center;color:#64748b">Sin registros de IBP en este filtro.</td></tr>'
+
+    # 5. Gráficos de Plataforma de Origen y Prioridad
+    glpi_cnt = data["por_origen"].get("GLPI", 0)
+    cu_cnt = data["por_origen"].get("ClickUp", 0)
+    tot_orig = glpi_cnt + cu_cnt
+    glpi_pct = (glpi_cnt / tot_orig * 100.0) if tot_orig > 0 else 0.0
+    cu_pct = (cu_cnt / tot_orig * 100.0) if tot_orig > 0 else 0.0
+
+    prio_colors = {"Crítica": "#ef4444", "Alta": "#f97316", "Media": "#3b82f6", "Baja": "#10b981"}
+    prio_bars_html = ""
+    for p_key in ["Crítica", "Alta", "Media", "Baja"]:
+        p_cnt = data["por_prioridad"].get(p_key, 0)
+        p_pct = (p_cnt / kpis["total_items"] * 100.0) if kpis["total_items"] > 0 else 0.0
+        prio_bars_html += f"""
+        <div style="margin-bottom:5px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+                <span style="font-weight:600;color:#334155">{p_key}</span>
+                <span style="font-weight:700">{p_cnt} ({p_pct:.0f}%)</span>
+            </div>
+            <div style="background:#e2e8f0;height:5px;border-radius:3px;overflow:hidden">
+                <div style="width:{p_pct:.1f}%;background:{prio_colors[p_key]};height:100%"></div>
+            </div>
+        </div>
+        """
+
+    # Tablas de Especialistas, Clientes y Escalamientos
     spec_rows = ""
     for s in data["por_especialista"]:
         pct = s["cumplimiento_pct"]
@@ -692,6 +1229,22 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
         </tr>
         """
 
+    esc_rows = ""
+    for esc in data.get("escalations", [])[:25]:
+        rec_text = (esc.get("recommendations") or esc.get("notes") or "Sin recomendaciones registradas").replace("\n", "<br>")
+        esc_rows += f"""
+        <tr>
+            <td><strong>#{esc['id']} - {esc['title']}</strong></td>
+            <td style="text-align:center"><span style="background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;font-weight:700;font-size:9.5px">{esc['ibp']}</span></td>
+            <td style="text-align:center"><span style="background:#f1f5f9;color:#0f172a;padding:2px 6px;border-radius:4px;font-weight:700;font-size:9.5px">{esc['category']}</span></td>
+            <td style="text-align:center;font-size:10px">{esc['received_at_str']}</td>
+            <td style="text-align:center;font-size:10px">{esc['escalated_at_str']}</td>
+            <td style="font-size:10px;color:#334155">{rec_text}</td>
+        </tr>
+        """
+    if not esc_rows:
+        esc_rows = '<tr><td colspan="6" style="text-align:center;color:#64748b">No se registraron expedientes de escalamiento bajo este filtro.</td></tr>'
+
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -713,16 +1266,16 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             line-height: 1.4;
         }}
         .report-page {{
-            max-width: 900px;
+            max-width: 920px;
             margin: 0 auto;
             background: #ffffff;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
-            padding: 32px 36px;
+            padding: 28px 34px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.05);
         }}
         .no-print-bar {{
-            max-width: 900px;
+            max-width: 920px;
             margin: 0 auto 16px auto;
             display: flex;
             align-items: center;
@@ -751,8 +1304,8 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             justify-content: space-between;
             align-items: flex-start;
             border-bottom: 2px solid #1b365d;
-            padding-bottom: 16px;
-            margin-bottom: 20px;
+            padding-bottom: 14px;
+            margin-bottom: 16px;
         }}
         .company-title {{
             font-size: 18px;
@@ -771,24 +1324,25 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             background: #eff6ff;
             border: 1px solid #bfdbfe;
             color: #1d4ed8;
-            padding: 4px 10px;
+            padding: 3px 9px;
             border-radius: 6px;
             font-weight: 700;
-            font-size: 11px;
+            font-size: 10.5px;
             display: inline-block;
             margin-top: 6px;
+            margin-right: 4px;
         }}
         .kpi-grid {{
             display: grid;
             grid-template-columns: repeat(6, 1fr);
-            gap: 10px;
-            margin-bottom: 24px;
+            gap: 8px;
+            margin-bottom: 16px;
         }}
         .kpi-card {{
             background: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            padding: 10px 8px;
+            padding: 9px 6px;
             text-align: center;
             border-top: 3px solid #1b365d;
         }}
@@ -797,45 +1351,66 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
         .kpi-card.blue {{ border-top-color: #2563eb; }}
         .kpi-card.yellow {{ border-top-color: #f59e0b; }}
         .kpi-lbl {{
-            font-size: 9px;
+            font-size: 8.5px;
             text-transform: uppercase;
             font-weight: 700;
             color: #64748b;
             letter-spacing: 0.3px;
         }}
         .kpi-val {{
-            font-size: 20px;
+            font-size: 19px;
             font-weight: 800;
-            margin-top: 4px;
+            margin-top: 3px;
             color: #0f172a;
         }}
+        .charts-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 14px;
+        }}
+        .chart-box {{
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            background: #ffffff;
+        }}
+        .chart-box-title {{
+            font-size: 11px;
+            font-weight: 800;
+            color: #1b365d;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 4px;
+        }}
         .section-title {{
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 700;
             color: #1b365d;
             text-transform: uppercase;
             letter-spacing: 0.2px;
-            margin: 20px 0 10px 0;
+            margin: 18px 0 8px 0;
             border-left: 3px solid #2563eb;
             padding-left: 8px;
         }}
         table {{
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 16px;
-            font-size: 11px;
+            margin-bottom: 14px;
+            font-size: 10.5px;
         }}
         th {{
             background: #1b365d;
             color: #ffffff;
             font-weight: 700;
-            padding: 8px 6px;
+            padding: 7px 6px;
             text-align: left;
-            font-size: 10px;
+            font-size: 9.5px;
             text-transform: uppercase;
         }}
         td {{
-            padding: 7px 6px;
+            padding: 6px 6px;
             border-bottom: 1px solid #e2e8f0;
         }}
         tr:nth-child(even) td {{
@@ -845,8 +1420,8 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-top: 40px;
-            padding-top: 24px;
+            margin-top: 32px;
+            padding-top: 20px;
             border-top: 1px dashed #cbd5e1;
         }}
         .sig-block {{
@@ -874,7 +1449,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 border: none !important;
                 box-shadow: none !important;
                 margin: 0 auto !important;
-                padding: 12mm 15mm 12mm 15mm !important;
+                padding: 10mm 14mm 10mm 14mm !important;
                 max-width: 100% !important;
                 border-radius: 0 !important;
                 box-sizing: border-box !important;
@@ -882,7 +1457,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             .no-print-bar {{
                 display: none !important;
             }}
-            .kpi-grid, .breakdown-grid, .footer-signatures, table tr {{
+            .kpi-grid, .charts-grid, .chart-box, .footer-signatures, table tr {{
                 page-break-inside: avoid;
                 break-inside: avoid;
             }}
@@ -892,9 +1467,9 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
 <body>
     <div class="no-print-bar">
         <div>
-            <strong>Reporte Ejecutivo Oficial</strong> · Listo para imprimir o guardar como PDF.
+            <strong>Reporte Ejecutivo Oficial con KPIs y Gráficos</strong> · Listo para imprimir o guardar como PDF.
             <div style="font-size:11px;color:#94a3b8;margin-top:2px">
-                Nota: En la ventana de impresión, desactiva la casilla <em>"Encabezados y pies de página"</em> para eliminar cualquier URL residual del navegador.
+                Nota: En la ventana de impresión, desactiva la casilla <em>"Encabezados y pies de página"</em> y activa <em>"Gráficos de fondo"</em>.
             </div>
         </div>
         <div style="display:flex;gap:10px">
@@ -910,22 +1485,27 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             <div>
                 <div class="company-title">Soluciones SYCOM</div>
                 <div class="company-sub">Coordinación de Infraestructura y Base de Datos</div>
-                <div class="badge-period">Período: {data['period_label']}</div>
+                <div>
+                    <span class="badge-period">Período: {data['period_label']}</span>
+                    <span class="badge-period">IBP: {ibp_filter_lbl}</span>
+                    <span class="badge-period">Categoría: {cat_filter_lbl}</span>
+                    <span class="badge-period">Especialista: {spec_filter_lbl}</span>
+                </div>
             </div>
             <div style="text-align:right">
-                <div style="font-size:10px;color:#64748b">INFORME DE GESTIÓN MENSUAL</div>
-                <div style="font-weight:700;font-size:12px;color:#1b365d;margin-top:2px">MESA DE CONTROL INTEGRADA</div>
+                <div style="font-size:10px;color:#64748b">INFORME EJECUTIVO DE GESTIÓN Y SLA</div>
+                <div style="font-weight:700;font-size:11.5px;color:#1b365d;margin-top:2px">{dynamic_report_heading}</div>
                 <div style="font-size:9.5px;color:#94a3b8;margin-top:4px">Emisión: {data['generated_at']}</div>
             </div>
         </div>
 
         <div class="kpi-grid">
             <div class="kpi-card">
-                <div class="kpi-lbl">Total Casos</div>
+                <div class="kpi-lbl">Total Actividades</div>
                 <div class="kpi-val">{kpis['total_items']}</div>
             </div>
             <div class="kpi-card green">
-                <div class="kpi-lbl">Cerrados</div>
+                <div class="kpi-lbl">Cerradas</div>
                 <div class="kpi-val" style="color:#10b981">{kpis['total_cerrados']}</div>
             </div>
             <div class="kpi-card cyan">
@@ -933,25 +1513,94 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 <div class="kpi-val" style="color:#0ea5e9">{kpis['total_en_curso']}</div>
             </div>
             <div class="kpi-card blue">
-                <div class="kpi-lbl">Pendientes</div>
-                <div class="kpi-val" style="color:#2563eb">{kpis['total_pendientes']}</div>
-            </div>
-            <div class="kpi-card yellow">
-                <div class="kpi-lbl">En Espera</div>
-                <div class="kpi-val" style="color:#f59e0b">{kpis['total_en_espera']}</div>
+                <div class="kpi-lbl">Escalamientos</div>
+                <div class="kpi-val" style="color:#2563eb">{kpis.get('total_escalamientos', 0)}</div>
             </div>
             <div class="kpi-card green">
-                <div class="kpi-lbl">Cumplimiento SLA</div>
+                <div class="kpi-lbl">SLA Sycom (Emp.)</div>
                 <div class="kpi-val" style="color:{'#10b981' if kpis['cumplimiento_general'] >= 90 else '#f59e0b'}">{kpis['cumplimiento_general']}%</div>
+            </div>
+            <div class="kpi-card cyan">
+                <div class="kpi-lbl">SLA Equipo (Infra)</div>
+                <div class="kpi-val" style="color:{'#10b981' if kpis.get('cumplimiento_equipo', 100.0) >= 90 else '#0ea5e9'}">{kpis.get('cumplimiento_equipo', 100.0)}%</div>
             </div>
         </div>
 
-        <div style="font-size:11.5px;color:#475569;margin-bottom:14px;background:#f1f5f9;padding:8px 12px;border-radius:6px;display:flex;justify-content:space-between">
+        <div style="font-size:11px;color:#475569;margin-bottom:14px;background:#f1f5f9;padding:7px 12px;border-radius:6px;display:flex;justify-content:space-between">
             <span><strong>Tiempo Promedio de Resolución:</strong> {kpis['avg_resolution_str']}</span>
-            <span><strong>Fuera de SLA:</strong> {kpis['total_fuera_sla']} casos · <strong>Dentro de SLA:</strong> {kpis['total_dentro_sla']} casos</span>
+            <span><strong>Dentro de SLA:</strong> {kpis['total_dentro_sla']} · <strong>Fuera de SLA:</strong> {kpis['total_fuera_sla']} · <strong>Pendientes:</strong> {kpis['total_pendientes']}</span>
         </div>
 
-        <div class="section-title">1. Rendimiento y Carga Operativa por Especialista</div>
+        <div class="section-title">1. Panel Gráfico de Indicadores Clave (KPIs, IBP y Categorías)</div>
+        <div class="charts-grid">
+            <div class="chart-box">
+                <div class="chart-box-title">Distribución de Estados y Cumplimiento SLA</div>
+                {donut_svg_html}
+            </div>
+            <div class="chart-box">
+                <div class="chart-box-title">Carga Operativa y SLA por Especialista</div>
+                {spec_chart_bars}
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-box">
+                <div class="chart-box-title">Gráfico por Categoría Técnica (Volumen &amp; SLA)</div>
+                {cat_chart_html}
+            </div>
+            <div class="chart-box">
+                <div class="chart-box-title">Gráfico por IBP / Banco Participante (Volumen &amp; SLA)</div>
+                {ibp_chart_html}
+                <div style="margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9">
+                    <div style="font-size:10px;font-weight:700;color:#1b365d;margin-bottom:4px">ORIGEN Y PRIORIDAD OPERATIVA</div>
+                    <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:4px">
+                        <span><strong>GLPI:</strong> {glpi_cnt} ({glpi_pct:.0f}%)</span>
+                        <span><strong>ClickUp:</strong> {cu_cnt} ({cu_pct:.0f}%)</span>
+                    </div>
+                    {prio_bars_html}
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">2. Desglose Ejecutivo por IBP (Banco Participante)</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>IBP / Entidad Bancaria</th>
+                    <th style="text-align:center">Volumen Total</th>
+                    <th style="text-align:center">Actividades</th>
+                    <th style="text-align:center">Escalamientos</th>
+                    <th style="text-align:center">Cerrados</th>
+                    <th style="text-align:center">Fuera SLA</th>
+                    <th style="text-align:center">SLA Sycom %</th>
+                    <th style="text-align:center">SLA Equipo %</th>
+                </tr>
+            </thead>
+            <tbody>
+                {ibp_table_rows}
+            </tbody>
+        </table>
+
+        <div class="section-title">3. Desglose Ejecutivo por Categoría Técnica</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Categoría Técnica</th>
+                    <th style="text-align:center">Volumen Total</th>
+                    <th style="text-align:center">Actividades</th>
+                    <th style="text-align:center">Escalamientos</th>
+                    <th style="text-align:center">Cerrados</th>
+                    <th style="text-align:center">Fuera SLA</th>
+                    <th style="text-align:center">SLA Sycom %</th>
+                    <th style="text-align:center">SLA Equipo %</th>
+                </tr>
+            </thead>
+            <tbody>
+                {cat_table_rows}
+            </tbody>
+        </table>
+
+        <div class="section-title">4. Rendimiento y Carga Operativa por Especialista</div>
         <table>
             <thead>
                 <tr>
@@ -970,7 +1619,24 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             </tbody>
         </table>
 
-        <div class="section-title">2. Volumen de Actividad y Cumplimiento por Cliente / Entidad</div>
+        <div class="section-title">5. Expedientes de Escalamientos y Recomendaciones Técnicas</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Expediente / Asunto</th>
+                    <th style="text-align:center">IBP</th>
+                    <th style="text-align:center">Categoría</th>
+                    <th style="text-align:center">Recibido Sycom</th>
+                    <th style="text-align:center">Escalado Infra</th>
+                    <th>Recomendaciones / Notas</th>
+                </tr>
+            </thead>
+            <tbody>
+                {esc_rows}
+            </tbody>
+        </table>
+
+        <div class="section-title">6. Volumen de Actividad y Cumplimiento por Cliente / Entidad</div>
         <table>
             <thead>
                 <tr>

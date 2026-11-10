@@ -3083,6 +3083,29 @@
               </div>
 
               <div style="display:flex;align-items:center;gap:6px">
+                <span class="muted" style="font-size:11.5px">IBP / Banco:</span>
+                <select id="analyticsIbpSelect" onchange="loadAnalyticsData()"
+                  style="font-size:12px;padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none;max-width:190px">
+                  <option value="">Todas las IBPs</option>
+                </select>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="muted" style="font-size:11.5px">Categoría:</span>
+                <select id="analyticsCategorySelect" onchange="loadAnalyticsData()"
+                  style="font-size:12px;padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none">
+                  <option value="">Todas las Categorías</option>
+                  <option value="CPU">CPU</option>
+                  <option value="RAM">RAM</option>
+                  <option value="Disco">Disco</option>
+                  <option value="Antivirus">Antivirus</option>
+                  <option value="PostgreSQL">PostgreSQL</option>
+                  <option value="Servicios">Servicios</option>
+                  <option value="Infraestructura">Infraestructura</option>
+                </select>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:6px">
                 <span class="muted" style="font-size:11.5px">Especialista:</span>
                 <select id="analyticsSpecialistSelect" onchange="loadAnalyticsData()"
                   style="font-size:12px;padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none">
@@ -3094,6 +3117,22 @@
                   <option value="Sin asignar">Sin Asignar</option>
                 </select>
               </div>
+
+              <button class="btn" onclick="exportAnalyticsPrintView()" title="Exportar informe en PDF con KPIs y gráficos según el filtro actual"
+                style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;border-color:rgba(79,140,255,0.4);font-weight:700;display:inline-flex;align-items:center;gap:6px;padding:6px 12px">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+                </svg>
+                <span>Exportar PDF con Gráficos</span>
+              </button>
+
+              <button class="btn" onclick="exportAnalyticsExcel()" title="Descargar Excel filtrado por IBP y Categoría"
+                style="background:rgba(16,185,129,0.15);color:#34d399;border-color:rgba(16,185,129,0.35);font-weight:700;display:inline-flex;align-items:center;gap:6px;padding:6px 11px">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>Excel</span>
+              </button>
 
               <button class="btn" onclick="loadAnalyticsData()" title="Refrescar métricas ahora"
                 style="background:rgba(255,255,255,0.05);color:var(--text);border-color:rgba(255,255,255,0.14);display:inline-flex;align-items:center;gap:5px;padding:6px 11px">
@@ -3156,6 +3195,49 @@
                 </div>
                 <div id="chartSpecialistsContainer">
                   <!-- Generado por JS (Barras verticales + desglose) -->
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 2B. Gráficos por Categoría Técnica y por IBP / Banco Participante -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(380px, 1fr));gap:18px;margin-bottom:20px">
+
+            <!-- Gráfico 3: Distribución y SLA por Categoría Técnica -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;display:flex;flex-direction:column;justify-content:space-between">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                  <div>
+                    <h4 style="margin:0;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                      <span>Gráfico por Categoría Técnica (CPU, RAM, Disco, BD, etc.)</span>
+                    </h4>
+                    <span class="muted" style="font-size:11.5px">Volumen de actividades, escalamientos y cumplimiento SLA por categoría</span>
+                  </div>
+                  <span class="muted" style="font-size:11px" id="lblCategoryCount">—</span>
+                </div>
+                <div id="chartCategoryContainer">
+                  <!-- Generado por JS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Gráfico 4: Distribución y SLA por IBP (Banco Participante) -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;display:flex;flex-direction:column;justify-content:space-between">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                  <div>
+                    <h4 style="margin:0;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
+                      <span>Gráfico por IBP / Institución Bancaria Participante</span>
+                    </h4>
+                    <span class="muted" style="font-size:11.5px">Volumen operativo, escalamientos y cumplimiento SLA por banco (SIMF)</span>
+                  </div>
+                  <span class="muted" style="font-size:11px" id="lblIbpCount">—</span>
+                </div>
+                <div id="chartIbpContainer">
+                  <!-- Generado por JS -->
                 </div>
               </div>
             </div>
@@ -6162,7 +6244,9 @@
       period: 'month',
       startDate: '',
       endDate: '',
-      specialist: ''
+      specialist: '',
+      ibp: '',
+      category: ''
     };
 
     function escapeHtml(str) {
@@ -6245,6 +6329,14 @@
         <option value="Sin asignar" ${REPORT_FILTER_STATE.specialist === 'Sin asignar' ? 'selected' : ''}>Sin asignar</option>
       `;
 
+      const ibpCatalog = (typeof IBP_INVENTORY !== 'undefined' && Array.isArray(IBP_INVENTORY)) ? IBP_INVENTORY : [];
+      const ibpOptions = `<option value="" ${!REPORT_FILTER_STATE.ibp ? 'selected' : ''}>Todas las IBPs (Global)</option>` +
+        ibpCatalog.map(b => `<option value="${escapeHtml(b.label)}" ${REPORT_FILTER_STATE.ibp === b.label ? 'selected' : ''}>${escapeHtml(b.label)}</option>`).join('');
+
+      const catList = ['CPU', 'RAM', 'Disco', 'Antivirus', 'PostgreSQL', 'Servicios', 'Infraestructura'];
+      const catOptions = `<option value="" ${!REPORT_FILTER_STATE.category ? 'selected' : ''}>Todas las Categorías</option>` +
+        catList.map(c => `<option value="${c}" ${REPORT_FILTER_STATE.category === c ? 'selected' : ''}>${c}</option>`).join('');
+
       modal.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
           <div style="display:flex;align-items:center;gap:12px">
@@ -6262,7 +6354,7 @@
                 <span>Centro de Reportes Ejecutivos</span>
                 <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px">M9</span>
               </h2>
-              <div class="muted" style="font-size:12px;margin-top:2px">Exportación oficial en Excel (.xlsx) y vista de impresión PDF con métricas y SLA</div>
+              <div class="muted" style="font-size:12px;margin-top:2px">Exportación oficial en Excel (.xlsx) y vista PDF con KPIs, gráficos por IBP y Categoría</div>
             </div>
           </div>
           <button type="button" class="btn" onclick="closeModal()" style="padding:4px 9px;font-size:16px;line-height:1" title="Cerrar">&times;</button>
@@ -6270,7 +6362,7 @@
 
         <!-- Filtros de Reporte -->
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;margin-bottom:16px">
-          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:12px;align-items:end">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(175px, 1fr));gap:12px;align-items:end">
             <div>
               <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Período de Análisis:</label>
               <select id="reportPeriodSelect" class="form-input" onchange="onReportPeriodChange(this.value)" style="width:100%">
@@ -6278,6 +6370,20 @@
                 <option value="30days" ${REPORT_FILTER_STATE.period === '30days' ? 'selected' : ''}>Últimos 30 días</option>
                 <option value="all" ${REPORT_FILTER_STATE.period === 'all' ? 'selected' : ''}>Histórico completo</option>
                 <option value="custom" ${REPORT_FILTER_STATE.period === 'custom' ? 'selected' : ''}>Rango personalizado...</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">IBP / Banco Participante:</label>
+              <select id="reportIbpSelect" class="form-input" onchange="onReportIbpChange(this.value)" style="width:100%">
+                ${ibpOptions}
+              </select>
+            </div>
+
+            <div>
+              <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Categoría Técnica:</label>
+              <select id="reportCategorySelect" class="form-input" onchange="onReportCategoryChange(this.value)" style="width:100%">
+                ${catOptions}
               </select>
             </div>
 
@@ -6327,13 +6433,13 @@
 
             <button type="button" class="btn" id="btnPrintPdf" onclick="openExecutivePrintView()"
               style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;border-color:rgba(79,140,255,.4);font-weight:700;display:inline-flex;align-items:center;gap:8px;padding:9px 16px"
-              title="Abrir vista ejecutiva membretada optimizada para impresión en PDF">
+              title="Abrir vista ejecutiva membretada optimizada para impresión en PDF con KPIs y gráficos">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 9 6 2 18 2 18 9"/>
                 <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
                 <rect x="6" y="14" width="12" height="8"/>
               </svg>
-              <span>Ver / Imprimir PDF</span>
+              <span>Ver / Imprimir PDF con Gráficos</span>
             </button>
           </div>
         </div>
@@ -6365,6 +6471,16 @@
       await loadReportsPreview();
     }
 
+    async function onReportIbpChange(val) {
+      REPORT_FILTER_STATE.ibp = val;
+      await loadReportsPreview();
+    }
+
+    async function onReportCategoryChange(val) {
+      REPORT_FILTER_STATE.category = val;
+      await loadReportsPreview();
+    }
+
     async function loadReportsPreview() {
       const preview = document.getElementById('reportPreviewContainer');
       if (!preview) return;
@@ -6381,6 +6497,8 @@
         if (REPORT_FILTER_STATE.startDate) params.set('start_date', REPORT_FILTER_STATE.startDate);
         if (REPORT_FILTER_STATE.endDate) params.set('end_date', REPORT_FILTER_STATE.endDate);
         if (REPORT_FILTER_STATE.specialist) params.set('specialist', REPORT_FILTER_STATE.specialist);
+        if (REPORT_FILTER_STATE.ibp) params.set('ibp', REPORT_FILTER_STATE.ibp);
+        if (REPORT_FILTER_STATE.category) params.set('category', REPORT_FILTER_STATE.category);
 
         if (CURRENT_USER) {
           if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
@@ -6425,11 +6543,11 @@
           <!-- Indicador de período -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:12px;color:var(--muted)">
             <span>${escapeHtml(data.period_label || 'Período seleccionado')}</span>
-            <span>${data.items ? data.items.length : 0} actividades en alcance</span>
+            <span>${data.items ? data.items.length : 0} actividades · ${k.total_escalamientos || 0} escalamientos</span>
           </div>
 
           <!-- Tarjetas KPI -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;margin-bottom:14px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(125px, 1fr));gap:10px;margin-bottom:14px">
             <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
               <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Total Casos</div>
               <div style="font-size:22px;font-weight:800;color:var(--text);margin-top:2px">${k.total_items || 0}</div>
@@ -6441,9 +6559,14 @@
               <div class="muted" style="font-size:10px;margin-top:2px">${k.total_dentro_sla || 0} a tiempo</div>
             </div>
             <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
-              <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Cumplimiento SLA</div>
+              <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Escalamientos</div>
+              <div style="font-size:22px;font-weight:800;color:var(--accent);margin-top:2px">${k.total_escalamientos || 0}</div>
+              <div class="muted" style="font-size:10px;margin-top:2px">En el filtro actual</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
+              <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">SLA Sycom</div>
               <div style="font-size:22px;font-weight:800;color:${slaColor};margin-top:2px">${slaVal.toFixed(1)}%</div>
-              <div class="muted" style="font-size:10px;margin-top:2px">Meta: 90.0%</div>
+              <div class="muted" style="font-size:10px;margin-top:2px">SLA Equipo: ${(Number(k.cumplimiento_equipo) || 100).toFixed(0)}%</div>
             </div>
             <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
               <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Resolución Prom.</div>
@@ -6489,16 +6612,17 @@
 
     async function downloadExecutiveExcel() {
       const btn = document.getElementById('btnDownloadExcel');
-      if (!btn) return;
-      const oldHtml = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = `<svg class="spin-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>Generando Excel...</span>`;
+      if (btn) {
+        btn.disabled = true;
+      }
 
       try {
         const params = new URLSearchParams();
         if (REPORT_FILTER_STATE.startDate) params.set('start_date', REPORT_FILTER_STATE.startDate);
         if (REPORT_FILTER_STATE.endDate) params.set('end_date', REPORT_FILTER_STATE.endDate);
         if (REPORT_FILTER_STATE.specialist) params.set('specialist', REPORT_FILTER_STATE.specialist);
+        if (REPORT_FILTER_STATE.ibp) params.set('ibp', REPORT_FILTER_STATE.ibp);
+        if (REPORT_FILTER_STATE.category) params.set('category', REPORT_FILTER_STATE.category);
 
         if (CURRENT_USER) {
           if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
@@ -6532,19 +6656,22 @@
         window.URL.revokeObjectURL(url);
         a.remove();
 
-        showToast('¡Descarga Exitosa!', `Se ha generado ${filename}`);
+        showToast('Descarga Exitosa', `Se ha generado ${filename}`);
         recordCurrentReportInHistory();
       } catch (err) {
         console.error('Error al descargar reporte Excel:', err);
         alert(`No se pudo generar el reporte Excel: ${err.message}`);
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = oldHtml;
+        if (btn) btn.disabled = false;
       }
     }
 
     function getReportFilterTitle() {
-      const spec = REPORT_FILTER_STATE.specialist ? ` (${REPORT_FILTER_STATE.specialist})` : '';
+      const parts = [];
+      if (REPORT_FILTER_STATE.ibp) parts.push(`IBP: ${REPORT_FILTER_STATE.ibp}`);
+      if (REPORT_FILTER_STATE.category) parts.push(`Cat: ${REPORT_FILTER_STATE.category}`);
+      if (REPORT_FILTER_STATE.specialist) parts.push(REPORT_FILTER_STATE.specialist);
+      const spec = parts.length ? ` (${parts.join(' · ')})` : '';
       if (REPORT_FILTER_STATE.period === 'month') {
         const now = new Date();
         return `Informe Ejecutivo - ${getMonthName(now.getMonth())} ${now.getFullYear()}${spec}`;
@@ -6569,7 +6696,9 @@
           title: getReportFilterTitle(),
           start_date: REPORT_FILTER_STATE.startDate,
           end_date: REPORT_FILTER_STATE.endDate,
-          specialist: REPORT_FILTER_STATE.specialist
+          specialist: REPORT_FILTER_STATE.specialist,
+          ibp: REPORT_FILTER_STATE.ibp,
+          category: REPORT_FILTER_STATE.category
         })
       }).then(() => loadReportsHistory()).catch(err => console.warn('No se pudo registrar reporte en historial:', err));
     }
@@ -6579,6 +6708,8 @@
       if (REPORT_FILTER_STATE.startDate) params.set('start_date', REPORT_FILTER_STATE.startDate);
       if (REPORT_FILTER_STATE.endDate) params.set('end_date', REPORT_FILTER_STATE.endDate);
       if (REPORT_FILTER_STATE.specialist) params.set('specialist', REPORT_FILTER_STATE.specialist);
+      if (REPORT_FILTER_STATE.ibp) params.set('ibp', REPORT_FILTER_STATE.ibp);
+      if (REPORT_FILTER_STATE.category) params.set('category', REPORT_FILTER_STATE.category);
 
       if (CURRENT_USER) {
         if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
@@ -6914,15 +7045,80 @@
       }
     }
 
+    function ensureAnalyticsIbpOptions() {
+      const ibpSelect = document.getElementById('analyticsIbpSelect');
+      if (!ibpSelect || ibpSelect.options.length > 1) return;
+      const ibpCatalog = (typeof IBP_INVENTORY !== 'undefined' && Array.isArray(IBP_INVENTORY)) ? IBP_INVENTORY : [];
+      ibpCatalog.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.label;
+        opt.textContent = b.label;
+        ibpSelect.appendChild(opt);
+      });
+    }
+
+    function syncReportFilterFromAnalytics() {
+      const periodSelect = document.getElementById('analyticsPeriodSelect');
+      const specSelect = document.getElementById('analyticsSpecialistSelect');
+      const ibpSelect = document.getElementById('analyticsIbpSelect');
+      const catSelect = document.getElementById('analyticsCategorySelect');
+
+      const periodVal = periodSelect ? periodSelect.value : 'month';
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+
+      if (periodVal === 'month') {
+        REPORT_FILTER_STATE.period = 'month';
+        REPORT_FILTER_STATE.startDate = `${yyyy}-${mm}-01`;
+        REPORT_FILTER_STATE.endDate = todayStr;
+      } else if (periodVal === 'last30') {
+        REPORT_FILTER_STATE.period = '30days';
+        const d30 = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+        REPORT_FILTER_STATE.startDate = `${d30.getFullYear()}-${String(d30.getMonth() + 1).padStart(2, '0')}-${String(d30.getDate()).padStart(2, '0')}`;
+        REPORT_FILTER_STATE.endDate = todayStr;
+      } else if (periodVal === 'last7') {
+        REPORT_FILTER_STATE.period = 'custom';
+        const d7 = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+        REPORT_FILTER_STATE.startDate = `${d7.getFullYear()}-${String(d7.getMonth() + 1).padStart(2, '0')}-${String(d7.getDate()).padStart(2, '0')}`;
+        REPORT_FILTER_STATE.endDate = todayStr;
+      } else {
+        REPORT_FILTER_STATE.period = 'all';
+        REPORT_FILTER_STATE.startDate = '';
+        REPORT_FILTER_STATE.endDate = '';
+      }
+
+      REPORT_FILTER_STATE.specialist = specSelect ? specSelect.value : '';
+      REPORT_FILTER_STATE.ibp = ibpSelect ? ibpSelect.value : '';
+      REPORT_FILTER_STATE.category = catSelect ? catSelect.value : '';
+    }
+
+    function exportAnalyticsPrintView() {
+      syncReportFilterFromAnalytics();
+      openExecutivePrintView();
+    }
+
+    async function exportAnalyticsExcel() {
+      syncReportFilterFromAnalytics();
+      await downloadExecutiveExcel();
+    }
+
     async function loadAnalyticsData() {
+      ensureAnalyticsIbpOptions();
       const kpiGrid = document.getElementById('analyticsKpiGrid');
       const statusBadge = document.getElementById('lblAnalyticsStatus');
       if (statusBadge) statusBadge.textContent = 'Actualizando...';
 
       const periodSelect = document.getElementById('analyticsPeriodSelect');
       const specSelect = document.getElementById('analyticsSpecialistSelect');
+      const ibpSelect = document.getElementById('analyticsIbpSelect');
+      const catSelect = document.getElementById('analyticsCategorySelect');
       const periodVal = periodSelect ? periodSelect.value : 'month';
       const specVal = specSelect ? specSelect.value : '';
+      const ibpVal = ibpSelect ? ibpSelect.value : '';
+      const catVal = catSelect ? catSelect.value : '';
 
       let startDate = '';
       let endDate = '';
@@ -6959,6 +7155,8 @@
         if (startDate) params.set('start_date', startDate);
         if (endDate) params.set('end_date', endDate);
         if (specVal) params.set('specialist', specVal);
+        if (ibpVal) params.set('ibp', ibpVal);
+        if (catVal) params.set('category', catVal);
 
         if (CURRENT_USER) {
           if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
@@ -6996,6 +7194,8 @@
       renderAnalyticsKpis(data.kpis || {}, data.por_origen || {});
       renderSlaDonutChart(data.kpis || {});
       renderSpecialistsChart(data.por_especialista || []);
+      renderCategoryChart(data.por_categoria || []);
+      renderIbpChart(data.por_ibp || []);
       renderPlatformChart(data.por_origen || {});
       renderPriorityChart(data.por_prioridad || {});
       renderClientsChart(data.por_cliente || []);
@@ -7433,6 +7633,96 @@
           </div>
         `;
       }).join('');
+    }
+
+    function renderCategoryChart(list) {
+      const container = document.getElementById('chartCategoryContainer');
+      const countEl = document.getElementById('lblCategoryCount');
+      if (!container) return;
+
+      if (!list || !list.length) {
+        container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--muted)">Sin datos de categorías en este filtro.</div>`;
+        return;
+      }
+
+      if (countEl) countEl.textContent = `${list.length} categorías`;
+      const maxTotal = Math.max(...list.map(c => c.total || 0), 1);
+      const catColors = {
+        'CPU': '#ef4444',
+        'RAM': '#f97316',
+        'Disco': '#eab308',
+        'Antivirus': '#10b981',
+        'PostgreSQL': '#3b82f6',
+        'Servicios': '#8b5cf6',
+        'Infraestructura': '#06b6d4'
+      };
+
+      container.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">` + list.map(c => {
+        const sla = Number(c.cumplimiento_pct) || 0;
+        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
+        const barColor = catColors[c.category] || '#4f8cff';
+        const barPct = c.total > 0 ? Math.max((c.total / maxTotal) * 100, 4) : 0;
+
+        return `
+          <div style="background:rgba(255,255,255,0.02);padding:8px 11px;border-radius:8px;border:1px solid rgba(255,255,255,0.05)">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:5px">
+              <span style="display:flex;align-items:center;gap:7px;font-weight:700;color:var(--text)">
+                <span style="width:9px;height:9px;border-radius:2px;background:${barColor};display:inline-block"></span>
+                ${escapeHtml(c.category)}
+              </span>
+              <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+                <span style="color:var(--muted)"><strong>${c.total}</strong> total (${c.total_items || 0} act. / ${c.total_escalamientos || 0} esc.)</span>
+                <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:10px;padding:2px 6px;font-weight:700">
+                  ${sla.toFixed(0)}% SLA
+                </span>
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.06);height:6px;border-radius:3px;overflow:hidden">
+              <div style="width:${barPct}%;background:${barColor};height:100%"></div>
+            </div>
+          </div>
+        `;
+      }).join('') + `</div>`;
+    }
+
+    function renderIbpChart(list) {
+      const container = document.getElementById('chartIbpContainer');
+      const countEl = document.getElementById('lblIbpCount');
+      if (!container) return;
+
+      if (!list || !list.length) {
+        container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--muted)">Sin registros por IBP en este filtro.</div>`;
+        return;
+      }
+
+      if (countEl) countEl.textContent = `${list.length} IBPs con actividad`;
+      const topIbps = list.slice(0, 8);
+      const maxTotal = Math.max(...topIbps.map(i => i.total || 0), 1);
+
+      container.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">` + topIbps.map(item => {
+        const sla = Number(item.cumplimiento_pct) || 0;
+        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
+        const barPct = item.total > 0 ? Math.max((item.total / maxTotal) * 100, 4) : 0;
+
+        return `
+          <div style="background:rgba(255,255,255,0.02);padding:8px 11px;border-radius:8px;border:1px solid rgba(255,255,255,0.05)">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:5px">
+              <span style="font-weight:700;color:#38bdf8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:210px" title="${escapeHtml(item.ibp)}">
+                ${escapeHtml(item.ibp)}
+              </span>
+              <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+                <span style="color:var(--muted)"><strong>${item.total}</strong> (${item.total_items || 0} act. / ${item.total_escalamientos || 0} esc.)</span>
+                <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:10px;padding:2px 6px;font-weight:700">
+                  ${sla.toFixed(0)}% SLA
+                </span>
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.06);height:6px;border-radius:3px;overflow:hidden">
+              <div style="width:${barPct}%;background:linear-gradient(90deg, #38bdf8, #2563eb);height:100%"></div>
+            </div>
+          </div>
+        `;
+      }).join('') + `</div>`;
     }
 
     // =========================================================================

@@ -1554,7 +1554,7 @@ def api_test_telegram(_role: str = Depends(verify_coordinator_role)):
 # REPORTES EJECUTIVOS (M9) - EXCEL & PDF
 # ==============================================================================
 
-def _resolve_report_filters(start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param):
+def _resolve_report_filters(start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param, ibp=None, category=None):
     role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
 
     # Restricción estricta: Solo el rol Coordinador / Administrador puede generar reportes
@@ -1567,7 +1567,9 @@ def _resolve_report_filters(start_date, end_date, specialist, x_user_role, x_use
     spec = specialist.strip() if isinstance(specialist, str) and specialist.strip() else None
     s_date = start_date.strip() if isinstance(start_date, str) and start_date.strip() else None
     e_date = end_date.strip() if isinstance(end_date, str) and end_date.strip() else None
-    return s_date, e_date, spec
+    ibp_val = ibp.strip() if isinstance(ibp, str) and ibp.strip() else None
+    cat_val = category.strip() if isinstance(category, str) and category.strip() else None
+    return s_date, e_date, spec, ibp_val, cat_val
 
 
 @app.get("/api/reports/data")
@@ -1575,6 +1577,8 @@ def api_report_data(
     start_date: str = Query(None, description="Fecha inicio YYYY-MM-DD"),
     end_date: str = Query(None, description="Fecha fin YYYY-MM-DD"),
     specialist: str = Query(None, description="Filtrar por especialista"),
+    ibp: str = Query(None, description="Filtrar por IBP / Banco Participante"),
+    category: str = Query(None, description="Filtrar por Categoría Técnica"),
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
@@ -1582,14 +1586,16 @@ def api_report_data(
     user_param: str = Query(None, alias="user"),
 ):
     """Retorna los datos consolidados para reportes ejecutivos en formato JSON."""
-    s_date, e_date, spec = _resolve_report_filters(
-        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param
+    s_date, e_date, spec, ibp_val, cat_val = _resolve_report_filters(
+        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param, ibp, category
     )
     data = get_report_data(
         db=db,
         start_date=s_date,
         end_date=e_date,
-        specialist_filter=spec
+        specialist_filter=spec,
+        ibp_filter=ibp_val,
+        category_filter=cat_val,
     )
     return data
 
@@ -1599,6 +1605,8 @@ def api_report_excel(
     start_date: str = Query(None, description="Fecha inicio YYYY-MM-DD"),
     end_date: str = Query(None, description="Fecha fin YYYY-MM-DD"),
     specialist: str = Query(None, description="Filtrar por especialista"),
+    ibp: str = Query(None, description="Filtrar por IBP / Banco Participante"),
+    category: str = Query(None, description="Filtrar por Categoría Técnica"),
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
@@ -1606,14 +1614,16 @@ def api_report_excel(
     user_param: str = Query(None, alias="user"),
 ):
     """Genera y descarga el archivo Excel (.xlsx) corporativo con KPIs y métricas."""
-    s_date, e_date, spec = _resolve_report_filters(
-        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param
+    s_date, e_date, spec, ibp_val, cat_val = _resolve_report_filters(
+        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param, ibp, category
     )
     data = get_report_data(
         db=db,
         start_date=s_date,
         end_date=e_date,
-        specialist_filter=spec
+        specialist_filter=spec,
+        ibp_filter=ibp_val,
+        category_filter=cat_val,
     )
 
     excel_buffer = generate_excel_report(data)
@@ -1634,6 +1644,8 @@ def api_report_print_view(
     start_date: str = Query(None, description="Fecha inicio YYYY-MM-DD"),
     end_date: str = Query(None, description="Fecha fin YYYY-MM-DD"),
     specialist: str = Query(None, description="Filtrar por especialista"),
+    ibp: str = Query(None, description="Filtrar por IBP / Banco Participante"),
+    category: str = Query(None, description="Filtrar por Categoría Técnica"),
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
@@ -1641,14 +1653,16 @@ def api_report_print_view(
     user_param: str = Query(None, alias="user"),
 ):
     """Genera la vista ejecutiva HTML lista para imprimir o guardar como PDF en alta resolución."""
-    s_date, e_date, spec = _resolve_report_filters(
-        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param
+    s_date, e_date, spec, ibp_val, cat_val = _resolve_report_filters(
+        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param, ibp, category
     )
     data = get_report_data(
         db=db,
         start_date=s_date,
         end_date=e_date,
-        specialist_filter=spec
+        specialist_filter=spec,
+        ibp_filter=ibp_val,
+        category_filter=cat_val,
     )
 
     html_content = generate_executive_html(data)
@@ -1661,6 +1675,8 @@ class SaveReportRequest(BaseModel):
     start_date: str | None = None
     end_date: str | None = None
     specialist: str | None = None
+    ibp: str | None = None
+    category: str | None = None
 
 
 @app.get("/api/reports/history")
@@ -1743,28 +1759,40 @@ def api_reports_generate_and_save(
 
     user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")).strip() or "Adonis Lozada Figueroa"
 
-    s_date, e_date, spec = _resolve_report_filters(
-        req.start_date, req.end_date, req.specialist, x_user_role, x_user_name, role_param, user_param
+    s_date, e_date, spec, ibp_val, cat_val = _resolve_report_filters(
+        req.start_date, req.end_date, req.specialist, x_user_role, x_user_name, role_param, user_param, req.ibp, req.category
     )
 
     data = get_report_data(
         db=db,
         start_date=s_date,
         end_date=e_date,
-        specialist_filter=spec
+        specialist_filter=spec,
+        ibp_filter=ibp_val,
+        category_filter=cat_val,
     )
     k = data.get("kpis", {})
 
     now_dt = datetime.datetime.now(CARACAS_TZ)
-    default_title = f"Informe Ejecutivo - {now_dt.strftime('%B %Y').capitalize()}"
+    scope_suffix = []
+    if ibp_val:
+        scope_suffix.append(f"IBP {ibp_val}")
+    if cat_val:
+        scope_suffix.append(f"Cat. {cat_val}")
+    suffix_str = f" ({' · '.join(scope_suffix)})" if scope_suffix else ""
+    default_title = f"Informe Ejecutivo{suffix_str} - {now_dt.strftime('%B %Y').capitalize()}"
     title = (req.title or "").strip() or default_title
+
+    spec_summary = spec or "Todo el equipo"
+    if scope_suffix:
+        spec_summary = f"{spec_summary} | {' | '.join(scope_suffix)}"
 
     report_entry = GeneratedReport(
         title=title,
         period_label=data.get("period_label", "Período seleccionado"),
         start_date=s_date,
         end_date=e_date,
-        specialist_filter=spec or "Todo el equipo",
+        specialist_filter=spec_summary,
         generated_by=user_name,
         total_items=k.get("total_items", 0),
         total_closed=k.get("total_cerrados", 0),
