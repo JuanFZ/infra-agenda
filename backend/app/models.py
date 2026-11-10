@@ -17,6 +17,7 @@ class Item(Base):
     priority = Column(String(50), default="Media")  # Crítica, Alta, Media, Baja
     status = Column(String(50), default="pendiente") # pendiente, curso, espera, cerrado
     status_origin = Column(String(100), nullable=True) # Estado original en origen
+    description = Column(Text, nullable=True)       # Detalle o alcance técnico de la actividad
     
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     received_at = Column(DateTime, nullable=True)   # Fecha de Recibimiento en Sycom (SLA Empresa)
@@ -26,6 +27,8 @@ class Item(Base):
     closed_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow)
     synced_at = Column(DateTime, default=datetime.datetime.utcnow)
+    escalation_id = Column(Integer, nullable=True)  # Vínculo opcional con escalation_documents.id
+    recommendations = Column(Text, nullable=True)   # Recomendaciones registradas al cerrar o editar
 
     @property
     def base_sla_start(self) -> datetime.datetime | None:
@@ -180,6 +183,7 @@ class EscalationDocument(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     title = Column(String(250), nullable=False)               # ej. "SIMF-ES-5260 88920 Venezolano"
+    category = Column(String(100), default="Servicios")       # CPU, RAM, Disco, Antivirus, PostgreSQL, Servicios
     doc_url = Column(String(1000), nullable=True)             # Enlace a Google Docs o Drive
     original_filename = Column(String(250), nullable=True)
     stored_filename = Column(String(250), nullable=True)
@@ -188,6 +192,7 @@ class EscalationDocument(Base):
     uploaded_by = Column(String(150), default="Adonis Lozada")
     uploaded_by_role = Column(String(50), default="Coordinador")
     notes = Column(Text, nullable=True)
+    recommendations = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 

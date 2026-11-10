@@ -2349,16 +2349,6 @@
       <span class="label">Atrasadas</span>
       <span class="count" id="navOver">0</span>
     </div>
-    <div class="nav" data-view="clientes" title="Clientes">
-      <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-      <span class="label">Clientes</span>
-    </div>
 
     <div class="nav" data-view="escalamientos" id="sidebarNavEscalations" title="Repositorio de Escalamientos">
       <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
@@ -2564,7 +2554,7 @@
           <span class="muted" id="kanbanSubText" style="font-size:12px">Arrastra actividades entre columnas para
             sincronizar su estado</span>
         </div>
-        <button class="btn" onclick="openCreateModal()" <button class="btn" id="btnKanbanNewActivity"
+        <button class="btn" id="btnKanbanNewActivity"
           onclick="openCreateModal()"
           style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700"
           title="Crear nueva actividad">
@@ -2591,26 +2581,6 @@
                 <th>Asunto</th>
                 <th>Prioridad</th>
                 <th>SLA</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <div class="view" id="v-clientes">
-      <div class="card">
-        <h3>Estado por Cliente / Entidad</h3>
-        <div class="table-responsive">
-          <table id="tblClients">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Abiertos</th>
-                <th>Atrasadas</th>
-                <th>Cerrados</th>
-                <th>Cumplimiento SLA</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -2672,17 +2642,19 @@
           <table id="tblEscalations">
             <thead>
               <tr>
-                <th style="min-width:240px">Código / Título del Escalamiento</th>
-                <th style="min-width:160px">Documento / Enlace</th>
+                <th style="min-width:220px">Código / Título del Escalamiento</th>
+                <th style="min-width:110px">Categoría</th>
+                <th style="min-width:140px">Documento / Enlace</th>
                 <th>Registrado Por</th>
                 <th>Fecha de Registro</th>
-                <th style="min-width:180px">Observaciones</th>
-                <th style="text-align:center;min-width:150px">Acciones</th>
+                <th style="min-width:160px">Observaciones</th>
+                <th style="min-width:180px">Recomendaciones</th>
+                <th style="text-align:center;min-width:180px">Acciones</th>
               </tr>
             </thead>
             <tbody id="tblEscalationsBody">
               <tr>
-                <td colspan="6" style="text-align:center;padding:24px" class="muted">Cargando repositorio de
+                <td colspan="8" style="text-align:center;padding:24px" class="muted">Cargando repositorio de
                   escalamientos...</td>
               </tr>
             </tbody>
@@ -3073,9 +3045,9 @@
     function getAuthHeaders() {
       const headers = { 'Content-Type': 'application/json' };
       if (CURRENT_USER) {
-        if (CURRENT_USER.role) headers['X-User-Role'] = CURRENT_USER.role;
-        if (CURRENT_USER.full_name) headers['X-User-Name'] = CURRENT_USER.full_name;
-        else if (CURRENT_USER.username) headers['X-User-Name'] = CURRENT_USER.username;
+        if (CURRENT_USER.role) headers['X-User-Role'] = encodeURIComponent(CURRENT_USER.role);
+        if (CURRENT_USER.full_name) headers['X-User-Name'] = encodeURIComponent(CURRENT_USER.full_name);
+        else if (CURRENT_USER.username) headers['X-User-Name'] = encodeURIComponent(CURRENT_USER.username);
       }
       return headers;
     }
@@ -3234,6 +3206,7 @@
         const resItems = await fetch(`${API_URL}/items`, { headers: getAuthHeaders() });
         ALL_ITEMS = await resItems.json();
         renderAll();
+        loadEscalations().catch(e => console.warn('Preload escalations:', e));
       } catch (err) {
         document.getElementById('apiStatus').textContent = 'API Desconectada';
         console.error('Error conectando a FastAPI:', err);
@@ -3445,6 +3418,7 @@
       });
 
       const tbody = document.querySelector('#tblClients tbody');
+      if (!tbody) return;
       const keys = Object.keys(clientsMap);
       if (!keys.length) {
         tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">Sin datos de clientes.</td></tr>';
@@ -3542,6 +3516,12 @@
       // Validación: ClickUp no posee estado 'En espera'
       if (item.source === 'ClickUp' && targetStatus === 'espera') {
         alert("Las tareas de ClickUp solo tienen 3 estados: Pendientes (TO DO), En curso (IN PROGRESS) y Cerrados (COMPLETE).\n\nEl estado 'En espera' es exclusivo de GLPI.");
+        return;
+      }
+
+      // Si se mueve a Cerrado, abrir modal de cierre con recomendaciones y vinculación a escalamiento
+      if (targetStatus === 'cerrado') {
+        openCloseActivityModal(itemId, item.status);
         return;
       }
 
@@ -3779,6 +3759,7 @@
     function updateCreateSlaSuggestion() {
       const prioSelect = document.getElementById('createPriority');
       const escInput = document.getElementById('createEscalatedAt');
+      const recInput = document.getElementById('createReceivedAt');
       const badge = document.getElementById('createSlaBadgePreview');
       if (!prioSelect) return;
       const prio = prioSelect.value;
@@ -3788,6 +3769,9 @@
       let baseDate = new Date();
       if (escInput && escInput.value) {
         const parsed = new Date(escInput.value);
+        if (!isNaN(parsed.getTime())) baseDate = parsed;
+      } else if (recInput && recInput.value) {
+        const parsed = new Date(recInput.value);
         if (!isNaN(parsed.getTime())) baseDate = parsed;
       }
       const targetDate = new Date(baseDate.getTime() + h * 3600 * 1000);
@@ -3926,6 +3910,7 @@
     `;
 
       try {
+        const escIdVal = document.getElementById('createEscalationId')?.value;
         const payload = {
           source: source,
           title: title,
@@ -3933,7 +3918,8 @@
           priority: priority,
           specialist_keys: CREATE_SELECTED_KEYS.length ? CREATE_SELECTED_KEYS : null,
           received_at: receivedAtVal ? new Date(receivedAtVal).toISOString() : null,
-          escalated_at: escalatedAtVal ? new Date(escalatedAtVal).toISOString() : null
+          escalated_at: escalatedAtVal ? new Date(escalatedAtVal).toISOString() : null,
+          escalation_id: escIdVal ? parseInt(escIdVal) : null
         };
 
         const res = await fetch(`${API_URL}/items`, {
@@ -3995,10 +3981,14 @@
       }
     }
 
-    function openCreateModal() {
+    async function openCreateModal() {
       if (!isCoordinator()) {
         alert('Permiso denegado: Solo el rol Coordinador tiene permisos para crear nuevas actividades.');
         return;
+      }
+
+      if (!ESCALATIONS_LIST || !ESCALATIONS_LIST.length) {
+        await loadEscalations().catch(() => {});
       }
 
       if (TV_MODE_ACTIVE && !TV_IS_PAUSED) {
@@ -4055,32 +4045,31 @@
         <textarea id="createDesc" class="form-input" rows="3" placeholder="Detalles técnicos, comandos, alcance o requerimientos específicos..."></textarea>
       </div>
 
-      <!-- 4. Prioridad y Doble SLA (Empresa y Equipo) -->
+      <!-- 4. Doble SLA: Fechas (Sycom y Equipo) -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" for="createPriority">Prioridad:</label>
-          <select id="createPriority" class="form-input" onchange="updateCreateSlaSuggestion()" style="cursor:pointer">
-            <option value="Media" selected>Media (SLA Equipo: 72h)</option>
-            <option value="Baja">Baja (SLA Equipo: 120h)</option>
-            <option value="Alta">Alta (SLA Equipo: 24h)</option>
-            <option value="Crítica">Crítica (SLA Equipo: 4h)</option>
-          </select>
+          <label class="form-label" for="createReceivedAt">Recibimiento en Sycom (SLA Empresa):</label>
+          <input type="datetime-local" id="createReceivedAt" class="form-input" onchange="updateCreateSlaSuggestion()" style="cursor:pointer">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" for="createReceivedAt">Recibimiento en Sycom (SLA Empresa):</label>
-          <input type="datetime-local" id="createReceivedAt" class="form-input" style="cursor:pointer">
-        </div>
-      </div>
-
-      <div style="margin-bottom:14px">
-        <div class="form-group" style="margin-bottom:6px">
           <label class="form-label" for="createEscalatedAt">Escalada al Equipo de Infra & BD (SLA Equipo):</label>
           <input type="datetime-local" id="createEscalatedAt" class="form-input" onchange="updateCreateSlaSuggestion()" style="cursor:pointer">
         </div>
-        <div id="createSlaBadgePreview" style="margin-top:4px"></div>
       </div>
 
-      <!-- 5. Responsable(s) con Buscador corporativo -->
+      <!-- 5. Prioridad -->
+      <div class="form-group" style="margin-bottom:14px">
+        <label class="form-label" for="createPriority">Prioridad:</label>
+        <select id="createPriority" class="form-input" onchange="updateCreateSlaSuggestion()" style="cursor:pointer">
+          <option value="Media" selected>Media (SLA Equipo: 72h)</option>
+          <option value="Baja">Baja (SLA Equipo: 120h)</option>
+          <option value="Alta">Alta (SLA Equipo: 24h)</option>
+          <option value="Crítica">Crítica (SLA Equipo: 4h)</option>
+        </select>
+        <div id="createSlaBadgePreview" style="margin-top:6px"></div>
+      </div>
+
+      <!-- 6. Responsable(s) con Buscador corporativo -->
       <div class="form-group">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <label class="form-label" style="margin-bottom:0">Responsable(s):</label>
@@ -4101,6 +4090,16 @@
           </div>
           <div id="createAssigneeDropdownMenu" class="assignee-dropdown-menu" style="display:none"></div>
         </div>
+      </div>
+
+      <!-- 6. Vincular a Escalamiento -->
+      <div class="form-group">
+        <label class="form-label" for="createEscalationId">Vincular a Escalamiento: <span class="muted" style="font-weight:400;text-transform:none">(Opcional)</span></label>
+        <select id="createEscalationId" class="form-input" style="cursor:pointer">
+          <option value="">-- Sin escalamiento vinculado --</option>
+          ${ESCALATIONS_LIST.map(esc => `<option value="${esc.id}">[${escapeHtml(esc.category || 'Servicios')}] ${escapeHtml(esc.title)}</option>`).join('')}
+        </select>
+        <small class="muted" style="font-size:11px;margin-top:3px;display:block">Si la actividad deriva de un escalamiento, selecciónalo para relacionarlo y añadir recomendaciones al cerrar.</small>
       </div>
 
       <!-- Botones de Acción -->
@@ -4128,11 +4127,14 @@
       }, 100);
     }
 
-    function openModal(id) {
+    async function openModal(id) {
       if (IS_DRAGGING) return;
       if (TV_MODE_ACTIVE && !TV_IS_PAUSED) {
         TV_PAUSED_BY_MODAL = true;
         tvTogglePause();
+      }
+      if (!ESCALATIONS_LIST || !ESCALATIONS_LIST.length) {
+        await loadEscalations().catch(() => {});
       }
       const it = ALL_ITEMS.find(i => i.id === id);
       if (!it) return;
@@ -4244,6 +4246,48 @@
       <dt>Tiempo registrado:</dt><dd><b>${getItemTimeLabel(it)}</b></dd>
       <dt>Vencimiento SLA Equipo:</dt><dd>${formatDate(it.due_at, true)}</dd>
       <dt>SLA / Plazo Equipo:</dt><dd><b>${it.sla_percent}%</b> consumido (${it.semaphore.toUpperCase()}) ${getItemSlaRemaining(it) ? '· <b>' + getItemSlaRemaining(it) + '</b>' : ''}</dd>
+      <dt>Escalamiento vinculado:</dt>
+      <dd>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          ${(isCoordinator() || canUserEditItem(it)) ? `
+            <select id="modalItemEscalationSelect" onchange="changeItemEscalation(${it.id}, this.value)" style="background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:11.5px;cursor:pointer">
+              <option value="">-- Sin escalamiento vinculado --</option>
+              ${ESCALATIONS_LIST.map(esc => `<option value="${esc.id}" ${it.escalation_id === esc.id ? 'selected' : ''}>[${escapeHtml(esc.category || 'Servicios')}] ${escapeHtml(esc.title)}</option>`).join('')}
+            </select>
+          ` : `
+            ${(() => {
+              const esc = ESCALATIONS_LIST.find(e => e.id === it.escalation_id);
+              return esc ? `<b>[${escapeHtml(esc.category || 'Servicios')}] ${escapeHtml(esc.title)}</b>` : (it.escalation_id ? `<b>Escalamiento #${it.escalation_id}</b>` : '<span class="muted">Sin vincular</span>');
+            })()}
+          `}
+          ${(() => {
+            const esc = ESCALATIONS_LIST.find(e => e.id === it.escalation_id);
+            const docUrl = esc ? (esc.doc_url || '') : '';
+            return docUrl ? `<a href="${escapeHtml(docUrl)}" target="_blank" rel="noopener noreferrer" class="btn" style="padding:3px 7px;font-size:11px;background:rgba(79,140,255,0.15);color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:4px"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg><span>Abrir Doc</span></a>` : '';
+          })()}
+        </div>
+      </dd>
+      <dt>Recomendaciones:</dt>
+      <dd>
+        ${(isCoordinator() || canUserEditItem(it)) ? `
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <textarea id="modalItemRecommendationsInput" class="form-input" rows="2" 
+              placeholder="Escribe recomendaciones técnicas (se anexan automáticamente al escalamiento vinculado)..."
+              style="font-size:12px;resize:vertical;width:100%">${escapeHtml(it.recommendations || '')}</textarea>
+            <div style="display:flex;justify-content:flex-end">
+              <button type="button" class="btn" id="btnSaveModalRecs" onclick="saveItemRecommendations(${it.id})" 
+                style="padding:4px 10px;font-size:11px;background:rgba(16,185,129,0.15);color:#34d399;border-color:rgba(16,185,129,0.3);display:inline-flex;align-items:center;gap:4px">
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Guardar Recomendaciones</span>
+              </button>
+            </div>
+          </div>
+        ` : (it.recommendations ? `
+          <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:8px 10px;font-size:12px;color:#a7f3d0;white-space:pre-wrap">
+            ${escapeHtml(it.recommendations)}
+          </div>
+        ` : '<span class="muted">Sin recomendaciones registradas</span>')}
+      </dd>
     </dl>
     <div class="actions" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       ${isCoordinator() ? `
@@ -4367,6 +4411,11 @@
         return;
       }
 
+      if (newStatus === 'cerrado') {
+        openCloseActivityModal(itemId, item.status);
+        return;
+      }
+
       const oldStatus = item.status;
       item.status = newStatus;
       try {
@@ -4391,6 +4440,217 @@
         alert('Error de conexión al cambiar estado.');
         item.status = oldStatus;
         openModal(itemId);
+      }
+    }
+
+    async function openCloseActivityModal(itemId, previousStatus) {
+      const it = ALL_ITEMS.find(i => i.id === itemId);
+      if (!it) return;
+
+      if (!ESCALATIONS_LIST || !ESCALATIONS_LIST.length) {
+        await loadEscalations().catch(() => {});
+      }
+
+      if (TV_MODE_ACTIVE && !TV_IS_PAUSED) {
+        TV_PAUSED_BY_MODAL = true;
+        tvTogglePause();
+      }
+
+      const modal = document.getElementById('modalContent');
+      modal.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:12px">
+          <div>
+            <h2 style="font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px;margin:0">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              <span>Cierre de Actividad</span>
+            </h2>
+            <div class="muted" style="font-size:12px;margin-top:2px">
+              ${escapeHtml(it.source)} #${escapeHtml(it.external_id)} · ${escapeHtml(it.title)}
+            </div>
+          </div>
+          <button type="button" class="btn" onclick="cancelCloseActivityModal(${it.id}, '${previousStatus}')" style="padding:4px 9px;font-size:16px;line-height:1" title="Cancelar">&times;</button>
+        </div>
+
+        <form id="formCloseActivity" onsubmit="event.preventDefault(); submitCloseActivity(${it.id});">
+          <!-- 1. Vincular / Confirmar Escalamiento -->
+          <div class="form-group" style="margin-bottom:14px">
+            <label class="form-label" for="closeActivityEscalationSelect" style="display:block;margin-bottom:5px;font-size:12px;font-weight:600">
+              Vincular a Escalamiento: <span class="muted" style="font-weight:400;text-transform:none">(Opcional)</span>
+            </label>
+            <select id="closeActivityEscalationSelect" class="form-input" style="width:100%;font-size:12.5px;cursor:pointer">
+              <option value="">-- Sin escalamiento vinculado --</option>
+              ${ESCALATIONS_LIST.map(esc => `<option value="${esc.id}" ${it.escalation_id === esc.id ? 'selected' : ''}>[${escapeHtml(esc.category || 'Servicios')}] ${escapeHtml(esc.title)}</option>`).join('')}
+            </select>
+            <small class="muted" style="font-size:11px;margin-top:4px;display:block">
+              Si seleccionas un escalamiento, las recomendaciones ingresadas se añadirán automáticamente al expediente del escalamiento.
+            </small>
+          </div>
+
+          <!-- 2. Recomendaciones -->
+          <div class="form-group" style="margin-bottom:14px">
+            <label class="form-label" for="closeActivityRecommendations" style="display:block;margin-bottom:5px;font-size:12px;font-weight:600">
+              Recomendaciones del Cierre: <span class="muted" style="font-weight:400;text-transform:none">(Opcional)</span>
+            </label>
+            <textarea id="closeActivityRecommendations" class="form-input" rows="4" 
+              placeholder="Escribe recomendaciones técnicas, observaciones finales, acciones preventivas o causa raíz..." 
+              style="width:100%;font-size:12.5px;resize:vertical">${escapeHtml(it.recommendations || '')}</textarea>
+            <small class="muted" style="font-size:11px;margin-top:4px;display:block">
+              Se anexarán al campo de Recomendaciones del escalamiento vinculado y quedarán registradas en la actividad.
+            </small>
+          </div>
+
+          <!-- Botones de Acción -->
+          <div class="actions" style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:18px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px">
+            <button type="button" class="btn" onclick="cancelCloseActivityModal(${it.id}, '${previousStatus}')">Cancelar</button>
+            <button type="submit" class="btn primary" id="btnConfirmCloseActivity" 
+              style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span id="btnConfirmCloseText">Cerrar Actividad</span>
+            </button>
+          </div>
+        </form>
+      `;
+
+      document.getElementById('modalBg').classList.add('show');
+      setTimeout(() => {
+        const recInput = document.getElementById('closeActivityRecommendations');
+        if (recInput) recInput.focus();
+      }, 100);
+    }
+
+    function cancelCloseActivityModal(itemId, previousStatus) {
+      const item = ALL_ITEMS.find(i => i.id === itemId);
+      if (item) {
+        item.status = previousStatus;
+        renderKanban(ALL_ITEMS);
+        if (TV_MODE_ACTIVE) renderTvSlide();
+      }
+      closeModal();
+    }
+
+    async function submitCloseActivity(itemId) {
+      const item = ALL_ITEMS.find(i => i.id === itemId);
+      if (!item) return;
+
+      const escSelect = document.getElementById('closeActivityEscalationSelect');
+      const recInput = document.getElementById('closeActivityRecommendations');
+      const btn = document.getElementById('btnConfirmCloseActivity');
+      const btnText = document.getElementById('btnConfirmCloseText');
+
+      const escalationId = escSelect && escSelect.value ? parseInt(escSelect.value) : 0;
+      const recommendations = recInput ? recInput.value.trim() : '';
+
+      if (btn) {
+        btn.disabled = true;
+        if (btnText) btnText.textContent = 'Cerrando...';
+      }
+
+      const oldStatus = item.status;
+      item.status = 'cerrado';
+
+      try {
+        const res = await fetch(`${API_URL}/items/${itemId}/status`, {
+          method: 'POST',
+          headers: {
+            ...getAuthHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status: 'cerrado',
+            recommendations: recommendations || null,
+            escalation_id: escalationId
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          alert(`Error al cerrar la actividad: ${data.detail || 'Ocurrió un error en el servidor'}`);
+          item.status = oldStatus;
+          renderKanban(ALL_ITEMS);
+          if (TV_MODE_ACTIVE) renderTvSlide();
+          if (btn) {
+            btn.disabled = false;
+            if (btnText) btnText.textContent = 'Cerrar Actividad';
+          }
+          return;
+        }
+
+        closeModal();
+        await loadData();
+        await loadEscalations();
+        if (TV_MODE_ACTIVE) renderTvSlide();
+        showToast('Actividad Cerrada', `${item.source} #${item.external_id} cerrada exitosamente${recommendations ? ' y recomendaciones registradas' : ''}.`, 'success', 4000);
+      } catch (err) {
+        console.error('Error cerrando actividad:', err);
+        alert('Error de conexión al cerrar la actividad.');
+        item.status = oldStatus;
+        renderKanban(ALL_ITEMS);
+        if (TV_MODE_ACTIVE) renderTvSlide();
+        if (btn) {
+          btn.disabled = false;
+          if (btnText) btnText.textContent = 'Cerrar Actividad';
+        }
+      }
+    }
+
+    async function changeItemEscalation(itemId, escalationId) {
+      try {
+        const res = await fetch(`${API_URL}/items/${itemId}`, {
+          method: 'PATCH',
+          headers: {
+            ...getAuthHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            escalation_id: escalationId ? parseInt(escalationId) : 0
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          alert(`Error al actualizar escalamiento: ${err.detail || 'Error en el servidor'}`);
+          return;
+        }
+        const it = ALL_ITEMS.find(i => i.id === itemId);
+        if (it) it.escalation_id = escalationId ? parseInt(escalationId) : null;
+        showToast('Escalamiento actualizado', 'El vínculo con el escalamiento se actualizó correctamente.', 'info', 3000);
+        openModal(itemId);
+      } catch (err) {
+        console.error('Error in changeItemEscalation:', err);
+        alert('Error de conexión al vincular el escalamiento.');
+      }
+    }
+
+    async function saveItemRecommendations(itemId) {
+      const recInput = document.getElementById('modalItemRecommendationsInput');
+      const recVal = recInput ? recInput.value.trim() : '';
+      const btn = document.getElementById('btnSaveModalRecs');
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch(`${API_URL}/items/${itemId}`, {
+          method: 'PATCH',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ recommendations: recVal })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          alert(`Error al guardar recomendaciones: ${err.detail || 'Error en el servidor'}`);
+          if (btn) btn.disabled = false;
+          return;
+        }
+        const it = ALL_ITEMS.find(i => i.id === itemId);
+        if (it) it.recommendations = recVal || null;
+        await loadEscalations();
+        showToast('Recomendaciones guardadas', 'Las recomendaciones se registraron exitosamente.', 'success', 3000);
+        openModal(itemId);
+      } catch (err) {
+        console.error('Error in saveItemRecommendations:', err);
+        alert('Error de conexión al guardar las recomendaciones.');
+        if (btn) btn.disabled = false;
       }
     }
 
@@ -6454,16 +6714,28 @@
     }
 
     // =========================================================================
-    // MÓDULO DE ESCALAMIENTOS - REPOSITORIO DOCUMENTAL Y ENLACES (GOOGLE DOCS)
+    // MÓDULO DE ESCALAMIENTOS - GESTIÓN Y REPOSITORIO DOCUMENTAL (GOOGLE DOCS)
     // =========================================================================
     let ESCALATIONS_LIST = [];
-    let SELECTED_ESCALATION_FILE = null;
-    let ESCALATION_ACTIVE_TAB = 'url'; // 'url' | 'file'
+    const ESCALATION_CATEGORIES = ['CPU', 'RAM', 'Disco', 'Antivirus', 'PostgreSQL', 'Servicios'];
+
+    function getCategoryBadge(cat) {
+      const c = cat || 'Servicios';
+      const styles = {
+        'CPU': 'background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3)',
+        'RAM': 'background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3)',
+        'Disco': 'background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3)',
+        'Antivirus': 'background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3)',
+        'PostgreSQL': 'background:rgba(99,102,241,0.15);color:#818cf8;border:1px solid rgba(99,102,241,0.3)',
+        'Servicios': 'background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid rgba(148,163,184,0.3)'
+      };
+      const style = styles[c] || styles['Servicios'];
+      return `<span class="badge" style="${style};font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px">${escapeHtml(c)}</span>`;
+    }
 
     async function loadEscalations() {
       const tbody = document.getElementById('tblEscalationsBody');
       const countBadge = document.getElementById('lblEscalationsCount');
-      if (!tbody) return;
 
       try {
         const res = await fetch(`${API_URL}/escalations`, {
@@ -6479,22 +6751,26 @@
           countBadge.textContent = `${list.length} escalamiento${list.length === 1 ? '' : 's'}`;
         }
 
-        const sInput = document.getElementById('fSearchEscalations');
-        const q = sInput ? sInput.value.trim() : '';
-        if (q) {
-          filterEscalationsTable(q);
-        } else {
-          renderEscalationsTable(list);
+        if (tbody) {
+          const sInput = document.getElementById('fSearchEscalations');
+          const q = sInput ? sInput.value.trim() : '';
+          if (q) {
+            filterEscalationsTable(q);
+          } else {
+            renderEscalationsTable(list);
+          }
         }
       } catch (err) {
         console.error('Error cargando escalamientos:', err);
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="6" style="text-align:center;padding:24px;color:var(--red)">
-              Error al cargar repositorio de escalamientos: ${escapeHtml(err.message)}
-            </td>
-          </tr>
-        `;
+        if (tbody) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="8" style="text-align:center;padding:24px;color:var(--red)">
+                Error al cargar repositorio de escalamientos: ${escapeHtml(err.message)}
+              </td>
+            </tr>
+          `;
+        }
       }
     }
 
@@ -6506,11 +6782,12 @@
       }
       const filtered = ESCALATIONS_LIST.filter(d => {
         const title = (d.title || '').toLowerCase();
+        const cat = (d.category || '').toLowerCase();
         const docUrl = (d.doc_url || '').toLowerCase();
-        const orig = (d.original_filename || '').toLowerCase();
         const user = (d.uploaded_by || '').toLowerCase();
         const notes = (d.notes || '').toLowerCase();
-        return title.includes(q) || docUrl.includes(q) || orig.includes(q) || user.includes(q) || notes.includes(q);
+        const recs = (d.recommendations || '').toLowerCase();
+        return title.includes(q) || cat.includes(q) || docUrl.includes(q) || user.includes(q) || notes.includes(q) || recs.includes(q);
       });
       renderEscalationsTable(filtered);
     }
@@ -6522,7 +6799,7 @@
       if (!list || !list.length) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="6" style="text-align:center;padding:36px 20px;color:var(--muted)">
+            <td colspan="8" style="text-align:center;padding:36px 20px;color:var(--muted)">
               <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4;display:block;margin:0 auto 10px auto">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
@@ -6531,7 +6808,7 @@
                 <polyline points="10 9 9 9 8 9"/>
               </svg>
               No se encontraron escalamientos registrados.<br>
-              <small style="margin-top:4px;display:inline-block">Haz clic en <strong>" Registrar Escalamiento"</strong> para vincular el primer documento de Google Docs.</small>
+              <small style="margin-top:4px;display:inline-block">Haz clic en <strong>"+ Registrar Escalamiento"</strong> para vincular un documento de Google Docs.</small>
             </td>
           </tr>
         `;
@@ -6539,52 +6816,57 @@
       }
 
       tbody.innerHTML = list.map(d => {
-        const isGoogleDoc = !!d.doc_url || d.doc_type === 'google_docs';
-        const targetUrl = d.doc_url || `${API_URL}/escalations/${d.id}/view`;
+        const targetUrl = d.doc_url || '#';
+        const hasValidUrl = targetUrl && targetUrl !== '#';
+        const docIconSvg = `
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
+        `;
 
-        const typeBadge = isGoogleDoc
-          ? `<a href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer" 
-              style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:rgba(66,133,244,0.12);border:1px solid rgba(66,133,244,0.3);color:#60a5fa;text-decoration:none;font-size:11px;font-weight:600"
-              title="Abrir enlace de Google Docs en pestaña nueva">
-              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-              <span>Google Docs</span>
-            </a>`
-          : `<span class="badge" style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.25);font-size:11px;font-family:monospace">
-              PDF · ${escapeHtml(d.file_size_formatted || '—')}
-            </span>`;
+        const typeBadge = hasValidUrl ? `
+          <a href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer" 
+            style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:rgba(66,133,244,0.12);border:1px solid rgba(66,133,244,0.3);color:#60a5fa;text-decoration:none;font-size:11px;font-weight:600"
+            title="Abrir enlace de Google Docs en pestaña nueva">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            <span>Google Docs</span>
+          </a>
+        ` : `
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--muted);font-size:11px">
+            Sin enlace
+          </span>
+        `;
 
-        const docIconSvg = isGoogleDoc
-          ? `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>`
-          : `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>`;
+        const titleContent = hasValidUrl ? `
+          <a href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer" 
+            style="font-size:13px;font-weight:700;color:var(--text);text-decoration:none;display:inline-flex;align-items:center;gap:5px" 
+            title="Abrir ${escapeHtml(d.title)} en una pestaña nueva">
+            <span>${escapeHtml(d.title)}</span>
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        ` : `<span style="font-size:13px;font-weight:700;color:var(--text)">${escapeHtml(d.title)}</span>`;
 
         return `
           <tr>
             <td>
               <div style="display:flex;align-items:flex-start;gap:10px">
-                <div style="background:${isGoogleDoc ? 'rgba(66,133,244,0.12)' : 'rgba(239,68,68,0.12)'};border:1px solid ${isGoogleDoc ? 'rgba(66,133,244,0.25)' : 'rgba(239,68,68,0.25)'};border-radius:6px;padding:6px;display:flex;align-items:center;justify-content:center;margin-top:2px;flex-shrink:0" title="${isGoogleDoc ? 'Documento de Google Docs' : 'Documento PDF'}">
+                <div style="background:rgba(66,133,244,0.12);border:1px solid rgba(66,133,244,0.25);border-radius:6px;padding:6px;display:flex;align-items:center;justify-content:center;margin-top:2px;flex-shrink:0" title="Documento de Google Docs">
                   ${docIconSvg}
                 </div>
                 <div>
-                  <a href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer" 
-                    style="font-size:13px;font-weight:700;color:var(--text);text-decoration:none;display:inline-flex;align-items:center;gap:5px" 
-                    title="Abrir ${escapeHtml(d.title)} en una pestaña nueva">
-                    <span>${escapeHtml(d.title)}</span>
-                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                  </a>
+                  ${titleContent}
                   <span class="muted" style="font-size:11px;display:block;margin-top:2px;font-family:monospace">
-                    ${isGoogleDoc ? (d.doc_url ? escapeHtml(d.doc_url.replace(/https?:\/\//, '').slice(0, 48) + '...') : 'Google Docs') : escapeHtml(d.original_filename || 'PDF')}
+                    ${d.doc_url ? escapeHtml(d.doc_url.replace(/https?:\/\//, '').slice(0, 48) + '...') : 'Google Docs'}
                   </span>
                 </div>
               </div>
+            </td>
+            <td>
+              ${getCategoryBadge(d.category)}
             </td>
             <td>
               ${typeBadge}
@@ -6597,23 +6879,34 @@
               <div style="font-size:12px;color:var(--text);white-space:nowrap">${escapeHtml(d.created_at_caracas || '—')}</div>
             </td>
             <td>
-              <div style="font-size:11.5px;color:var(--muted);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(d.notes || '')}">
+              <div style="font-size:11.5px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(d.notes || '')}">
                 ${escapeHtml(d.notes || '—')}
               </div>
             </td>
+            <td>
+              <div style="font-size:11.5px;color:#a7f3d0;max-width:260px;max-height:80px;overflow-y:auto;white-space:pre-wrap;background:rgba(16,185,129,0.06);padding:4px 8px;border-radius:6px;border:1px solid rgba(16,185,129,0.15)" title="${escapeHtml(d.recommendations || '')}">
+                ${d.recommendations ? escapeHtml(d.recommendations) : '<span class="muted" style="color:var(--muted)">—</span>'}
+              </div>
+            </td>
             <td style="text-align:center">
-              <div style="display:inline-flex;align-items:center;gap:6px">
+              <div style="display:inline-flex;align-items:center;gap:5px">
                 <button type="button" class="btn" onclick="openEscalationLink('${escapeHtml(targetUrl)}')"
-                  style="padding:5px 9px;font-size:11px;background:rgba(79,140,255,0.15);color:var(--accent);border-color:rgba(79,140,255,0.3);display:inline-flex;align-items:center;gap:5px"
+                  style="padding:5px 8px;font-size:11px;background:rgba(79,140,255,0.15);color:var(--accent);border-color:rgba(79,140,255,0.3);display:inline-flex;align-items:center;gap:4px"
                   title="Abrir documento en una nueva pestaña">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                  <span>Abrir Doc</span>
+                  <span>Abrir</span>
                 </button>
                 <button type="button" class="btn" onclick="copyEscalationLink('${escapeHtml(targetUrl)}')"
-                  style="padding:5px 8px;font-size:11px;background:rgba(255,255,255,0.05);color:var(--text);border-color:rgba(255,255,255,0.14);display:inline-flex;align-items:center;gap:4px"
+                  style="padding:5px 7px;font-size:11px;background:rgba(255,255,255,0.05);color:var(--text);border-color:rgba(255,255,255,0.14);display:inline-flex;align-items:center;gap:4px"
                   title="Copiar enlace directo al portapapeles">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                   <span>Copiar</span>
+                </button>
+                <button type="button" class="btn" onclick="openEscalationModal(${d.id})"
+                  style="padding:5px 8px;font-size:11px;background:rgba(243,156,18,0.15);color:#f39c12;border-color:rgba(243,156,18,0.35);display:inline-flex;align-items:center;gap:4px"
+                  title="Editar datos, categoría o recomendaciones del escalamiento">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  <span>Editar</span>
                 </button>
                 <button type="button" class="btn" onclick="deleteEscalation(${d.id}, '${escapeHtml(d.title)}')"
                   style="padding:5px 7px;font-size:11px;color:#f87171;background:rgba(255,93,93,0.1);border-color:rgba(255,93,93,0.25)"
@@ -6628,12 +6921,12 @@
     }
 
     function openEscalationLink(url) {
-      if (!url) return;
+      if (!url || url === '#') return;
       window.open(url, '_blank', 'noopener,noreferrer');
     }
 
     function copyEscalationLink(url) {
-      if (!url) return;
+      if (!url || url === '#') return;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(() => {
           showToast('¡Enlace Copiado!', 'El enlace del documento fue copiado al portapapeles.');
@@ -6659,12 +6952,19 @@
       document.body.removeChild(ta);
     }
 
-    function openEscalationModal() {
-      SELECTED_ESCALATION_FILE = null;
-      ESCALATION_ACTIVE_TAB = 'url';
+    function openEscalationModal(editId = null) {
       const modal = document.getElementById('modalContent');
       const authorName = CURRENT_USER ? (CURRENT_USER.full_name || CURRENT_USER.username) : 'Adonis Lozada Figueroa';
       const authorRole = CURRENT_USER ? (CURRENT_USER.role || 'Coordinador') : 'Coordinador';
+
+      const existingDoc = editId ? ESCALATIONS_LIST.find(x => x.id === editId) : null;
+      const isEditing = !!existingDoc;
+
+      const titleVal = existingDoc ? existingDoc.title : '';
+      const catVal = existingDoc ? (existingDoc.category || 'Servicios') : 'Servicios';
+      const urlVal = existingDoc ? (existingDoc.doc_url || '') : '';
+      const notesVal = existingDoc ? (existingDoc.notes || '') : '';
+      const recsVal = existingDoc ? (existingDoc.recommendations || '') : '';
 
       modal.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:12px">
@@ -6674,95 +6974,97 @@
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
               </svg>
-              <span>Registrar Escalamiento</span>
+              <span>${isEditing ? 'Editar Escalamiento' : 'Registrar Escalamiento'}</span>
             </h3>
-            <span class="muted" style="font-size:12px;margin-top:2px;display:block">Vincula el enlace del documento de Google Docs o expediente para consulta del equipo</span>
+            <span class="muted" style="font-size:12px;margin-top:2px;display:block">
+              ${isEditing ? 'Modifica los datos del escalamiento, categoría o recomendaciones' : 'Vincula el enlace del documento de Google Docs para consulta del equipo'}
+            </span>
           </div>
           <button class="btn" onclick="closeModal()" style="padding:4px 8px;font-size:13px">&times;</button>
         </div>
 
-        <!-- Pestañas para Tipo de Escalamiento -->
-        <div style="display:flex;gap:6px;margin-bottom:16px;background:rgba(255,255,255,0.03);padding:4px;border-radius:8px;border:1px solid rgba(255,255,255,0.06)">
-          <button type="button" id="tabEscalationUrl" onclick="switchEscalationTab('url')"
-            style="flex:1;padding:8px 12px;font-size:12px;font-weight:700;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all .2s ease">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-            <span>Enlace Google Docs</span>
-          </button>
-          <button type="button" id="tabEscalationFile" onclick="switchEscalationTab('file')"
-            style="flex:1;padding:8px 12px;font-size:12px;font-weight:600;border-radius:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all .2s ease">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <span>Subir Archivo PDF</span>
-          </button>
-        </div>
-
-        <!-- Campo Común: Código / Título -->
-        <div style="margin-bottom:14px">
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
-            Código / Título del Escalamiento <span style="color:var(--red)">*</span>
-          </label>
-          <input type="text" id="escalationTitleInput" class="form-input" 
-            placeholder="ej: SIMF-ES-5260 88920 Venezolano" 
-            style="width:100%;font-size:13px;font-weight:600">
-          <small class="muted" style="font-size:11px;margin-top:3px;display:block">Identificador formal para búsqueda y auditoría (ej: SIMF-ES-5260 88920 Venezolano)</small>
-        </div>
-
-        <!-- Sección Google Docs (URL) -->
-        <div id="escalationUrlSection" style="margin-bottom:14px">
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
-            Enlace de Google Docs <span style="color:var(--red)">*</span>
-          </label>
-          <input type="url" id="escalationUrlInput" class="form-input"
-            placeholder="https://docs.google.com/document/d/..."
-            style="width:100%;font-size:12px;font-family:monospace">
-          <small class="muted" style="font-size:11px;margin-top:3px;display:block">Pega la URL del documento compartido en Google Drive / Docs</small>
-        </div>
-
-        <!-- Sección Archivo PDF -->
-        <div id="escalationFileSection" style="display:none;margin-bottom:14px">
-          <input type="file" id="escalationFileInput" accept=".pdf" onchange="onEscalationFileSelected(this)" style="display:none">
-          <div id="escalationDropZone" onclick="document.getElementById('escalationFileInput').click()"
-            style="border:2px dashed rgba(79,140,255,0.35);border-radius:10px;padding:20px 16px;text-align:center;background:rgba(79,140,255,0.03);cursor:pointer;transition:all .2s ease">
-            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);margin-bottom:6px">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
-            <div id="escalationDropText">
-              <strong style="color:var(--text);font-size:12.5px;display:block">Haz clic aquí o arrastra tu archivo PDF</strong>
-              <span class="muted" style="font-size:11px;margin-top:2px;display:block">Solo formato PDF (.pdf) · Máx. 50 MB</span>
-            </div>
+        <form id="formEscalation" onsubmit="event.preventDefault(); submitEscalationForm(${isEditing ? existingDoc.id : 'null'});">
+          <!-- 1. Código / Título -->
+          <div style="margin-bottom:14px">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
+              Código / Título del Escalamiento <span style="color:var(--red)">*</span>
+            </label>
+            <input type="text" id="escalationTitleInput" class="form-input" 
+              placeholder="ej: SIMF-ES-5260 88920 Venezolano" 
+              value="${escapeHtml(titleVal)}"
+              style="width:100%;font-size:13px;font-weight:600" required>
+            <small class="muted" style="font-size:11px;margin-top:3px;display:block">Identificador formal para búsqueda y auditoría (ej: SIMF-ES-5260 88920 Venezolano)</small>
           </div>
-        </div>
 
-        <!-- Observaciones -->
-        <div style="margin-bottom:14px">
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
-            Observaciones o Notas del Caso <span class="muted" style="font-weight:400">(Opcional)</span>
-          </label>
-          <textarea id="escalationNotesInput" class="form-input" rows="2" 
-            placeholder="Detalles del cliente, motivo del escalamiento, estado actual..." 
-            style="width:100%;font-size:12px;resize:vertical"></textarea>
-        </div>
+          <!-- 2. Categoría -->
+          <div style="margin-bottom:14px">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
+              Categoría del Escalamiento <span style="color:var(--red)">*</span>
+            </label>
+            <select id="escalationCategoryInput" class="form-input" style="width:100%;font-size:12.5px;cursor:pointer">
+              ${ESCALATION_CATEGORIES.map(c => `<option value="${c}" ${catVal === c ? 'selected' : ''}>${c}</option>`).join('')}
+            </select>
+            <small class="muted" style="font-size:11px;margin-top:3px;display:block">Clasificación operativa del caso (CPU, RAM, Disco, Antivirus, PostgreSQL, Servicios)</small>
+          </div>
 
-        <!-- Autor info -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;margin-bottom:18px;font-size:11.5px">
-          <span class="muted">Registrado por:</span>
-          <span style="font-weight:600;color:var(--text)">${escapeHtml(authorName)} <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:10px">${escapeHtml(authorRole)}</span></span>
-        </div>
+          <!-- 3. Enlace Google Docs -->
+          <div style="margin-bottom:14px">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
+              Enlace de Google Docs <span style="color:var(--red)">*</span>
+            </label>
+            <input type="url" id="escalationUrlInput" class="form-input"
+              placeholder="https://docs.google.com/document/d/..."
+              value="${escapeHtml(urlVal)}"
+              style="width:100%;font-size:12px;font-family:monospace" required>
+            <small class="muted" style="font-size:11px;margin-top:3px;display:block">Pega la URL del documento compartido en Google Drive / Docs</small>
+          </div>
 
-        <!-- Botones de Acción -->
-        <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
-          <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
-          <button type="button" class="btn primary" id="btnSubmitEscalation" onclick="submitEscalationForm()"
-            style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-            <span id="btnSubmitEscalationText">Guardar Escalamiento</span>
-          </button>
-        </div>
+          <!-- 4. Observaciones -->
+          <div style="margin-bottom:14px">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
+              Observaciones o Notas del Caso <span class="muted" style="font-weight:400">(Opcional)</span>
+            </label>
+            <textarea id="escalationNotesInput" class="form-input" rows="2" 
+              placeholder="Detalles del cliente, motivo del escalamiento, estado actual..." 
+              style="width:100%;font-size:12px;resize:vertical">${escapeHtml(notesVal)}</textarea>
+          </div>
+
+          <!-- 5. Recomendaciones -->
+          <div style="margin-bottom:14px">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)">
+              Recomendaciones del Escalamiento <span class="muted" style="font-weight:400">(Opcional)</span>
+            </label>
+            <textarea id="escalationRecommendationsInput" class="form-input" rows="3" 
+              placeholder="Recomendaciones técnicas consolidadas, pasos correctivos, acciones preventivas..." 
+              style="width:100%;font-size:12px;resize:vertical">${escapeHtml(recsVal)}</textarea>
+            <small class="muted" style="font-size:11px;margin-top:3px;display:block">Este campo también se alimenta automáticamente cuando se cierran actividades vinculadas a este escalamiento.</small>
+          </div>
+
+          <!-- Info de autor -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;margin-bottom:18px;font-size:11.5px">
+            <span class="muted">${isEditing ? 'Modificado por:' : 'Registrado por:'}</span>
+            <span style="font-weight:600;color:var(--text)">${escapeHtml(authorName)} <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:10px">${escapeHtml(authorRole)}</span></span>
+          </div>
+
+          <!-- Botones de Acción -->
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
+            <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+            <button type="submit" class="btn primary" id="btnSubmitEscalation"
+              style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span id="btnSubmitEscalationText">${isEditing ? 'Guardar Cambios' : 'Guardar Escalamiento'}</span>
+            </button>
+          </div>
+        </form>
       `;
 
       document.getElementById('modalBg').classList.add('show');
+      setTimeout(() => {
+        const titleInput = document.getElementById('escalationTitleInput');
+        if (titleInput) titleInput.focus();
+      }, 100);
     }
 
     // Alias retrocompatible
@@ -6770,80 +7072,12 @@
       openEscalationModal();
     }
 
-    function switchEscalationTab(tab) {
-      ESCALATION_ACTIVE_TAB = tab;
-      const tabUrl = document.getElementById('tabEscalationUrl');
-      const tabFile = document.getElementById('tabEscalationFile');
-      const secUrl = document.getElementById('escalationUrlSection');
-      const secFile = document.getElementById('escalationFileSection');
-      const btnText = document.getElementById('btnSubmitEscalationText');
-
-      if (tab === 'url') {
-        if (tabUrl) {
-          tabUrl.style.background = 'var(--accent)';
-          tabUrl.style.color = '#fff';
-          tabUrl.style.fontWeight = '700';
-        }
-        if (tabFile) {
-          tabFile.style.background = 'transparent';
-          tabFile.style.color = 'var(--muted)';
-          tabFile.style.fontWeight = '600';
-        }
-        if (secUrl) secUrl.style.display = 'block';
-        if (secFile) secFile.style.display = 'none';
-        if (btnText) btnText.textContent = 'Guardar Escalamiento';
-      } else {
-        if (tabFile) {
-          tabFile.style.background = 'var(--accent)';
-          tabFile.style.color = '#fff';
-          tabFile.style.fontWeight = '700';
-        }
-        if (tabUrl) {
-          tabUrl.style.background = 'transparent';
-          tabUrl.style.color = 'var(--muted)';
-          tabUrl.style.fontWeight = '600';
-        }
-        if (secUrl) secUrl.style.display = 'none';
-        if (secFile) secFile.style.display = 'block';
-        if (btnText) btnText.textContent = 'Subir Archivo PDF';
-      }
-    }
-
-    function onEscalationFileSelected(input) {
-      if (!input.files || !input.files[0]) return;
-      const file = input.files[0];
-      if (!file.name.toLowerCase().endsWith('.pdf')) {
-        alert('Formato no permitido: Solo se admiten archivos en formato PDF (.pdf).');
-        input.value = '';
-        return;
-      }
-      SELECTED_ESCALATION_FILE = file;
-
-      const dropText = document.getElementById('escalationDropText');
-      const sizeStr = (file.size < 1024 * 1024)
-        ? `${(file.size / 1024).toFixed(1)} KB`
-        : `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
-
-      if (dropText) {
-        dropText.innerHTML = `
-          <strong style="color:#34d399;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            ${escapeHtml(file.name)}
-          </strong>
-          <span class="muted" style="font-size:11.5px;margin-top:3px;display:block">Tamaño: ${sizeStr} · Listo para cargar</span>
-        `;
-      }
-
+    async function submitEscalationForm(editId = null) {
       const titleInput = document.getElementById('escalationTitleInput');
-      if (titleInput && !titleInput.value.trim()) {
-        const autoName = file.name.replace(/\.pdf$/i, '').replace(/[_-]/g, ' ');
-        titleInput.value = autoName;
-      }
-    }
-
-    async function submitEscalationForm() {
-      const titleInput = document.getElementById('escalationTitleInput');
+      const catInput = document.getElementById('escalationCategoryInput');
+      const urlInput = document.getElementById('escalationUrlInput');
       const notesInput = document.getElementById('escalationNotesInput');
+      const recsInput = document.getElementById('escalationRecommendationsInput');
       const btn = document.getElementById('btnSubmitEscalation');
 
       const title = titleInput ? titleInput.value.trim() : '';
@@ -6853,154 +7087,67 @@
         return;
       }
 
-      // Si es pestaña de Enlace Google Docs
-      if (ESCALATION_ACTIVE_TAB === 'url') {
-        const urlInput = document.getElementById('escalationUrlInput');
-        const docUrl = urlInput ? urlInput.value.trim() : '';
-        if (!docUrl) {
-          alert('Por favor pega el enlace de Google Docs correspondiente al escalamiento.');
-          if (urlInput) urlInput.focus();
-          return;
-        }
-        if (!docUrl.startsWith('http://') && !docUrl.startsWith('https://')) {
-          alert('El enlace debe ser una URL válida que inicie con https:// o http://');
-          if (urlInput) urlInput.focus();
-          return;
-        }
-
-        const origBtnHtml = btn ? btn.innerHTML : '';
-        if (btn) {
-          btn.disabled = true;
-          btn.innerHTML = `<svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>Guardando...</span>`;
-        }
-
-        try {
-          const payload = {
-            title: title,
-            doc_url: docUrl,
-            notes: notesInput ? notesInput.value.trim() : ''
-          };
-
-          const res = await fetch(`${API_URL}/escalations`, {
-            method: 'POST',
-            headers: {
-              ...getAuthHeaders(),
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-          });
-
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.detail || `Error ${res.status}`);
-          }
-
-          closeModal();
-          await loadEscalations();
-          showToast('¡Escalamiento Registrado!', `El escalamiento "${title}" fue vinculado con éxito.`);
-        } catch (err) {
-          console.error('Error guardando escalamiento:', err);
-          alert(`No se pudo registrar el escalamiento: ${err.message}`);
-        } finally {
-          if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = origBtnHtml;
-          }
-        }
+      const category = catInput ? catInput.value : 'Servicios';
+      const docUrl = urlInput ? urlInput.value.trim() : '';
+      if (!docUrl) {
+        alert('Por favor pega el enlace de Google Docs correspondiente al escalamiento.');
+        if (urlInput) urlInput.focus();
         return;
       }
 
-      // Si es pestaña de Archivo PDF
-      if (!SELECTED_ESCALATION_FILE) {
-        alert('Por favor selecciona primero un archivo PDF para subir.');
-        return;
+      let cleanUrl = docUrl;
+      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+        cleanUrl = 'https://' + cleanUrl;
       }
 
       const origBtnHtml = btn ? btn.innerHTML : '';
       if (btn) {
         btn.disabled = true;
-        btn.innerHTML = `<svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>Subiendo PDF...</span>`;
+        btn.innerHTML = `<svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>Guardando...</span>`;
       }
 
       try {
-        const file = SELECTED_ESCALATION_FILE;
-        const reader = new FileReader();
-
-        reader.onload = async function () {
-          try {
-            const base64Data = reader.result.split(',')[1];
-            const payload = {
-              title: title,
-              filename: file.name,
-              file_base64: base64Data,
-              notes: notesInput ? notesInput.value.trim() : ''
-            };
-
-            const res = await fetch(`${API_URL}/escalations/upload`, {
-              method: 'POST',
-              headers: {
-                ...getAuthHeaders(),
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(payload)
-            });
-
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}));
-              throw new Error(err.detail || `Error ${res.status}`);
-            }
-
-            closeModal();
-            await loadEscalations();
-            showToast('¡Documento Cargado!', `El documento "${title}" fue guardado con éxito.`);
-          } catch (err) {
-            console.error('Error subiendo escalamiento:', err);
-            alert(`No se pudo subir el documento: ${err.message}`);
-          } finally {
-            if (btn) {
-              btn.disabled = false;
-              btn.innerHTML = origBtnHtml;
-            }
-          }
+        const payload = {
+          title: title,
+          category: category,
+          doc_url: cleanUrl,
+          notes: notesInput ? notesInput.value.trim() : '',
+          recommendations: recsInput ? recsInput.value.trim() : ''
         };
 
-        reader.onerror = function () {
-          alert('Error de lectura al procesar el archivo en el navegador.');
-          if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = origBtnHtml;
-          }
-        };
+        const isEditing = editId !== null && editId !== undefined;
+        const endpoint = isEditing ? `${API_URL}/escalations/${editId}` : `${API_URL}/escalations`;
+        const method = isEditing ? 'PUT' : 'POST';
 
-        reader.readAsDataURL(file);
+        const res = await fetch(endpoint, {
+          method: method,
+          headers: {
+            ...getAuthHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `Error ${res.status}`);
+        }
+
+        closeModal();
+        await loadEscalations();
+        showToast(
+          isEditing ? '¡Escalamiento Actualizado!' : '¡Escalamiento Registrado!',
+          `El escalamiento "${title}" fue ${isEditing ? 'actualizado' : 'vinculado'} con éxito.`
+        );
       } catch (err) {
-        console.error('Error general subiendo escalamiento:', err);
-        alert(`Error al procesar subida: ${err.message}`);
+        console.error('Error guardando escalamiento:', err);
+        alert(`No se pudo guardar el escalamiento: ${err.message}`);
+      } finally {
         if (btn) {
           btn.disabled = false;
           btn.innerHTML = origBtnHtml;
         }
       }
-    }
-
-    // Alias retrocompatible
-    function submitEscalationUpload() {
-      submitEscalationForm();
-    }
-
-    function viewEscalation(id) {
-      const url = `${API_URL}/escalations/${id}/view`;
-      window.open(url, '_blank');
-    }
-
-    function downloadEscalation(id, filename) {
-      const a = document.createElement('a');
-      a.href = `${API_URL}/escalations/${id}/download`;
-      a.download = filename || `Escalamiento_${id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      showToast('Descarga iniciada', `Descargando archivo PDF...`);
     }
 
     async function deleteEscalation(id, title) {

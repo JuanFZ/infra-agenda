@@ -51,6 +51,12 @@ def ensure_db_schema():
                 cursor.execute("ALTER TABLE items ADD COLUMN received_at DATETIME")
             if "escalated_at" not in cols:
                 cursor.execute("ALTER TABLE items ADD COLUMN escalated_at DATETIME")
+            if "escalation_id" not in cols:
+                cursor.execute("ALTER TABLE items ADD COLUMN escalation_id INTEGER")
+            if "recommendations" not in cols:
+                cursor.execute("ALTER TABLE items ADD COLUMN recommendations TEXT")
+            if "description" not in cols:
+                cursor.execute("ALTER TABLE items ADD COLUMN description TEXT")
             
             cursor.execute("PRAGMA table_info(users)")
             u_cols = [row[1] for row in cursor.fetchall()]
@@ -61,8 +67,13 @@ def ensure_db_schema():
 
             cursor.execute("PRAGMA table_info(escalation_documents)")
             esc_cols = [row[1] for row in cursor.fetchall()]
-            if esc_cols and "doc_url" not in esc_cols:
-                cursor.execute("ALTER TABLE escalation_documents ADD COLUMN doc_url VARCHAR(1000)")
+            if esc_cols:
+                if "doc_url" not in esc_cols:
+                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN doc_url VARCHAR(1000)")
+                if "category" not in esc_cols:
+                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN category VARCHAR(100) DEFAULT 'Servicios'")
+                if "recommendations" not in esc_cols:
+                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN recommendations TEXT")
 
             conn.connection.commit()
     except Exception as e:
@@ -145,6 +156,8 @@ class AssignRequest(BaseModel):
 
 class StatusUpdateRequest(BaseModel):
     status: str
+    recommendations: str | None = None
+    escalation_id: int | None = None
 
 class CreateItemRequest(BaseModel):
     source: str
@@ -155,6 +168,14 @@ class CreateItemRequest(BaseModel):
     received_at: str | None = None   # Fecha y hora en que la solicitud llegó a Sycom (SLA Empresa)
     escalated_at: str | None = None  # Fecha y hora en que fue escalada a Infra & BD (SLA Equipo)
     due_at: str | None = None        # Opcional, calculado automáticamente por prioridad a partir de escalated_at
+    escalation_id: int | None = None
+
+class UpdateItemRequest(BaseModel):
+    title: str | None = None
+    priority: str | None = None
+    description: str | None = None
+    escalation_id: int | None = None
+    recommendations: str | None = None
 
 class LoginRequest(BaseModel):
     username: str
@@ -343,6 +364,9 @@ def get_items(
             "closed_at": item.closed_at.isoformat() if item.closed_at else None,
             "updated_at": item.updated_at.isoformat() if item.updated_at else None,
             "synced_at": item.synced_at.isoformat() if item.synced_at else None,
+            "description": item.description,
+            "escalation_id": item.escalation_id,
+            "recommendations": item.recommendations,
             "is_overdue": item.is_overdue,
             "sla_percent": item.sla_percent,
             "semaphore": item.semaphore,
@@ -653,7 +677,8 @@ def update_item_status(
         pass  # Coordinador / Administrador tiene autorización total sobre cualquier actividad
     elif role == "especialista":
         # Especialista solo puede cambiar de estado sus propias actividades asignadas
-        user_name_clean = (x_user_name.strip().lower()) if isinstance(x_user_name, str) else ""
+        import urllib.parse
+        user_name_clean = urllib.parse.unquote(x_user_name.strip()).lower() if isinstance(x_user_name, str) else ""
         first_name = user_name_clean.split()[0] if user_name_clean else ""
         assignee_clean = (item.assignee_name or "").lower()
         if not user_name_clean or (user_name_clean not in assignee_clean and first_name not in assignee_clean):
@@ -699,9 +724,30 @@ def update_item_status(
     item.updated_at = now_utc
     item.synced_at = now_utc
 
+    if req.escalation_id is not None:
+        item.escalation_id = req.escalation_id if req.escalation_id > 0 else None
+
     if new_st == "cerrado":
         item.closed_at = now_utc
         item.status_origin = "5 - Resuelto" if source == "GLPI" else "complete"
+
+        # Registrar recomendaciones y anexarlas al escalamiento vinculado si aplica
+        if req.recommendations and req.recommendations.strip():
+            rec_clean = req.recommendations.strip()
+            item.recommendations = rec_clean
+
+            target_esc_id = item.escalation_id
+            if target_esc_id:
+                esc = db.query(EscalationDocument).filter(EscalationDocument.id == target_esc_id).first()
+                if esc:
+                    esc_time_str = now_caracas_str('%d-%m-%Y %I:%M %p')
+                    entry = f"• [{esc_time_str}] {item.source} #{item.external_id} - {item.title}:\n{rec_clean}"
+                    if esc.recommendations and esc.recommendations.strip():
+                        item_ref = f"{item.source} #{item.external_id}"
+                        if rec_clean not in esc.recommendations or item_ref not in esc.recommendations:
+                            esc.recommendations = esc.recommendations.strip() + "\n\n" + entry
+                    else:
+                        esc.recommendations = entry
     elif new_st == "curso":
         item.closed_at = None
         item.status_origin = "2 - En curso (asignado)" if source == "GLPI" else "in progress"
@@ -731,6 +777,7 @@ def update_item_status(
         safe_assignee = html.escape(item.assignee_name or "Sin asignar")
         now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
         user_info = f" por {html.escape(x_user_name)}" if x_user_name else ""
+        rec_info = f"\n💡 <b>Recomendaciones:</b>\n{html.escape(req.recommendations.strip())}\n" if (new_st == "cerrado" and req.recommendations and req.recommendations.strip()) else ""
         msg = (
             f"📋 <b>Cambio de estado en Tablero Kanban</b>\n\n"
             f"📌 <b>Asunto:</b> {safe_title}\n"
@@ -738,6 +785,7 @@ def update_item_status(
             f"📊 <b>Nuevo estado:</b> {status_labels.get(new_st, new_st)} ({safe_status_orig})\n"
             f"👤 <b>Responsable:</b> {safe_assignee}\n"
             f"🕒 <b>Hora:</b> {now_str}\n"
+            f"{rec_info}"
             f"⚡ <i>Actualizado{user_info} desde la Agenda</i>"
         )
         send_telegram_message(msg, parse_mode="HTML")
@@ -755,6 +803,8 @@ def update_item_status(
             "assignee_name": item.assignee_name,
             "status": item.status,
             "status_origin": item.status_origin,
+            "escalation_id": item.escalation_id,
+            "recommendations": item.recommendations,
             "closed_at": item.closed_at.isoformat() if item.closed_at else None,
             "updated_at": item.updated_at.isoformat() if item.updated_at else None
         }
@@ -897,7 +947,8 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
         assigned_at=now_utc if matched_list else None,
         due_at=due_dt,
         updated_at=now_utc,
-        synced_at=now_utc
+        synced_at=now_utc,
+        escalation_id=req.escalation_id if (req.escalation_id and req.escalation_id > 0) else None
     )
     db.add(item)
     db.commit()
@@ -956,7 +1007,89 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
             "assignee_name": item.assignee_name,
             "priority": item.priority,
             "status": item.status,
-            "url": item.url
+            "url": item.url,
+            "escalation_id": item.escalation_id
+        }
+    }
+
+
+@app.patch("/api/items/{item_id}")
+@app.put("/api/items/{item_id}")
+def update_item_details(
+    item_id: int,
+    req: UpdateItemRequest,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    role_param: str = Query(None, alias="role"),
+    user_param: str = Query(None, alias="user")
+):
+    item = db.query(Item).filter(Item.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Actividad no encontrada")
+
+    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
+    user_name_raw = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")) or ""
+    import urllib.parse
+    user_name_clean = urllib.parse.unquote(user_name_raw).strip().lower()
+
+    if role in ("coordinador", "admin", "administrador"):
+        if req.title is not None and req.title.strip():
+            item.title = req.title.strip()
+        if req.priority is not None and req.priority.strip():
+            item.priority = req.priority.strip()
+        if req.description is not None:
+            item.description = req.description.strip()
+    elif role == "especialista":
+        assignee_clean = (item.assignee_name or "").lower()
+        first_name = user_name_clean.split()[0] if user_name_clean else ""
+        if not user_name_clean or (user_name_clean not in assignee_clean and first_name not in assignee_clean):
+            raise HTTPException(
+                status_code=403,
+                detail="Permiso denegado: Como Especialista, solo puedes actualizar actividades asignadas a ti."
+            )
+        if req.title is not None or req.priority is not None or req.description is not None:
+            raise HTTPException(
+                status_code=403,
+                detail="Permiso denegado: Como Especialista, solo puedes vincular escalamientos o registrar recomendaciones."
+            )
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="Permiso denegado: Se requiere rol de Coordinador o Especialista asignado."
+        )
+
+    if req.escalation_id is not None:
+        item.escalation_id = req.escalation_id if req.escalation_id > 0 else None
+
+    if req.recommendations is not None:
+        rec_clean = req.recommendations.strip()
+        item.recommendations = rec_clean or None
+        if item.escalation_id and rec_clean:
+            esc = db.query(EscalationDocument).filter(EscalationDocument.id == item.escalation_id).first()
+            if esc:
+                now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
+                entry = f"• [{now_str}] {item.source} #{item.external_id} - {item.title}:\n{rec_clean}"
+                if esc.recommendations and esc.recommendations.strip():
+                    item_ref = f"{item.source} #{item.external_id}"
+                    if rec_clean not in esc.recommendations or item_ref not in esc.recommendations:
+                        esc.recommendations = esc.recommendations.strip() + "\n\n" + entry
+                else:
+                    esc.recommendations = entry
+
+    item.updated_at = datetime.datetime.utcnow()
+    db.commit()
+    db.refresh(item)
+    return {
+        "status": "OK",
+        "message": "Actividad actualizada con éxito",
+        "item": {
+            "id": item.id,
+            "escalation_id": item.escalation_id,
+            "recommendations": item.recommendations,
+            "title": item.title,
+            "priority": item.priority,
+            "description": item.description
         }
     }
 
@@ -1318,10 +1451,23 @@ def format_file_size(num_bytes: int) -> str:
         return f"{num_bytes / (1024 * 1024):.2f} MB"
 
 
+VALID_ESCALATION_CATEGORIES = ["CPU", "RAM", "Disco", "Antivirus", "PostgreSQL", "Servicios"]
+
+
 class CreateEscalationRequest(BaseModel):
     title: str
     doc_url: str
+    category: str = "Servicios"
     notes: str | None = None
+    recommendations: str | None = None
+
+
+class UpdateEscalationRequest(BaseModel):
+    title: str | None = None
+    category: str | None = None
+    doc_url: str | None = None
+    notes: str | None = None
+    recommendations: str | None = None
 
 
 class UploadEscalationRequest(BaseModel):
@@ -1341,6 +1487,7 @@ def api_get_escalations(db: Session = Depends(get_db)):
         result.append({
             "id": d.id,
             "title": d.title,
+            "category": d.category or "Servicios",
             "doc_url": d.doc_url or (f"/api/escalations/{d.id}/view" if d.stored_filename else "#"),
             "doc_type": "google_docs" if is_gdoc else "pdf",
             "original_filename": d.original_filename or "Documento Google Docs",
@@ -1350,6 +1497,7 @@ def api_get_escalations(db: Session = Depends(get_db)):
             "uploaded_by": d.uploaded_by,
             "uploaded_by_role": d.uploaded_by_role,
             "notes": d.notes or "",
+            "recommendations": d.recommendations or "",
             "created_at": d.created_at.isoformat() if d.created_at else None,
             "created_at_caracas": format_caracas_time(d.created_at, "%d-%m-%Y %I:%M %p") if d.created_at else "—",
             "view_url": d.doc_url or f"/api/escalations/{d.id}/view",
@@ -1379,11 +1527,16 @@ def api_create_escalation(
     if not (doc_url.startswith("http://") or doc_url.startswith("https://")):
         doc_url = "https://" + doc_url
 
+    category = (req.category or "").strip()
+    if category not in VALID_ESCALATION_CATEGORIES:
+        category = "Servicios"
+
     role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "Coordinador")).strip().capitalize()
     user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "Adonis Lozada Figueroa")).strip() or "Adonis Lozada Figueroa"
 
     doc = EscalationDocument(
         title=title,
+        category=category,
         doc_url=doc_url,
         original_filename=f"{title} (Google Docs)",
         stored_filename="",
@@ -1392,6 +1545,7 @@ def api_create_escalation(
         uploaded_by=user_name,
         uploaded_by_role=role,
         notes=(req.notes or "").strip() or None,
+        recommendations=(req.recommendations or "").strip() or None,
         created_at=datetime.datetime.utcnow()
     )
     db.add(doc)
@@ -1404,17 +1558,22 @@ def api_create_escalation(
         from .notifications.telegram_notifier import send_telegram_message, now_caracas_str
         now_str = now_caracas_str("%d-%m-%Y %I:%M %p")
         safe_title = html.escape(title)
+        safe_cat = html.escape(category)
         safe_author = html.escape(user_name)
         notes_text = (req.notes or "").strip()
         safe_notes = f"\n📝 <b>Notas:</b> {html.escape(notes_text)}" if notes_text else ""
+        recs_text = (req.recommendations or "").strip()
+        safe_recs = f"\n💡 <b>Recomendaciones:</b> {html.escape(recs_text)}" if recs_text else ""
         link_html = f"\n🔗 <a href=\"{doc_url}\"><b>Abrir en Google Docs</b></a>"
 
         msg = (
             f"📄 <b>Nuevo Escalamiento Registrado</b>\n\n"
             f"📌 <b>Código / Caso:</b> <code>{safe_title}</code>\n"
+            f"📂 <b>Categoría:</b> {safe_cat}\n"
             f"👤 <b>Registrado por:</b> {safe_author} ({role})\n"
             f"🕒 <b>Fecha:</b> {now_str}"
             f"{safe_notes}"
+            f"{safe_recs}"
             f"{link_html}\n\n"
             f"⚡ <i>Agenda de Infraestructura &amp; BD · Soluciones SYCOM</i>"
         )
@@ -1428,12 +1587,108 @@ def api_create_escalation(
         "document": {
             "id": doc.id,
             "title": doc.title,
+            "category": doc.category,
             "doc_url": doc.doc_url,
             "doc_type": "google_docs",
             "file_size_formatted": "Google Docs",
             "uploaded_by": doc.uploaded_by,
             "uploaded_by_role": doc.uploaded_by_role,
             "notes": doc.notes or "",
+            "recommendations": doc.recommendations or "",
+            "created_at_caracas": format_caracas_time(doc.created_at, "%d-%m-%Y %I:%M %p")
+        }
+    }
+
+
+@app.put("/api/escalations/{doc_id}")
+@app.patch("/api/escalations/{doc_id}")
+def api_update_escalation(
+    doc_id: int,
+    req: UpdateEscalationRequest,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    role_param: str = Query(None, alias="role"),
+    user_param: str = Query(None, alias="user")
+):
+    """Actualiza los datos, categoría o recomendaciones de un escalamiento."""
+    doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Documento de escalamiento no encontrado.")
+
+    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "Coordinador")).strip().capitalize()
+    user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "Adonis Lozada Figueroa")).strip() or "Adonis Lozada Figueroa"
+
+    if req.title is not None:
+        t = req.title.strip()
+        if not t:
+            raise HTTPException(status_code=400, detail="El código o título no puede estar vacío.")
+        doc.title = t
+
+    if req.category is not None:
+        c = req.category.strip()
+        if c in VALID_ESCALATION_CATEGORIES:
+            doc.category = c
+
+    if req.doc_url is not None:
+        u = req.doc_url.strip()
+        if not u:
+            raise HTTPException(status_code=400, detail="El enlace (URL) no puede estar vacío.")
+        if not (u.startswith("http://") or u.startswith("https://")):
+            u = "https://" + u
+        doc.doc_url = u
+
+    if req.notes is not None:
+        doc.notes = req.notes.strip() or None
+
+    if req.recommendations is not None:
+        doc.recommendations = req.recommendations.strip() or None
+
+    db.commit()
+    db.refresh(doc)
+
+    # Notificación a Telegram por actualización
+    try:
+        import html
+        from .notifications.telegram_notifier import send_telegram_message, now_caracas_str
+        now_str = now_caracas_str("%d-%m-%Y %I:%M %p")
+        safe_title = html.escape(doc.title)
+        safe_cat = html.escape(doc.category or "Servicios")
+        safe_author = html.escape(user_name)
+        notes_text = (doc.notes or "").strip()
+        safe_notes = f"\n📝 <b>Notas:</b> {html.escape(notes_text)}" if notes_text else ""
+        recs_text = (doc.recommendations or "").strip()
+        safe_recs = f"\n💡 <b>Recomendaciones:</b> {html.escape(recs_text)}" if recs_text else ""
+        link_html = f"\n🔗 <a href=\"{doc.doc_url}\"><b>Abrir en Google Docs</b></a>" if doc.doc_url else ""
+
+        msg = (
+            f"✏️ <b>Escalamiento Actualizado</b>\n\n"
+            f"📌 <b>Código / Caso:</b> <code>{safe_title}</code>\n"
+            f"📂 <b>Categoría:</b> {safe_cat}\n"
+            f"👤 <b>Modificado por:</b> {safe_author} ({role})\n"
+            f"🕒 <b>Fecha:</b> {now_str}"
+            f"{safe_notes}"
+            f"{safe_recs}"
+            f"{link_html}\n\n"
+            f"⚡ <i>Agenda de Infraestructura &amp; BD · Soluciones SYCOM</i>"
+        )
+        send_telegram_message(msg, parse_mode="HTML")
+    except Exception as e:
+        print(f"[Telegram Update Escalation Notification Error] {e}")
+
+    return {
+        "status": "OK",
+        "message": "Escalamiento actualizado exitosamente.",
+        "document": {
+            "id": doc.id,
+            "title": doc.title,
+            "category": doc.category,
+            "doc_url": doc.doc_url,
+            "doc_type": "google_docs",
+            "uploaded_by": doc.uploaded_by,
+            "uploaded_by_role": doc.uploaded_by_role,
+            "notes": doc.notes or "",
+            "recommendations": doc.recommendations or "",
             "created_at_caracas": format_caracas_time(doc.created_at, "%d-%m-%Y %I:%M %p")
         }
     }
