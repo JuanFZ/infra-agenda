@@ -12,6 +12,7 @@ class Item(Base):
     title = Column(String(500))                     # Asunto / Nombre
     category = Column(String(100), default="General") # BD, Servidores, etc.
     client_name = Column(String(150), default="Interno")
+    project_name = Column(String(150), nullable=True) # SIMF, SGLPAR, Sycom, MicroFilms Center, etc.
     client_type = Column(String(50), default="Interno") # Interno / Externo
     assignee_name = Column(String(150), default="Sin asignar")
     priority = Column(String(50), default="Media")  # Crítica, Alta, Media, Baja
@@ -193,7 +194,22 @@ class EscalationDocument(Base):
     uploaded_by_role = Column(String(50), default="Coordinador")
     notes = Column(Text, nullable=True)
     recommendations = Column(Text, nullable=True)
+    ibp_id = Column(Integer, nullable=True)                   # Vínculo a ibps.id
+    ibp = Column(String(100), nullable=True)                  # Identificación Bancaria del Participante (ej. "0134 - BANESCO")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class IBP(Base):
+    __tablename__ = "ibps"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(150), unique=True, index=True, nullable=False) # ej. "Banesco", "Banco Mercantil"
+    code = Column(String(50), unique=True, index=True, nullable=True)   # ej. "BANESCO", "MERCANTIL"
+    description = Column(String(300), nullable=True)
+    environment = Column(String(50), default="Producción")
+    is_active = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
 
 
 

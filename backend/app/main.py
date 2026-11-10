@@ -4,6 +4,7 @@ import re
 import base64
 import datetime
 import hashlib
+import unicodedata
 from fastapi import FastAPI, Depends, Query, HTTPException, Header, Response
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from .database import engine, Base, get_db, SessionLocal
-from .models import Item, SyncLog, AlertLog, User, GeneratedReport, EscalationDocument
+from .models import Item, SyncLog, AlertLog, User, GeneratedReport, EscalationDocument, IBP
 from .config import SYNC_INTERVAL_MINUTES
 from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
 from .sync.glpi_client import GLPIClient
@@ -39,6 +40,187 @@ def verify_password(plain_password: str, hashed_password: str | None) -> bool:
         return False
     return hash_password(plain_password) == hashed_password
 
+# Catálogo oficial de las 34 IBPs (Identificación Bancaria del Participante) de la plataforma SIMF
+IBP_INVENTORY = [
+    {"code": "0000", "name": "BTC", "label": "0000 - BTC"},
+    {"code": "0001", "name": "BCV", "label": "0001 - BCV"},
+    {"code": "0102", "name": "BDV", "label": "0102 - BDV"},
+    {"code": "0104", "name": "BVC", "label": "0104 - BVC"},
+    {"code": "0105", "name": "MERCANTIL", "label": "0105 - MERCANTIL"},
+    {"code": "0108", "name": "PROVINCIAL", "label": "0108 - PROVINCIAL"},
+    {"code": "0114", "name": "BANCARIBE", "label": "0114 - BANCARIBE"},
+    {"code": "0115", "name": "EXTERIOR", "label": "0115 - EXTERIOR"},
+    {"code": "0128", "name": "CARONÍ", "label": "0128 - CARONÍ"},
+    {"code": "0134", "name": "BANESCO", "label": "0134 - BANESCO"},
+    {"code": "0137", "name": "SOFITASA", "label": "0137 - SOFITASA"},
+    {"code": "0138", "name": "PLAZA", "label": "0138 - PLAZA"},
+    {"code": "0145", "name": "BANCOEX", "label": "0145 - BANCOEX"},
+    {"code": "0146", "name": "BANGENTE", "label": "0146 - BANGENTE"},
+    {"code": "0151", "name": "BFC", "label": "0151 - BFC"},
+    {"code": "0152", "name": "BANDES", "label": "0152 - BANDES"},
+    {"code": "0156", "name": "100%BANCO", "label": "0156 - 100%BANCO"},
+    {"code": "0157", "name": "DELSUR", "label": "0157 - DELSUR"},
+    {"code": "0163", "name": "TESORO", "label": "0163 - TESORO"},
+    {"code": "0166", "name": "AGRÍCOLA", "label": "0166 - AGRÍCOLA"},
+    {"code": "0168", "name": "BANCRECER", "label": "0168 - BANCRECER"},
+    {"code": "0169", "name": "R4", "label": "0169 - R4"},
+    {"code": "0171", "name": "ACTIVO", "label": "0171 - ACTIVO"},
+    {"code": "0172", "name": "BANCAMIGA", "label": "0172 - BANCAMIGA"},
+    {"code": "0173", "name": "BID", "label": "0173 - BID"},
+    {"code": "0174", "name": "BANPLUS", "label": "0174 - BANPLUS"},
+    {"code": "0175", "name": "BDT", "label": "0175 - BDT"},
+    {"code": "0177", "name": "BANFANB", "label": "0177 - BANFANB"},
+    {"code": "0178", "name": "N58", "label": "0178 - N58"},
+    {"code": "0191", "name": "BNC", "label": "0191 - BNC"},
+    {"code": "0601", "name": "IMCP", "label": "0601 - IMCP"},
+    {"code": "0882", "name": "Suiche7B (Consorcio)", "label": "0882 - Suiche7B (Consorcio)"},
+    {"code": "0883", "name": "CONEXUS (Consorcio)", "label": "0883 - CONEXUS (Consorcio)"},
+    {"code": "2017", "name": "ONT", "label": "2017 - ONT"}
+]
+
+IBP_CODE_MAP = {x["code"]: x["label"] for x in IBP_INVENTORY}
+
+def _clean_ibp_str(s: str | None) -> str:
+    if not s:
+        return ""
+    nfkd = unicodedata.normalize("NFKD", str(s))
+    return "".join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()
+
+IBP_ALIASES = {
+    "btc": "0000",
+    "bcv": "0001",
+    "banco central": "0001",
+    "banco central de venezuela": "0001",
+    "bdv": "0102",
+    "banco de venezuela": "0102",
+    "venezuela": "0102",
+    "bvc": "0104",
+    "banco venezolano de credito": "0104",
+    "venezolano de credito": "0104",
+    "venezolano": "0104",
+    "mercantil": "0105",
+    "banco mercantil": "0105",
+    "provincial": "0108",
+    "bbva": "0108",
+    "bbva provincial": "0108",
+    "banco provincial": "0108",
+    "bancaribe": "0114",
+    "banco del caribe": "0114",
+    "caribe": "0114",
+    "exterior": "0115",
+    "banco exterior": "0115",
+    "caroni": "0128",
+    "banco caroni": "0128",
+    "banesco": "0134",
+    "banco banesco": "0134",
+    "sofitasa": "0137",
+    "banco sofitasa": "0137",
+    "plaza": "0138",
+    "banco plaza": "0138",
+    "bancoex": "0145",
+    "banco de comercio exterior": "0145",
+    "bangente": "0146",
+    "bfc": "0151",
+    "banco fondo comun": "0151",
+    "fondo comun": "0151",
+    "bandes": "0152",
+    "100%banco": "0156",
+    "100% banco": "0156",
+    "100 banco": "0156",
+    "100banco": "0156",
+    "delsur": "0157",
+    "del sur": "0157",
+    "banco del sur": "0157",
+    "tesoro": "0163",
+    "banco del tesoro": "0163",
+    "agricola": "0166",
+    "banco agricola": "0166",
+    "banco agricola de venezuela": "0166",
+    "bancrecer": "0168",
+    "r4": "0169",
+    "activo": "0171",
+    "banco activo": "0171",
+    "bancamiga": "0172",
+    "bid": "0173",
+    "banplus": "0174",
+    "banco banplus": "0174",
+    "bdt": "0175",
+    "bicentenario": "0175",
+    "banco bicentenario": "0175",
+    "banco digital de los trabajadores": "0175",
+    "banfanb": "0177",
+    "n58": "0178",
+    "bnc": "0191",
+    "banco nacional de credito": "0191",
+    "imcp": "0601",
+    "suiche": "0882",
+    "suiche7b": "0882",
+    "suiche 7b": "0882",
+    "suiche7b (consorcio)": "0882",
+    "conexus": "0883",
+    "conexus (consorcio)": "0883",
+    "ont": "2017"
+}
+
+def normalize_ibp(val: str | None) -> str | None:
+    """Normaliza cualquier código, nombre, etiqueta o alias de IBP a su formato canónico oficial SIMF 'XXXX - NOMBRE'."""
+    if not val:
+        return None
+    val_clean = str(val).strip()
+    if not val_clean:
+        return None
+
+    # 1. Búsqueda directa por código numérico (ej. '0134', '134', '1' -> '0001')
+    if val_clean.isdigit() and len(val_clean) <= 4:
+        code_pad = val_clean.zfill(4)
+        if code_pad in IBP_CODE_MAP:
+            return IBP_CODE_MAP[code_pad]
+
+    cleaned = _clean_ibp_str(val_clean)
+
+    # 2. Búsqueda en alias populares y nombres institucionales
+    if cleaned in IBP_ALIASES:
+        return IBP_CODE_MAP[IBP_ALIASES[cleaned]]
+
+    # 3. Coincidencia exacta con catálogo oficial
+    for item in IBP_INVENTORY:
+        item_clean_name = _clean_ibp_str(item["name"])
+        item_clean_label = _clean_ibp_str(item["label"])
+        if cleaned == item_clean_label or cleaned == item["code"] or cleaned == item_clean_name:
+            return item["label"]
+        if cleaned.startswith(item["code"] + " ") or cleaned.startswith(item["code"] + "-"):
+            return item["label"]
+
+    # 4. Coincidencia por alias parcial (ej. 'consorcio suiche 7b', 'banco banesco c.a.')
+    for alias_key, code in sorted(IBP_ALIASES.items(), key=lambda x: -len(x[0])):
+        if len(alias_key) >= 3 and alias_key in cleaned:
+            return IBP_CODE_MAP[code]
+
+    # 5. Coincidencia por nombre en inventario
+    for item in IBP_INVENTORY:
+        item_clean_name = _clean_ibp_str(item["name"])
+        if len(item_clean_name) >= 3 and item_clean_name in cleaned:
+            return item["label"]
+
+    return val_clean
+
+def resolve_ibp(db: Session, raw_ibp: str | None, raw_ibp_id: int | None) -> tuple[str | None, int | None]:
+    """Resuelve y sincroniza la cadena canónica de IBP y el ID relacional en ibps."""
+    if (not raw_ibp or not str(raw_ibp).strip()) and (not raw_ibp_id or raw_ibp_id <= 0):
+        return None, None
+    clean_ibp = normalize_ibp(raw_ibp) if raw_ibp else None
+    matched_ibp = None
+    if raw_ibp_id and raw_ibp_id > 0:
+        matched_ibp = db.query(IBP).filter(IBP.is_active == 1, IBP.id == raw_ibp_id).first()
+        if matched_ibp and not clean_ibp:
+            clean_ibp = matched_ibp.name if " - " in matched_ibp.name else (normalize_ibp(matched_ibp.code) or matched_ibp.name)
+    if not matched_ibp and clean_ibp:
+        code_part = clean_ibp.split(" - ")[0] if " - " in clean_ibp else clean_ibp
+        matched_ibp = db.query(IBP).filter(IBP.is_active == 1, IBP.code == code_part).first()
+        if not matched_ibp:
+            matched_ibp = db.query(IBP).filter(IBP.is_active == 1, or_(IBP.name == clean_ibp, IBP.code == clean_ibp, IBP.name.ilike(f"%{clean_ibp}%"))).first()
+    return clean_ibp, (matched_ibp.id if matched_ibp else None)
+
 def ensure_db_schema():
     try:
         with engine.connect() as conn:
@@ -57,6 +239,8 @@ def ensure_db_schema():
                 cursor.execute("ALTER TABLE items ADD COLUMN recommendations TEXT")
             if "description" not in cols:
                 cursor.execute("ALTER TABLE items ADD COLUMN description TEXT")
+            if "project_name" not in cols:
+                cursor.execute("ALTER TABLE items ADD COLUMN project_name VARCHAR(150)")
             
             cursor.execute("PRAGMA table_info(users)")
             u_cols = [row[1] for row in cursor.fetchall()]
@@ -74,8 +258,47 @@ def ensure_db_schema():
                     cursor.execute("ALTER TABLE escalation_documents ADD COLUMN category VARCHAR(100) DEFAULT 'Servicios'")
                 if "recommendations" not in esc_cols:
                     cursor.execute("ALTER TABLE escalation_documents ADD COLUMN recommendations TEXT")
+                if "ibp_id" not in esc_cols:
+                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN ibp_id INTEGER")
+                if "ibp" not in esc_cols:
+                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN ibp VARCHAR(100)")
 
             conn.connection.commit()
+
+        # Poblar catálogo oficial de las 34 IBPs (Participantes SIMF)
+        seed_db = SessionLocal()
+        try:
+            official_codes = [x["code"] for x in IBP_INVENTORY]
+            # Desactivar y depurar posibles duplicados legacy de pruebas iniciales que no tengan código numérico SIMF
+            seed_db.query(IBP).filter(~IBP.code.in_(official_codes)).delete(synchronize_session=False)
+            seed_db.commit()
+
+            existing = seed_db.query(IBP).all()
+            existing_codes = {x.code for x in existing if x.code}
+            existing_names = {x.name for x in existing if x.name}
+            to_add = []
+            for item in IBP_INVENTORY:
+                if item["code"] not in existing_codes and item["label"] not in existing_names and item["name"] not in existing_names:
+                    to_add.append(IBP(
+                        name=item["label"],
+                        code=item["code"],
+                        description=f"Participante SIMF: {item['label']}",
+                        environment="Producción",
+                        is_active=1
+                    ))
+                else:
+                    for x in existing:
+                        if x.code == item["code"]:
+                            x.is_active = 1
+                            x.name = item["label"]
+            if to_add:
+                seed_db.add_all(to_add)
+            seed_db.commit()
+        except Exception as seed_err:
+            print(f"[Seed IBP Warning] {seed_err}")
+            seed_db.rollback()
+        finally:
+            seed_db.close()
     except Exception as e:
         print(f"[DB Schema Check] {e}")
 
@@ -169,6 +392,8 @@ class CreateItemRequest(BaseModel):
     escalated_at: str | None = None  # Fecha y hora en que fue escalada a Infra & BD (SLA Equipo)
     due_at: str | None = None        # Opcional, calculado automáticamente por prioridad a partir de escalated_at
     escalation_id: int | None = None
+    project_name: str | None = None  # SIMF, SGLPAR, etc. para ClickUp
+    client_name: str | None = None   # Sycom, MicroFilms Center, etc. para GLPI
 
 class UpdateItemRequest(BaseModel):
     title: str | None = None
@@ -176,6 +401,8 @@ class UpdateItemRequest(BaseModel):
     description: str | None = None
     escalation_id: int | None = None
     recommendations: str | None = None
+    project_name: str | None = None
+    client_name: str | None = None
 
 class LoginRequest(BaseModel):
     username: str
@@ -351,6 +578,7 @@ def get_items(
             "title": item.title,
             "category": item.category,
             "client_name": item.client_name,
+            "project_name": getattr(item, "project_name", item.client_name) or item.client_name,
             "client_type": item.client_type,
             "assignee_name": item.assignee_name,
             "priority": item.priority,
@@ -732,8 +960,11 @@ def update_item_status(
         item.status_origin = "5 - Resuelto" if source == "GLPI" else "complete"
 
         # Registrar recomendaciones y anexarlas al escalamiento vinculado si aplica
-        if req.recommendations and req.recommendations.strip():
-            rec_clean = req.recommendations.strip()
+        rec_clean = (req.recommendations or "").strip()
+        if not rec_clean and item.recommendations:
+            rec_clean = item.recommendations.strip()
+
+        if rec_clean:
             item.recommendations = rec_clean
 
             target_esc_id = item.escalation_id
@@ -895,7 +1126,12 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
     external_id = None
     url = None
     category = "Proyectos y Tareas" if source == "ClickUp" else "Tickets TI"
-    client_name = "Gestión Sycom" if source == "ClickUp" else "Interno Sycom"
+    subproject = (req.project_name or req.client_name or "").strip()
+    if source == "ClickUp":
+        client_name = subproject or "SIMF"
+    else:
+        client_name = subproject or "Sycom"
+    project_name = client_name
     status_origin = "to do" if source == "ClickUp" else "1 - Nuevo"
 
     if source == "ClickUp":
@@ -936,6 +1172,7 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
         description=req.description,
         category=category,
         client_name=client_name,
+        project_name=project_name,
         client_type="Interno",
         assignee_name=combined_names,
         priority=priority,
@@ -1004,6 +1241,8 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
             "external_id": item.external_id,
             "source": item.source,
             "title": item.title,
+            "client_name": item.client_name,
+            "project_name": getattr(item, "project_name", item.client_name),
             "assignee_name": item.assignee_name,
             "priority": item.priority,
             "status": item.status,
@@ -1040,6 +1279,12 @@ def update_item_details(
             item.priority = req.priority.strip()
         if req.description is not None:
             item.description = req.description.strip()
+        if req.project_name is not None and req.project_name.strip():
+            item.client_name = req.project_name.strip()
+            item.project_name = req.project_name.strip()
+        elif req.client_name is not None and req.client_name.strip():
+            item.client_name = req.client_name.strip()
+            item.project_name = req.client_name.strip()
     elif role == "especialista":
         assignee_clean = (item.assignee_name or "").lower()
         first_name = user_name_clean.split()[0] if user_name_clean else ""
@@ -1048,7 +1293,7 @@ def update_item_details(
                 status_code=403,
                 detail="Permiso denegado: Como Especialista, solo puedes actualizar actividades asignadas a ti."
             )
-        if req.title is not None or req.priority is not None or req.description is not None:
+        if req.title is not None or req.priority is not None or req.description is not None or req.project_name is not None or req.client_name is not None:
             raise HTTPException(
                 status_code=403,
                 detail="Permiso denegado: Como Especialista, solo puedes vincular escalamientos o registrar recomendaciones."
@@ -1065,17 +1310,20 @@ def update_item_details(
     if req.recommendations is not None:
         rec_clean = req.recommendations.strip()
         item.recommendations = rec_clean or None
-        if item.escalation_id and rec_clean:
-            esc = db.query(EscalationDocument).filter(EscalationDocument.id == item.escalation_id).first()
-            if esc:
-                now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
-                entry = f"• [{now_str}] {item.source} #{item.external_id} - {item.title}:\n{rec_clean}"
-                if esc.recommendations and esc.recommendations.strip():
-                    item_ref = f"{item.source} #{item.external_id}"
-                    if rec_clean not in esc.recommendations or item_ref not in esc.recommendations:
-                        esc.recommendations = esc.recommendations.strip() + "\n\n" + entry
-                else:
-                    esc.recommendations = entry
+
+    # Si la actividad tiene recomendaciones y está vinculada a un escalamiento, sincronizarlas al expediente
+    rec_to_sync = (item.recommendations or "").strip()
+    if item.escalation_id and rec_to_sync:
+        esc = db.query(EscalationDocument).filter(EscalationDocument.id == item.escalation_id).first()
+        if esc:
+            now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
+            entry = f"• [{now_str}] {item.source} #{item.external_id} - {item.title}:\n{rec_to_sync}"
+            if esc.recommendations and esc.recommendations.strip():
+                item_ref = f"{item.source} #{item.external_id}"
+                if rec_to_sync not in esc.recommendations or item_ref not in esc.recommendations:
+                    esc.recommendations = esc.recommendations.strip() + "\n\n" + entry
+            else:
+                esc.recommendations = entry
 
     item.updated_at = datetime.datetime.utcnow()
     db.commit()
@@ -1089,7 +1337,9 @@ def update_item_details(
             "recommendations": item.recommendations,
             "title": item.title,
             "priority": item.priority,
-            "description": item.description
+            "description": item.description,
+            "client_name": item.client_name,
+            "project_name": getattr(item, "project_name", item.client_name)
         }
     }
 
@@ -1458,6 +1708,8 @@ class CreateEscalationRequest(BaseModel):
     title: str
     doc_url: str
     category: str = "Servicios"
+    ibp: str | None = None
+    ibp_id: int | None = None
     notes: str | None = None
     recommendations: str | None = None
 
@@ -1465,29 +1717,108 @@ class CreateEscalationRequest(BaseModel):
 class UpdateEscalationRequest(BaseModel):
     title: str | None = None
     category: str | None = None
+    ibp: str | None = None
+    ibp_id: int | None = None
     doc_url: str | None = None
     notes: str | None = None
     recommendations: str | None = None
+
+
+class CreateIBPRequest(BaseModel):
+    name: str
+    code: str | None = None
+    description: str | None = None
+    environment: str = "Producción"
 
 
 class UploadEscalationRequest(BaseModel):
     title: str | None = None
     filename: str
     file_base64: str
+    category: str | None = None
+    ibp: str | None = None
+    ibp_id: int | None = None
     notes: str | None = None
+
+
+@app.get("/api/ibps")
+def api_get_ibps(db: Session = Depends(get_db)):
+    """Lista el catálogo oficial de Identificación Bancaria del Participante (IBP) de la plataforma SIMF."""
+    db_ibps = db.query(IBP).filter(IBP.is_active == 1).order_by(IBP.code.asc()).all()
+    if db_ibps:
+        return [
+            {
+                "id": i.id,
+                "name": i.name,
+                "code": i.code,
+                "label": i.name if " - " in i.name else (f"{i.code} - {i.name}" if i.code else i.name),
+                "description": i.description,
+                "environment": i.environment,
+                "is_active": i.is_active,
+                "created_at": i.created_at.isoformat() if i.created_at else None
+            }
+            for i in db_ibps
+        ]
+    return IBP_INVENTORY
+
+
+@app.post("/api/ibps")
+def api_create_ibp(
+    req: CreateIBPRequest,
+    db: Session = Depends(get_db),
+    _role: str = Depends(verify_coordinator_role)
+):
+    """Crea una nueva Instancia de Base de Datos / Plataforma (IBP) en la BD interna."""
+    name = (req.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="El nombre de la IBP es obligatorio.")
+    existing = db.query(IBP).filter(IBP.name.ilike(name)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya existe una IBP registrada con ese nombre.")
+    code = (req.code or "").strip().upper() if req.code else name[:20].upper().replace(" ", "_")
+    ibp = IBP(
+        name=name,
+        code=code,
+        description=(req.description or "").strip() or None,
+        environment=(req.environment or "Producción").strip(),
+        is_active=1,
+        created_at=datetime.datetime.utcnow()
+    )
+    db.add(ibp)
+    db.commit()
+    db.refresh(ibp)
+    return {
+        "status": "OK",
+        "message": "IBP creada exitosamente",
+        "ibp": {
+            "id": ibp.id,
+            "name": ibp.name,
+            "code": ibp.code,
+            "description": ibp.description,
+            "environment": ibp.environment,
+            "is_active": ibp.is_active
+        }
+    }
 
 
 @app.get("/api/escalations")
 def api_get_escalations(db: Session = Depends(get_db)):
-    """Lista todos los documentos de escalamiento registrados (con fecha y autor)."""
+    """Lista todos los documentos de escalamiento registrados (con fecha, autor e IBP asociada)."""
     docs = db.query(EscalationDocument).order_by(EscalationDocument.created_at.desc()).all()
+    ibp_map = {i.id: i for i in db.query(IBP).all()}
     result = []
     for d in docs:
         is_gdoc = bool(d.doc_url) or not d.stored_filename
+        ibp_obj = ibp_map.get(d.ibp_id) if d.ibp_id else None
+        ibp_val = d.ibp or (ibp_obj.name if ibp_obj else "") or ""
         result.append({
             "id": d.id,
             "title": d.title,
             "category": d.category or "Servicios",
+            "ibp": ibp_val,
+            "ibp_id": d.ibp_id,
+            "ibp_name": ibp_obj.name if ibp_obj else (d.ibp or None),
+            "ibp_code": ibp_obj.code if ibp_obj else None,
             "doc_url": d.doc_url or (f"/api/escalations/{d.id}/view" if d.stored_filename else "#"),
             "doc_type": "google_docs" if is_gdoc else "pdf",
             "original_filename": d.original_filename or "Documento Google Docs",
@@ -1528,15 +1859,24 @@ def api_create_escalation(
         doc_url = "https://" + doc_url
 
     category = (req.category or "").strip()
+    if category == "Servicios BD":
+        category = "Servicios"
+    elif category == "Discos":
+        category = "Disco"
     if category not in VALID_ESCALATION_CATEGORIES:
         category = "Servicios"
 
     role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "Coordinador")).strip().capitalize()
     user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "Adonis Lozada Figueroa")).strip() or "Adonis Lozada Figueroa"
 
+    clean_ibp, ibp_id = resolve_ibp(db, req.ibp, req.ibp_id)
+    ibp_obj = db.query(IBP).filter(IBP.id == ibp_id).first() if ibp_id else None
+
     doc = EscalationDocument(
         title=title,
         category=category,
+        ibp=clean_ibp,
+        ibp_id=ibp_id,
         doc_url=doc_url,
         original_filename=f"{title} (Google Docs)",
         stored_filename="",
@@ -1564,12 +1904,14 @@ def api_create_escalation(
         safe_notes = f"\n📝 <b>Notas:</b> {html.escape(notes_text)}" if notes_text else ""
         recs_text = (req.recommendations or "").strip()
         safe_recs = f"\n💡 <b>Recomendaciones:</b> {html.escape(recs_text)}" if recs_text else ""
+        safe_ibp = f"\n🏦 <b>IBP / Banco:</b> {html.escape(clean_ibp)}" if clean_ibp else ""
         link_html = f"\n🔗 <a href=\"{doc_url}\"><b>Abrir en Google Docs</b></a>"
 
         msg = (
             f"📄 <b>Nuevo Escalamiento Registrado</b>\n\n"
             f"📌 <b>Código / Caso:</b> <code>{safe_title}</code>\n"
-            f"📂 <b>Categoría:</b> {safe_cat}\n"
+            f"📂 <b>Categoría:</b> {safe_cat}"
+            f"{safe_ibp}\n"
             f"👤 <b>Registrado por:</b> {safe_author} ({role})\n"
             f"🕒 <b>Fecha:</b> {now_str}"
             f"{safe_notes}"
@@ -1588,6 +1930,10 @@ def api_create_escalation(
             "id": doc.id,
             "title": doc.title,
             "category": doc.category,
+            "ibp": doc.ibp or "",
+            "ibp_id": doc.ibp_id,
+            "ibp_name": ibp_obj.name if ibp_obj else (doc.ibp or None),
+            "ibp_code": ibp_obj.code if ibp_obj else None,
             "doc_url": doc.doc_url,
             "doc_type": "google_docs",
             "file_size_formatted": "Google Docs",
@@ -1627,8 +1973,17 @@ def api_update_escalation(
 
     if req.category is not None:
         c = req.category.strip()
+        if c == "Servicios BD":
+            c = "Servicios"
+        elif c == "Discos":
+            c = "Disco"
         if c in VALID_ESCALATION_CATEGORIES:
             doc.category = c
+
+    if "ibp" in req.model_fields_set or "ibp_id" in req.model_fields_set:
+        clean_ibp, ibp_id = resolve_ibp(db, req.ibp, req.ibp_id)
+        doc.ibp = clean_ibp
+        doc.ibp_id = ibp_id
 
     if req.doc_url is not None:
         u = req.doc_url.strip()
@@ -1638,11 +1993,11 @@ def api_update_escalation(
             u = "https://" + u
         doc.doc_url = u
 
-    if req.notes is not None:
-        doc.notes = req.notes.strip() or None
+    if "notes" in req.model_fields_set:
+        doc.notes = req.notes.strip() if req.notes else None
 
-    if req.recommendations is not None:
-        doc.recommendations = req.recommendations.strip() or None
+    if "recommendations" in req.model_fields_set:
+        doc.recommendations = req.recommendations.strip() if req.recommendations else None
 
     db.commit()
     db.refresh(doc)
@@ -1653,18 +2008,20 @@ def api_update_escalation(
         from .notifications.telegram_notifier import send_telegram_message, now_caracas_str
         now_str = now_caracas_str("%d-%m-%Y %I:%M %p")
         safe_title = html.escape(doc.title)
-        safe_cat = html.escape(doc.category or "Servicios")
+        safe_cat = html.escape(doc.category or "Servicios BD")
         safe_author = html.escape(user_name)
         notes_text = (doc.notes or "").strip()
         safe_notes = f"\n📝 <b>Notas:</b> {html.escape(notes_text)}" if notes_text else ""
         recs_text = (doc.recommendations or "").strip()
         safe_recs = f"\n💡 <b>Recomendaciones:</b> {html.escape(recs_text)}" if recs_text else ""
+        safe_ibp = f"\n🏦 <b>IBP / Banco:</b> {html.escape(doc.ibp)}" if doc.ibp else ""
         link_html = f"\n🔗 <a href=\"{doc.doc_url}\"><b>Abrir en Google Docs</b></a>" if doc.doc_url else ""
 
         msg = (
             f"✏️ <b>Escalamiento Actualizado</b>\n\n"
             f"📌 <b>Código / Caso:</b> <code>{safe_title}</code>\n"
-            f"📂 <b>Categoría:</b> {safe_cat}\n"
+            f"📂 <b>Categoría:</b> {safe_cat}"
+            f"{safe_ibp}\n"
             f"👤 <b>Modificado por:</b> {safe_author} ({role})\n"
             f"🕒 <b>Fecha:</b> {now_str}"
             f"{safe_notes}"
@@ -1676,6 +2033,8 @@ def api_update_escalation(
     except Exception as e:
         print(f"[Telegram Update Escalation Notification Error] {e}")
 
+    ibp_obj = db.query(IBP).filter(IBP.id == doc.ibp_id).first() if doc.ibp_id else None
+
     return {
         "status": "OK",
         "message": "Escalamiento actualizado exitosamente.",
@@ -1683,6 +2042,10 @@ def api_update_escalation(
             "id": doc.id,
             "title": doc.title,
             "category": doc.category,
+            "ibp": doc.ibp or "",
+            "ibp_id": doc.ibp_id,
+            "ibp_name": ibp_obj.name if ibp_obj else (doc.ibp or None),
+            "ibp_code": ibp_obj.code if ibp_obj else None,
             "doc_url": doc.doc_url,
             "doc_type": "google_docs",
             "uploaded_by": doc.uploaded_by,
@@ -1751,8 +2114,22 @@ def api_upload_escalation(
     user_name = (x_user_name.strip()) if isinstance(x_user_name, str) else "Adonis Lozada Figueroa"
     user_role = (x_user_role.strip().capitalize()) if isinstance(x_user_role, str) else "Coordinador"
 
+    clean_ibp, ibp_id = resolve_ibp(db, req.ibp, req.ibp_id)
+    ibp_obj = db.query(IBP).filter(IBP.id == ibp_id).first() if ibp_id else None
+
+    category = (req.category or "").strip() if req.category else "Servicios"
+    if category == "Servicios BD":
+        category = "Servicios"
+    elif category == "Discos":
+        category = "Disco"
+    if category not in VALID_ESCALATION_CATEGORIES:
+        category = "Servicios"
+
     doc = EscalationDocument(
         title=title,
+        category=category,
+        ibp=clean_ibp,
+        ibp_id=ibp_id,
         original_filename=clean_filename,
         stored_filename=stored_name,
         file_size_bytes=len(file_bytes),
@@ -1774,12 +2151,16 @@ def api_upload_escalation(
         safe_title = html.escape(title)
         safe_author = html.escape(user_name)
         safe_file = html.escape(req.filename)
+        safe_cat = html.escape(category)
+        safe_ibp = f"\n🏦 <b>IBP / Banco:</b> {html.escape(clean_ibp)}" if clean_ibp else ""
         notes_text = (req.notes or "").strip()
         safe_notes = f"\n📝 <b>Notas:</b> {html.escape(notes_text)}" if notes_text else ""
 
         msg = (
             f"📄 <b>Nuevo Escalamiento Registrado (PDF)</b>\n\n"
             f"📌 <b>Código / Caso:</b> <code>{safe_title}</code>\n"
+            f"📂 <b>Categoría:</b> {safe_cat}"
+            f"{safe_ibp}\n"
             f"📎 <b>Archivo:</b> {safe_file}\n"
             f"👤 <b>Registrado por:</b> {safe_author} ({user_role})\n"
             f"🕒 <b>Fecha:</b> {now_str}"
@@ -1796,6 +2177,11 @@ def api_upload_escalation(
         "document": {
             "id": doc.id,
             "title": doc.title,
+            "category": doc.category,
+            "ibp": doc.ibp or "",
+            "ibp_id": doc.ibp_id,
+            "ibp_name": ibp_obj.name if ibp_obj else (doc.ibp or None),
+            "ibp_code": ibp_obj.code if ibp_obj else None,
             "original_filename": doc.original_filename,
             "file_size_formatted": doc.file_size_formatted,
             "uploaded_by": doc.uploaded_by,
@@ -1907,6 +2293,11 @@ def api_delete_escalation(
         send_telegram_message(msg, parse_mode="HTML")
     except Exception as e:
         print(f"[Telegram Delete Escalation Error] {e}")
+
+    # Desvincular actividades que apuntaban a este escalamiento para evitar referencias huérfanas
+    items_linked = db.query(Item).filter(Item.escalation_id == doc_id).all()
+    for it in items_linked:
+        it.escalation_id = None
 
     db.delete(doc)
     db.commit()
