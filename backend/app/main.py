@@ -613,6 +613,13 @@ def serialize_item(item: Item) -> dict:
     """Serializa una actividad con sus campos cronológicos puros (received_at, escalated_at, duración)."""
     rec_iso = item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None)
     esc_iso = item.escalated_at.isoformat() if item.escalated_at else (item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None))
+    
+    is_recent_closed = False
+    if item.status == "cerrado":
+        ref_dt = item.closed_at or item.updated_at
+        if ref_dt:
+            is_recent_closed = bool(ref_dt >= get_yesterday_start())
+
     return {
         "id": item.id,
         "source": item.source,
@@ -639,7 +646,8 @@ def serialize_item(item: Item) -> dict:
         "escalation_id": item.escalation_id,
         "recommendations": item.recommendations,
         "duration_human": item.duration_human,
-        "time_attention_label": item.time_attention_label
+        "time_attention_label": item.time_attention_label,
+        "is_recent_closed": is_recent_closed
     }
 
 @app.get("/api/items")

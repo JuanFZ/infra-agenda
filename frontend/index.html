@@ -3979,14 +3979,16 @@
         let colItems = list.filter(i => i.status === c.k);
         if (c.k === 'cerrado') {
           // Filtro visual de las últimas 24 horas para mantener limpio el flujo de trabajo del Kanban
-          const nowMs = Date.now();
-          const oneDayMs = 24 * 60 * 60 * 1000;
           colItems = colItems.filter(i => {
-            const dateStr = i.closed_at || i.updated_at || i.created_at;
-            if (!dateStr) return true;
+            if (typeof i.is_recent_closed === 'boolean') {
+              return i.is_recent_closed;
+            }
+            const dateStr = i.closed_at || i.updated_at;
+            if (!dateStr) return false;
             const itemMs = new Date(dateStr).getTime();
-            if (isNaN(itemMs)) return true;
-            return (nowMs - itemMs) <= oneDayMs;
+            if (isNaN(itemMs)) return false;
+            const diff = Date.now() - itemMs;
+            return diff >= 0 && diff <= 24 * 60 * 60 * 1000;
           });
         }
         return `
