@@ -609,5 +609,44 @@ function simulateDeepLink(opts) {
   assert.strictEqual(slaMatches.length, 0, `Expected 0 SLA occurrences in index.html, found:\n${slaMatches.join('\n')}`);
   console.log('✓ Test 8: Complete removal of SLA metrics, badges, and containers verified');
 
+  // Test 9: 10-item pagination and centered controls
+  assert(content.includes('id="resumenPagination"'), 'resumenPagination container missing');
+  assert(content.includes('id="esperaPagination"'), 'esperaPagination container missing');
+  assert(content.includes('id="escalationsPagination"'), 'escalationsPagination container missing');
+  assert(content.includes('id="reportsHistoryPagination"'), 'reportsHistoryPagination container missing');
+  assert(content.includes('const PAGE_SIZE_DEFAULT = 10;'), 'PAGE_SIZE_DEFAULT must be 10');
+  assert(content.includes('function getPaginationPageNumbers('), 'getPaginationPageNumbers must be defined');
+  assert(content.includes('function renderPaginationControls('), 'renderPaginationControls must be defined');
+
+  // Test pagination helper logic in isolation
+  const getPageNumsMatch = content.match(/function getPaginationPageNumbers\(currentPage, totalPages\)[\s\S]*?\n    \}/);
+  const renderPaginationMatch = content.match(/function renderPaginationControls\(containerId, currentPage, totalItems, pageSize, onPageChangeFnName\)[\s\S]*?\n    \}/);
+  assert(getPageNumsMatch && renderPaginationMatch, 'Pagination functions extraction failed');
+
+  const paginationRunner = new Function(`
+    ${getPageNumsMatch[0]}
+    ${renderPaginationMatch[0]}
+    return { getPaginationPageNumbers, renderPaginationControls };
+  `)();
+
+  // Test getPaginationPageNumbers
+  assert.deepStrictEqual(paginationRunner.getPaginationPageNumbers(1, 1), [1]);
+  assert.deepStrictEqual(paginationRunner.getPaginationPageNumbers(1, 3), [1, 2, 3]);
+  assert.deepStrictEqual(paginationRunner.getPaginationPageNumbers(1, 10), [1, 2, 3, 4, '...', 10]);
+  assert.deepStrictEqual(paginationRunner.getPaginationPageNumbers(5, 10), [1, '...', 4, 5, 6, '...', 10]);
+
+  // Test renderPaginationControls DOM output
+  const mockContainer = { innerHTML: '', style: {} };
+  global.document = {
+    getElementById: (id) => (id === 'testPagination' ? mockContainer : null)
+  };
+  paginationRunner.renderPaginationControls('testPagination', 1, 25, 10, 'onTestChange');
+  assert.strictEqual(mockContainer.style.display, 'flex');
+  assert(mockContainer.innerHTML.includes('Mostrando 1–10 de 25'), 'Pagination info text incorrect');
+  assert(mockContainer.innerHTML.includes('disabled onclick="onTestChange(0)"'), 'Previous button should be disabled on page 1');
+  assert(mockContainer.innerHTML.includes('class="pagination-btn active"'), 'Page 1 button should be active');
+  assert(mockContainer.innerHTML.includes('onclick="onTestChange(2)"'), 'Next button should point to page 2');
+  console.log('✓ Test 9: 10-item pagination with centered page controls and slice boundaries verified');
+
   console.log('ALL FRONTEND TESTS PASSED SUCCESSFULLY!');
 })();

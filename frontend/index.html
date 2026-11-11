@@ -1504,6 +1504,79 @@
       color: #64748b;
     }
 
+    /* Controles de Paginación Centrales */
+    .pagination-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      flex-wrap: wrap;
+    }
+    .pagination-info {
+      font-size: 12px;
+      color: var(--muted);
+      margin-right: 12px;
+      font-weight: 500;
+    }
+    .pagination-btn {
+      min-width: 32px;
+      height: 32px;
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .pagination-btn:hover:not(:disabled):not(.active) {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.22);
+      color: #ffffff;
+    }
+    .pagination-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(79, 140, 255, 0.35);
+    }
+    .pagination-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    .pagination-ellipsis {
+      color: var(--muted);
+      padding: 0 4px;
+      font-size: 12px;
+      user-select: none;
+    }
+    body.light .pagination-container {
+      border-top-color: rgba(0, 0, 0, 0.06);
+    }
+    body.light .pagination-btn {
+      background: #ffffff;
+      border-color: rgba(0, 0, 0, 0.12);
+      color: #1e293b;
+    }
+    body.light .pagination-btn:hover:not(:disabled):not(.active) {
+      background: #f1f5f9;
+      border-color: rgba(0, 0, 0, 0.2);
+    }
+    body.light .pagination-btn.active {
+      background: var(--accent);
+      color: #ffffff;
+    }
+
     .create-platform-toggle {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -2801,6 +2874,7 @@
             </tbody>
           </table>
         </div>
+        <div id="resumenPagination" class="pagination-container"></div>
       </div>
     </div>
 
@@ -2848,6 +2922,7 @@
             <tbody></tbody>
           </table>
         </div>
+        <div id="esperaPagination" class="pagination-container"></div>
       </div>
     </div>
 
@@ -2938,6 +3013,7 @@
             </tbody>
           </table>
         </div>
+        <div id="escalationsPagination" class="pagination-container"></div>
       </div>
     </div>
 
@@ -3059,6 +3135,7 @@
               </tbody>
             </table>
           </div>
+          <div id="reportsHistoryPagination" class="pagination-container"></div>
         </div>
       </div>
 
@@ -3400,6 +3477,95 @@
     let HIGHLIGHT_ITEM_ID = null;
     let CURRENT_USER = null;
 
+    // Configuración y estado de paginación (10 elementos por página con controles centrales)
+    const PAGE_SIZE_DEFAULT = 10;
+    let RESUMEN_CURRENT_PAGE = 1;
+    let ESPERA_CURRENT_PAGE = 1;
+    let ESCALATIONS_CURRENT_PAGE = 1;
+    let REPORTS_HISTORY_CURRENT_PAGE = 1;
+    let CURRENT_FILTERED_ESCALATIONS = [];
+    let CURRENT_FILTERED_REPORTS_HISTORY = [];
+
+    function getPaginationPageNumbers(currentPage, totalPages) {
+      if (totalPages <= 7) {
+        const pages = [];
+        for (let i = 1; i <= totalPages; i++) pages.push(i);
+        return pages;
+      }
+      const pages = [1];
+      let start = Math.max(2, currentPage - 1);
+      let end = Math.min(totalPages - 1, currentPage + 1);
+
+      if (currentPage <= 3) {
+        end = 4;
+      } else if (currentPage >= totalPages - 2) {
+        start = totalPages - 3;
+      }
+
+      if (start > 2) pages.push('...');
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (end < totalPages - 1) pages.push('...');
+      pages.push(totalPages);
+      return pages;
+    }
+
+    function renderPaginationControls(containerId, currentPage, totalItems, pageSize, onPageChangeFnName) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      if (!totalItems || totalItems <= 0) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+        return;
+      }
+
+      container.style.display = 'flex';
+      const totalPages = Math.ceil(totalItems / pageSize) || 1;
+      const safeCurrentPage = Math.max(1, Math.min(currentPage, totalPages));
+
+      const startIdx = (safeCurrentPage - 1) * pageSize + 1;
+      const endIdx = Math.min(totalItems, safeCurrentPage * pageSize);
+
+      const prevDisabled = safeCurrentPage <= 1 ? 'disabled' : '';
+      const nextDisabled = safeCurrentPage >= totalPages ? 'disabled' : '';
+
+      const prevSvg = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`;
+      const nextSvg = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
+
+      const pageNumbers = getPaginationPageNumbers(safeCurrentPage, totalPages);
+
+      const pagesHtml = pageNumbers.map(p => {
+        if (p === '...') {
+          return `<span class="pagination-ellipsis">...</span>`;
+        }
+        const isActive = p === safeCurrentPage ? 'active' : '';
+        return `<button type="button" class="pagination-btn ${isActive}" onclick="${onPageChangeFnName}(${p})" title="Ir a la página ${p}">${p}</button>`;
+      }).join('');
+
+      container.innerHTML = `
+        <span class="pagination-info">Mostrando ${startIdx}–${endIdx} de ${totalItems}</span>
+        <div style="display:inline-flex;align-items:center;gap:6px">
+          <button type="button" class="pagination-btn" ${prevDisabled} onclick="${onPageChangeFnName}(${safeCurrentPage - 1})" title="Página anterior">
+            ${prevSvg}
+          </button>
+          ${pagesHtml}
+          <button type="button" class="pagination-btn" ${nextDisabled} onclick="${onPageChangeFnName}(${safeCurrentPage + 1})" title="Página siguiente">
+            ${nextSvg}
+          </button>
+        </div>
+      `;
+    }
+
+    function setResumenPage(page) {
+      RESUMEN_CURRENT_PAGE = page;
+      renderAll();
+    }
+
+    function setEsperaPage(page) {
+      ESPERA_CURRENT_PAGE = page;
+      renderAll();
+    }
+
     function isCoordinator() {
       if (!CURRENT_USER) return false;
       const r = (CURRENT_USER.role || '').toLowerCase();
@@ -3721,6 +3887,8 @@
       document.getElementById('fResp').value = '';
       document.getElementById('fSearch').value = '';
       ACTIVE_KPI_FILTER = null;
+      RESUMEN_CURRENT_PAGE = 1;
+      ESPERA_CURRENT_PAGE = 1;
       document.querySelectorAll('.kpi').forEach(el => el.classList.remove('selected'));
       renderAll();
     }
@@ -3796,12 +3964,20 @@
       const list = filterItems();
       document.getElementById('totalItemsCount').textContent = list.length;
 
-      // 1. Tabla Resumen
+      // 1. Tabla Resumen (Paginada a 10 elementos)
       const tbody = document.querySelector('#tblItems tbody');
       if (!list.length) {
         tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px" class="muted">Sin tickets que coincidan con los filtros.</td></tr>';
+        renderPaginationControls('resumenPagination', 1, 0, PAGE_SIZE_DEFAULT, 'setResumenPage');
       } else {
-        tbody.innerHTML = list.map(it => `
+        const resumenTotalPages = Math.ceil(list.length / PAGE_SIZE_DEFAULT) || 1;
+        if (RESUMEN_CURRENT_PAGE > resumenTotalPages) RESUMEN_CURRENT_PAGE = resumenTotalPages;
+        if (RESUMEN_CURRENT_PAGE < 1) RESUMEN_CURRENT_PAGE = 1;
+
+        const resumenStart = (RESUMEN_CURRENT_PAGE - 1) * PAGE_SIZE_DEFAULT;
+        const pageItems = list.slice(resumenStart, resumenStart + PAGE_SIZE_DEFAULT);
+
+        tbody.innerHTML = pageItems.map(it => `
       <tr class="click ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new-row' : ''}" onclick="openModal(${it.id})">
         <td><span class="badge" style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;padding:0"></span></td>
         <td><span class="badge src-${it.source}">${it.source}</span> #${it.external_id}</td>
@@ -3841,16 +4017,28 @@
         </td>
       </tr>
     `).join('');
+        renderPaginationControls('resumenPagination', RESUMEN_CURRENT_PAGE, list.length, PAGE_SIZE_DEFAULT, 'setResumenPage');
       }
 
       // 2. Kanban
       renderKanban(list);
 
-      // 3. En Espera
+      // 3. En Espera (Paginada a 10 elementos)
       const esperaList = list.filter(i => i.status === 'espera');
       const tblEsperaTbody = document.querySelector('#tblEspera tbody');
       if (tblEsperaTbody) {
-        tblEsperaTbody.innerHTML = esperaList.map(it => `
+        if (!esperaList.length) {
+          tblEsperaTbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align:center;padding:20px">Sin actividades en espera.</td></tr>';
+          renderPaginationControls('esperaPagination', 1, 0, PAGE_SIZE_DEFAULT, 'setEsperaPage');
+        } else {
+          const esperaTotalPages = Math.ceil(esperaList.length / PAGE_SIZE_DEFAULT) || 1;
+          if (ESPERA_CURRENT_PAGE > esperaTotalPages) ESPERA_CURRENT_PAGE = esperaTotalPages;
+          if (ESPERA_CURRENT_PAGE < 1) ESPERA_CURRENT_PAGE = 1;
+
+          const esperaStart = (ESPERA_CURRENT_PAGE - 1) * PAGE_SIZE_DEFAULT;
+          const pageEspera = esperaList.slice(esperaStart, esperaStart + PAGE_SIZE_DEFAULT);
+
+          tblEsperaTbody.innerHTML = pageEspera.map(it => `
           <tr class="click" onclick="openModal(${it.id})">
             <td><span class="badge src-${it.source}">${it.source}</span> #${it.external_id}</td>
             <td><b>${escapeHtml(it.title)}</b></td>
@@ -3867,7 +4055,10 @@
               </button>` : ''}
             </td>
           </tr>
-        `).join('') || '<tr><td colspan="7" class="muted" style="text-align:center;padding:20px">Sin actividades en espera.</td></tr>';
+        `).join('');
+
+          renderPaginationControls('esperaPagination', ESPERA_CURRENT_PAGE, esperaList.length, PAGE_SIZE_DEFAULT, 'setEsperaPage');
+        }
       }
       const tblOverdueTbody = document.querySelector('#tblOverdue tbody');
       if (tblOverdueTbody) {
@@ -5455,10 +5646,10 @@
     });
 
     // Filtros
-    document.getElementById('fSrc').onchange = renderAll;
-    document.getElementById('fPrio').onchange = renderAll;
-    document.getElementById('fResp').onchange = renderAll;
-    document.getElementById('fSearch').oninput = renderAll;
+    document.getElementById('fSrc').onchange = () => { RESUMEN_CURRENT_PAGE = 1; ESPERA_CURRENT_PAGE = 1; renderAll(); };
+    document.getElementById('fPrio').onchange = () => { RESUMEN_CURRENT_PAGE = 1; ESPERA_CURRENT_PAGE = 1; renderAll(); };
+    document.getElementById('fResp').onchange = () => { RESUMEN_CURRENT_PAGE = 1; ESPERA_CURRENT_PAGE = 1; renderAll(); };
+    document.getElementById('fSearch').oninput = () => { RESUMEN_CURRENT_PAGE = 1; ESPERA_CURRENT_PAGE = 1; renderAll(); };
     document.getElementById('btnTheme').onclick = () => document.body.classList.toggle('light');
     document.getElementById('modalBg').onclick = (e) => {
       if (e.target.id === 'modalBg') document.getElementById('modalBg').classList.remove('show');
@@ -7882,13 +8073,7 @@
         }
         const list = await res.json();
         GENERATED_REPORTS_LIST = list;
-        const sInput = document.getElementById('fSearchReports');
-        const q = sInput ? sInput.value.trim() : '';
-        if (q) {
-          filterReportsHistoryTable(q);
-        } else {
-          renderReportsHistoryTable(list);
-        }
+        filterReportsHistoryTable();
       } catch (err) {
         console.error('Error cargando historial de reportes:', err);
         tbody.innerHTML = `
@@ -7902,20 +8087,46 @@
     }
 
     function filterReportsHistoryTable(term) {
-      const q = (term || '').toLowerCase().trim();
+      const sInput = document.getElementById('fSearchReports');
+      const val = (term !== undefined && term !== null) ? term : (sInput ? sInput.value : '');
+      const q = (val || '').toLowerCase().trim();
       if (!q) {
-        renderReportsHistoryTable(GENERATED_REPORTS_LIST);
+        CURRENT_FILTERED_REPORTS_HISTORY = GENERATED_REPORTS_LIST || [];
+      } else {
+        CURRENT_FILTERED_REPORTS_HISTORY = (GENERATED_REPORTS_LIST || []).filter(r => {
+          const folio = `rep-${String(r.id).padStart(4, '0')}`.toLowerCase();
+          const title = (r.title || '').toLowerCase();
+          const period = (r.period_label || '').toLowerCase();
+          const spec = (r.specialist_filter || '').toLowerCase();
+          const user = (r.generated_by || '').toLowerCase();
+          return folio.includes(q) || title.includes(q) || period.includes(q) || spec.includes(q) || user.includes(q);
+        });
+      }
+      REPORTS_HISTORY_CURRENT_PAGE = 1;
+      applyReportsHistoryPagination();
+    }
+
+    function setReportsHistoryPage(page) {
+      REPORTS_HISTORY_CURRENT_PAGE = page;
+      applyReportsHistoryPagination();
+    }
+
+    function applyReportsHistoryPagination() {
+      const list = CURRENT_FILTERED_REPORTS_HISTORY || [];
+      const total = list.length;
+      if (!total) {
+        renderReportsHistoryTable([]);
+        renderPaginationControls('reportsHistoryPagination', 1, 0, PAGE_SIZE_DEFAULT, 'setReportsHistoryPage');
         return;
       }
-      const filtered = GENERATED_REPORTS_LIST.filter(r => {
-        const folio = `rep-${String(r.id).padStart(4, '0')}`.toLowerCase();
-        const title = (r.title || '').toLowerCase();
-        const period = (r.period_label || '').toLowerCase();
-        const spec = (r.specialist_filter || '').toLowerCase();
-        const user = (r.generated_by || '').toLowerCase();
-        return folio.includes(q) || title.includes(q) || period.includes(q) || spec.includes(q) || user.includes(q);
-      });
-      renderReportsHistoryTable(filtered);
+      const totalPages = Math.ceil(total / PAGE_SIZE_DEFAULT) || 1;
+      if (REPORTS_HISTORY_CURRENT_PAGE > totalPages) REPORTS_HISTORY_CURRENT_PAGE = totalPages;
+      if (REPORTS_HISTORY_CURRENT_PAGE < 1) REPORTS_HISTORY_CURRENT_PAGE = 1;
+
+      const start = (REPORTS_HISTORY_CURRENT_PAGE - 1) * PAGE_SIZE_DEFAULT;
+      const pageSlice = list.slice(start, start + PAGE_SIZE_DEFAULT);
+      renderReportsHistoryTable(pageSlice);
+      renderPaginationControls('reportsHistoryPagination', REPORTS_HISTORY_CURRENT_PAGE, total, PAGE_SIZE_DEFAULT, 'setReportsHistoryPage');
     }
 
     function renderReportsHistoryTable(list) {
@@ -9357,7 +9568,32 @@
         }
         return true;
       });
-      renderEscalationsTable(filtered);
+      CURRENT_FILTERED_ESCALATIONS = filtered;
+      ESCALATIONS_CURRENT_PAGE = 1;
+      applyEscalationsPagination();
+    }
+
+    function setEscalationsPage(page) {
+      ESCALATIONS_CURRENT_PAGE = page;
+      applyEscalationsPagination();
+    }
+
+    function applyEscalationsPagination() {
+      const list = CURRENT_FILTERED_ESCALATIONS || [];
+      const total = list.length;
+      if (!total) {
+        renderEscalationsTable([]);
+        renderPaginationControls('escalationsPagination', 1, 0, PAGE_SIZE_DEFAULT, 'setEscalationsPage');
+        return;
+      }
+      const totalPages = Math.ceil(total / PAGE_SIZE_DEFAULT) || 1;
+      if (ESCALATIONS_CURRENT_PAGE > totalPages) ESCALATIONS_CURRENT_PAGE = totalPages;
+      if (ESCALATIONS_CURRENT_PAGE < 1) ESCALATIONS_CURRENT_PAGE = 1;
+
+      const start = (ESCALATIONS_CURRENT_PAGE - 1) * PAGE_SIZE_DEFAULT;
+      const pageSlice = list.slice(start, start + PAGE_SIZE_DEFAULT);
+      renderEscalationsTable(pageSlice);
+      renderPaginationControls('escalationsPagination', ESCALATIONS_CURRENT_PAGE, total, PAGE_SIZE_DEFAULT, 'setEscalationsPage');
     }
 
     function renderEscalationsTable(list) {
