@@ -5,6 +5,7 @@ import base64
 import datetime
 import hashlib
 import unicodedata
+import urllib.parse
 from fastapi import FastAPI, Depends, Query, HTTPException, Header, Response
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
