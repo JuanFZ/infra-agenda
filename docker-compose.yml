@@ -1,5 +1,26 @@
 services:
   # ----------------------------------------------------
+  # Base de Datos Relacional PostgreSQL 16
+  # ----------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: dashboard_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tasks_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tasks_secret_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-tasks_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dashboard_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tasks_user} -d ${POSTGRES_DB:-tasks_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------
   # Backend API & Sincronizador (GLPI + ClickUp)
   # ----------------------------------------------------
   backend:
@@ -12,9 +33,14 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://tasks_user:tasks_secret_2026@db:5432/tasks_db}
     volumes:
       - ./backend/app:/app/app
       - dashboard_data:/app/
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - dashboard_net
 
@@ -37,6 +63,7 @@ services:
 
 volumes:
   dashboard_data:
+  postgres_data:
 
 networks:
   dashboard_net:

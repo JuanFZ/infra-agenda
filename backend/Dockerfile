@@ -7,9 +7,12 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Instalar utilidades del sistema (sqlite3 para diagnóstico y consultas directas)
+# Instalar utilidades del sistema (sqlite3, postgresql-client y librerías de conexión para PostgreSQL)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     sqlite3 \
+    postgresql-client \
+    libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar dependencias e instalarlas sin cache

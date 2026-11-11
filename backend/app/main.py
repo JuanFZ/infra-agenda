@@ -9,7 +9,7 @@ from fastapi import FastAPI, Depends, Query, HTTPException, Header, Response
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, inspect, text
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -223,63 +223,67 @@ def resolve_ibp(db: Session, raw_ibp: str | None, raw_ibp_id: int | None) -> tup
 
 def ensure_db_schema():
     try:
-        with engine.connect() as conn:
-            cursor = conn.connection.cursor()
-            cursor.execute("PRAGMA table_info(items)")
-            cols = [row[1] for row in cursor.fetchall()]
-            if "assigned_at" not in cols:
-                cursor.execute("ALTER TABLE items ADD COLUMN assigned_at DATETIME")
-            if "received_at" not in cols:
-                cursor.execute("ALTER TABLE items ADD COLUMN received_at DATETIME")
-            if "escalated_at" not in cols:
-                cursor.execute("ALTER TABLE items ADD COLUMN escalated_at DATETIME")
-            if "escalation_id" not in cols:
-                cursor.execute("ALTER TABLE items ADD COLUMN escalation_id INTEGER")
-            if "recommendations" not in cols:
-                cursor.execute("ALTER TABLE items ADD COLUMN recommendations TEXT")
-            if "description" not in cols:
-                cursor.execute("ALTER TABLE items ADD COLUMN description TEXT")
-            if "project_name" not in cols:
-                cursor.execute("ALTER TABLE items ADD COLUMN project_name VARCHAR(150)")
-            if "created_by" not in cols:
-                cursor.execute("ALTER TABLE items ADD COLUMN created_by VARCHAR(150)")
-            
-            cursor.execute("PRAGMA table_info(users)")
-            u_cols = [row[1] for row in cursor.fetchall()]
-            if "password_hash" not in u_cols:
-                cursor.execute("ALTER TABLE users ADD COLUMN password_hash VARCHAR(200)")
-            if "last_login" not in u_cols:
-                cursor.execute("ALTER TABLE users ADD COLUMN last_login DATETIME")
-            if "avatar_data" not in u_cols:
-                cursor.execute("ALTER TABLE users ADD COLUMN avatar_data TEXT")
-            if "phone" not in u_cols:
-                cursor.execute("ALTER TABLE users ADD COLUMN phone VARCHAR(50)")
-            if "job_title" not in u_cols:
-                cursor.execute("ALTER TABLE users ADD COLUMN job_title VARCHAR(100)")
-            if "bio" not in u_cols:
-                cursor.execute("ALTER TABLE users ADD COLUMN bio VARCHAR(255)")
+        inspector = inspect(engine)
+        table_names = inspector.get_table_names()
+        is_sqlite = engine.dialect.name == "sqlite"
+        dt_type = "DATETIME" if is_sqlite else "TIMESTAMP"
 
-            cursor.execute("PRAGMA table_info(escalation_documents)")
-            esc_cols = [row[1] for row in cursor.fetchall()]
-            if esc_cols:
+        with engine.begin() as conn:
+            # 1. items
+            if "items" in table_names:
+                cols = [c["name"] for c in inspector.get_columns("items")]
+                if "assigned_at" not in cols:
+                    conn.execute(text(f"ALTER TABLE items ADD COLUMN assigned_at {dt_type}"))
+                if "received_at" not in cols:
+                    conn.execute(text(f"ALTER TABLE items ADD COLUMN received_at {dt_type}"))
+                if "escalated_at" not in cols:
+                    conn.execute(text(f"ALTER TABLE items ADD COLUMN escalated_at {dt_type}"))
+                if "escalation_id" not in cols:
+                    conn.execute(text("ALTER TABLE items ADD COLUMN escalation_id INTEGER"))
+                if "recommendations" not in cols:
+                    conn.execute(text("ALTER TABLE items ADD COLUMN recommendations TEXT"))
+                if "description" not in cols:
+                    conn.execute(text("ALTER TABLE items ADD COLUMN description TEXT"))
+                if "project_name" not in cols:
+                    conn.execute(text("ALTER TABLE items ADD COLUMN project_name VARCHAR(150)"))
+                if "created_by" not in cols:
+                    conn.execute(text("ALTER TABLE items ADD COLUMN created_by VARCHAR(150)"))
+
+            # 2. users
+            if "users" in table_names:
+                u_cols = [c["name"] for c in inspector.get_columns("users")]
+                if "password_hash" not in u_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR(200)"))
+                if "last_login" not in u_cols:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN last_login {dt_type}"))
+                if "avatar_data" not in u_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN avatar_data TEXT"))
+                if "phone" not in u_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN phone VARCHAR(50)"))
+                if "job_title" not in u_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN job_title VARCHAR(100)"))
+                if "bio" not in u_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN bio VARCHAR(255)"))
+
+            # 3. escalation_documents
+            if "escalation_documents" in table_names:
+                esc_cols = [c["name"] for c in inspector.get_columns("escalation_documents")]
                 if "doc_url" not in esc_cols:
-                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN doc_url VARCHAR(1000)")
+                    conn.execute(text("ALTER TABLE escalation_documents ADD COLUMN doc_url VARCHAR(1000)"))
                 if "category" not in esc_cols:
-                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN category VARCHAR(100) DEFAULT 'Servicios'")
+                    conn.execute(text("ALTER TABLE escalation_documents ADD COLUMN category VARCHAR(100) DEFAULT 'Servicios'"))
                 if "recommendations" not in esc_cols:
-                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN recommendations TEXT")
+                    conn.execute(text("ALTER TABLE escalation_documents ADD COLUMN recommendations TEXT"))
                 if "ibp_id" not in esc_cols:
-                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN ibp_id INTEGER")
+                    conn.execute(text("ALTER TABLE escalation_documents ADD COLUMN ibp_id INTEGER"))
                 if "ibp" not in esc_cols:
-                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN ibp VARCHAR(100)")
+                    conn.execute(text("ALTER TABLE escalation_documents ADD COLUMN ibp VARCHAR(100)"))
                 if "received_at" not in esc_cols:
-                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN received_at DATETIME")
+                    conn.execute(text(f"ALTER TABLE escalation_documents ADD COLUMN received_at {dt_type}"))
                 if "escalated_at" not in esc_cols:
-                    cursor.execute("ALTER TABLE escalation_documents ADD COLUMN escalated_at DATETIME")
-                cursor.execute("UPDATE escalation_documents SET received_at = created_at WHERE received_at IS NULL")
-                cursor.execute("UPDATE escalation_documents SET escalated_at = COALESCE(received_at, created_at) WHERE escalated_at IS NULL")
-
-            conn.connection.commit()
+                    conn.execute(text(f"ALTER TABLE escalation_documents ADD COLUMN escalated_at {dt_type}"))
+                conn.execute(text("UPDATE escalation_documents SET received_at = created_at WHERE received_at IS NULL"))
+                conn.execute(text("UPDATE escalation_documents SET escalated_at = COALESCE(received_at, created_at) WHERE escalated_at IS NULL"))
 
         # Poblar catálogo oficial de las 34 IBPs (Participantes SIMF) si no existen
         seed_db = SessionLocal()
@@ -634,6 +638,13 @@ scheduler = BackgroundScheduler()
 
 @app.on_event("startup")
 def on_startup():
+    # Auto-migrar datos si es la primera vez que se inicia en PostgreSQL y existe dashboard.db
+    try:
+        from migrate_sqlite_to_pg import auto_migrate_if_needed
+        auto_migrate_if_needed()
+    except Exception as mig_err:
+        print(f"[Startup Migration Check] {mig_err}")
+
     # Inicializar usuarios del equipo
     init_users()
     # Purgar cerrados anteriores al día de ayer
