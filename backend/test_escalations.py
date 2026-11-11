@@ -1290,6 +1290,28 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertNotIn("fuera_sla", rep_kpis)
         self.assertNotIn("dentro_sla", rep_kpis)
 
+    @patch("app.sync.clickup_client.ClickUpClient.create_task")
+    def test_24_specialist_can_create_items_and_analyst_blocked(self, mock_cu):
+        """Test that Specialists can create activities via POST /api/items, but Analysts are blocked."""
+        mock_cu.return_value = {"id": "cu_spec_1", "url": "https://app.clickup.com/t/cu_spec_1"}
+
+        # 1. Specialist creates activity -> 200 OK
+        spec_res = self.client.post("/api/items", json={
+            "source": "ClickUp",
+            "title": "Actividad creada por Especialista",
+            "priority": "Alta",
+            "project_name": "SIMF"
+        }, headers={"X-User-Role": "Especialista", "X-User-Name": "Juan Fernandez"})
+        self.assertEqual(spec_res.status_code, 200)
+        self.assertEqual(spec_res.json()["item"]["external_id"], "cu_spec_1")
+
+        # 2. Analyst tries to create activity -> 403 Forbidden
+        analyst_res = self.client.post("/api/items", json={
+            "source": "ClickUp",
+            "title": "Intento de creación por Analista"
+        }, headers={"X-User-Role": "Analista"})
+        self.assertEqual(analyst_res.status_code, 403)
+
 
 if __name__ == "__main__":
     unittest.main()

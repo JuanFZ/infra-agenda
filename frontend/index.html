@@ -2428,57 +2428,6 @@
         <p class="login-sub">Control de Acceso Operativo · Sycom</p>
       </div>
 
-      <!-- Selector rápido de usuario -->
-      <div class="login-quick-users">
-        <div class="login-quick-label">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
-          <span>Selecciona tu usuario:</span>
-        </div>
-        <div class="login-quick-grid">
-          <button type="button" class="quick-user-btn" onclick="quickSelectUser('a.lozada', 'coordinador')">
-            <span class="qu-avatar coord">A</span>
-            <div class="qu-info">
-              <span class="qu-name">Adonis Lozada</span>
-              <span class="qu-role coord">Coordinador</span>
-            </div>
-          </button>
-          <button type="button" class="quick-user-btn" onclick="quickSelectUser('j.fernandez', 'especialista')">
-            <span class="qu-avatar spec">J</span>
-            <div class="qu-info">
-              <span class="qu-name">Juan Fernández</span>
-              <span class="qu-role spec">Especialista</span>
-            </div>
-          </button>
-          <button type="button" class="quick-user-btn" onclick="quickSelectUser('y.jimenez', 'especialista')">
-            <span class="qu-avatar spec">Y</span>
-            <div class="qu-info">
-              <span class="qu-name">Yoxaide Jiménez</span>
-              <span class="qu-role spec">Especialista</span>
-            </div>
-          </button>
-          <button type="button" class="quick-user-btn" onclick="quickSelectUser('l.acosta', 'especialista')">
-            <span class="qu-avatar spec">L</span>
-            <div class="qu-info">
-              <span class="qu-name">Luis Acosta</span>
-              <span class="qu-role spec">Especialista</span>
-            </div>
-          </button>
-          <button type="button" class="quick-user-btn" onclick="quickSelectUser('analista', 'analista')">
-            <span class="qu-avatar anal">A</span>
-            <div class="qu-info">
-              <span class="qu-name">Analista de Operaciones</span>
-              <span class="qu-role anal">Analista</span>
-            </div>
-          </button>
-        </div>
-      </div>
-
       <!-- Formulario de login -->
       <form id="formLogin" onsubmit="event.preventDefault(); handleLoginSubmit();">
         <div id="loginAlert" class="login-alert" style="display:none"></div>
@@ -4494,8 +4443,8 @@
     }
 
     async function openCreateModal() {
-      if (!isCoordinator()) {
-        alert('Permiso denegado: Solo el rol Coordinador tiene permisos para crear nuevas actividades.');
+      if (!isCoordinator() && !isSpecialist()) {
+        alert('Permiso denegado: Solo Coordinadores y Especialistas tienen permisos para crear nuevas actividades.');
         return;
       }
 
@@ -4509,6 +4458,13 @@
       }
       CREATE_SOURCE = 'ClickUp';
       CREATE_SELECTED_KEYS = [];
+      if (isSpecialist() && CURRENT_USER) {
+        const u = (CURRENT_USER.username || '').toLowerCase();
+        const matchedKey = Object.keys(SPECIALISTS_MAP).find(k => u.includes(k) || (CURRENT_USER.full_name && CURRENT_USER.full_name.toLowerCase().includes(k)));
+        if (matchedKey) {
+          CREATE_SELECTED_KEYS = [matchedKey];
+        }
+      }
 
       const modal = document.getElementById('modalContent');
       modal.innerHTML = `
@@ -5722,7 +5678,7 @@
           <span style="font-weight:700;font-size:14px">Tablero Kanban en Tiempo Real${srcFilter ? ` · ${srcFilter}` : ''}</span>
           <span class="badge" style="background:rgba(79,140,255,.15);color:var(--accent);font-size:11px">${tvKanbanItems.length} asuntos visibles</span>
         </div>
-        ${isCoordinator() ? `
+        ${(isCoordinator() || isSpecialist()) ? `
         <button type="button" class="btn" onclick="openCreateModal()" style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700;padding:7px 14px;font-size:12.5px;box-shadow:0 4px 14px rgba(16,185,129,.25);cursor:pointer;display:inline-flex;align-items:center;gap:6px">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           <span>Nueva Actividad</span>
@@ -5745,7 +5701,7 @@
                   <span>${c.title}</span>
                 </div>
                 <div style="display:inline-flex;align-items:center;gap:6px">
-                  ${(c.k === 'pendiente' && isCoordinator()) ? `
+                  ${(c.k === 'pendiente' && (isCoordinator() || isSpecialist())) ? `
                     <button type="button" onclick="openCreateModal()" style="padding:2px 8px;font-size:10.5px;font-weight:700;background:rgba(16,185,129,.2);border:1px solid rgba(16,185,129,.4);color:#34d399;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="Crear nueva actividad">
                       <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       Crear
@@ -5912,17 +5868,7 @@
        FUNCIONES DE LOGIN, AUTENTICACIÓN Y ROLES
        ======================================================== */
     function quickSelectUser(username, role) {
-      const uInput = document.getElementById('loginUser');
-      const pInput = document.getElementById('loginPass');
-      if (uInput) uInput.value = username;
-      if (pInput) {
-        pInput.value = 'sycom2026';
-        pInput.focus();
-      }
-      document.querySelectorAll('.quick-user-btn').forEach(b => b.classList.remove('active'));
-      if (window.event && window.event.currentTarget) {
-        window.event.currentTarget.classList.add('active');
-      }
+      // Selector rápido desactivado: cada usuario ingresa sus credenciales individuales
     }
 
     function togglePasswordVisibility() {
@@ -6062,7 +6008,7 @@
       const rolePill = document.getElementById('roleBadgeHeader');
 
       if (btnHeadCreate) {
-        btnHeadCreate.style.display = isCoord ? 'inline-flex' : 'none';
+        btnHeadCreate.style.display = (isCoord || isSpec) ? 'inline-flex' : 'none';
       }
       if (btnReports) {
         btnReports.style.display = isCoord ? 'inline-flex' : 'none';
@@ -6111,7 +6057,7 @@
       // 4. Botón Actividad en Modo TV
       const btnTvAct = document.getElementById('tvBtnNewActivity');
       if (btnTvAct) {
-        btnTvAct.style.display = isCoord ? 'inline-flex' : 'none';
+        btnTvAct.style.display = (isCoord || isSpec) ? 'inline-flex' : 'none';
       }
 
       // 5. Configuración dinámica del selector de Responsable según el perfil

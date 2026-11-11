@@ -425,6 +425,17 @@ def verify_coordinator_role(x_user_role: str | None = Header(None, alias="X-User
         )
     return role_clean
 
+
+def verify_coordinator_or_specialist_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
+    """Valida que la solicitud provenga de un usuario con rol Coordinador, Administrador o Especialista."""
+    role_clean = decode_header_val(x_user_role).lower()
+    if not role_clean or role_clean not in ("coordinador", "admin", "administrador", "especialista", "specialist"):
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Solo Coordinadores y Especialistas tienen permisos para crear actividades."
+        )
+    return role_clean
+
 SPECIALISTS_MAP = {
     "adonis": {
         "key": "adonis",
@@ -1139,7 +1150,7 @@ def update_item_status(
     }
 
 @app.post("/api/items")
-def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
+def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_or_specialist_role)):
     src = req.source.strip()
     if src.lower() in ["clickup", "click_up"]:
         source = "ClickUp"
