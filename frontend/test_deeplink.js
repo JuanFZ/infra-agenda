@@ -415,12 +415,14 @@ function simulateDeepLink(opts) {
   const handleDragOverFn = (content.match(/function handleDragOver\(e\)[\s\S]*?\n    \}/) || [])[0];
   const handleDropFn = (content.match(/async function handleDrop\(e, targetStatus\)[\s\S]*?\n    \}/) || [])[0];
   const renderKanbanFn = (content.match(/function renderKanban\(list\)[\s\S]*?\n    \}/) || [])[0];
+  const isItemRecentClosedFn = (content.match(/function isItemRecentClosed\(i\)[\s\S]*?\n    \}/) || [])[0];
 
   assert(setOriginFn, 'setOriginFilter function not found');
   assert(syncOriginFn, 'syncKanbanOriginUI function not found');
   assert(renderKpisFn, 'renderKPIs function not found');
   assert(handleDropFn, 'handleDrop function not found');
   assert(renderKanbanFn, 'renderKanban function not found');
+  assert(isItemRecentClosedFn, 'isItemRecentClosed function not found');
 
   const pillButtons = ['', 'ClickUp', 'GLPI'].map(origin => {
     const classes = new Set(origin === '' ? ['kanban-origin-pill', 'active'] : ['kanban-origin-pill']);
@@ -496,6 +498,7 @@ function simulateDeepLink(opts) {
     ${handleDragOverFn}
     ${handleDropFn}
     const onDrop = handleDrop;
+    ${isItemRecentClosedFn}
     ${renderKanbanFn}
     return {
       setOriginFilter,
@@ -572,6 +575,12 @@ function simulateDeepLink(opts) {
     content.includes('<option value="espera"'),
     'openModal must render the espera status option'
   );
+
+  // 5F: Verify that both standard Kanban and TV mode Kanban filter out closed items older than 24h
+  assert(content.includes('function isItemRecentClosed(i)'), 'isItemRecentClosed must be defined');
+  const tvKanbanCodeMatch = content.match(/else if \(s\.type === 'kanban'\)[\s\S]*?tv-kanban-cards/);
+  assert(tvKanbanCodeMatch, 'TV mode kanban slide block must exist');
+  assert(tvKanbanCodeMatch[0].includes('isItemRecentClosed'), 'TV mode kanban must apply isItemRecentClosed filter to closed items');
 
   console.log('✓ Test 5: Kanban 4-column layout for ClickUp/GLPI, full espera drag-and-drop, and clean KPIs verified');
 

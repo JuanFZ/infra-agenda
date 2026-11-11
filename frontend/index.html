@@ -3428,6 +3428,19 @@
       return false;
     }
 
+    function isItemRecentClosed(i) {
+      if (!i) return false;
+      if (typeof i.is_recent_closed === 'boolean') {
+        return i.is_recent_closed;
+      }
+      const dateStr = i.closed_at || i.updated_at;
+      if (!dateStr) return false;
+      const itemMs = new Date(dateStr).getTime();
+      if (isNaN(itemMs)) return false;
+      const diff = Date.now() - itemMs;
+      return diff >= 0 && diff <= 24 * 60 * 60 * 1000;
+    }
+
     function showToast(title, message = '', type = 'success', duration = 4500) {
       const container = document.getElementById('toastContainer');
       if (!container) return;
@@ -3969,17 +3982,7 @@
         let colItems = list.filter(i => i.status === c.k);
         if (c.k === 'cerrado') {
           // Filtro visual de las últimas 24 horas para mantener limpio el flujo de trabajo del Kanban
-          colItems = colItems.filter(i => {
-            if (typeof i.is_recent_closed === 'boolean') {
-              return i.is_recent_closed;
-            }
-            const dateStr = i.closed_at || i.updated_at;
-            if (!dateStr) return false;
-            const itemMs = new Date(dateStr).getTime();
-            if (isNaN(itemMs)) return false;
-            const diff = Date.now() - itemMs;
-            return diff >= 0 && diff <= 24 * 60 * 60 * 1000;
-          });
+          colItems = colItems.filter(isItemRecentClosed);
         }
         return `
       <div class="col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
@@ -5853,6 +5856,7 @@
       } else if (s.type === 'kanban') {
         const srcFilter = document.getElementById('fSrc') ? document.getElementById('fSrc').value : '';
         const tvKanbanItems = srcFilter ? visibleTvItems.filter(i => i.source === srcFilter) : visibleTvItems;
+        const visibleBoardItems = tvKanbanItems.filter(i => i.status !== 'cerrado' || isItemRecentClosed(i));
         const cols = [
           { k: 'pendiente', title: 'Pendientes', color: '#4f8cff' },
           { k: 'curso', title: 'En curso', color: '#22c3d6' },
@@ -5861,10 +5865,10 @@
         ];
 
         container.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 16px;backdrop-filter:blur(14px);flex-wrap:wrap;gap:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 16px;backdrop-filter:blur(14px);flex-wrap:gap:10px">
         <div style="display:flex;align-items:center;gap:10px">
           <span style="font-weight:700;font-size:14px">Tablero Kanban en Tiempo Real${srcFilter ? ` · ${srcFilter}` : ''}</span>
-          <span class="badge" style="background:rgba(79,140,255,.15);color:var(--accent);font-size:11px">${tvKanbanItems.length} asuntos visibles</span>
+          <span class="badge" style="background:rgba(79,140,255,.15);color:var(--accent);font-size:11px">${visibleBoardItems.length} asuntos visibles</span>
         </div>
         ${(isCoordinator() || isSpecialist()) ? `
         <button type="button" class="btn" onclick="openCreateModal()" style="background:linear-gradient(135deg, #10b981, #059669);color:#fff;border-color:rgba(16,185,129,.4);font-weight:700;padding:7px 14px;font-size:12.5px;box-shadow:0 4px 14px rgba(16,185,129,.25);cursor:pointer;display:inline-flex;align-items:center;gap:6px">
@@ -5880,7 +5884,11 @@
       </div>
       <div class="tv-kanban-grid">
         ${cols.map(c => {
-          const colItems = tvKanbanItems.filter(i => i.status === c.k);
+          let colItems = tvKanbanItems.filter(i => i.status === c.k);
+          if (c.k === 'cerrado') {
+            // Filtro visual de las últimas 24 horas para mantener limpio el flujo de trabajo del Kanban en Modo TV
+            colItems = colItems.filter(isItemRecentClosed);
+          }
           return `
             <div class="tv-kanban-col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
               <div class="tv-kanban-col-header" style="border-top:3px solid ${c.color}">
@@ -5895,7 +5903,7 @@
                       Crear
                     </button>
                   ` : ''}
-                  <span class="badge" style="background:rgba(255,255,255,.08);color:#fff;font-size:12px">${colItems.length}</span>
+                  <span class="badge" style="background:rgba(255,255,255,.08);color:#fff;font-size:12px" ${c.k === 'cerrado' ? 'title="Mostrando actividades cerradas en las últimas 24 horas"' : ''}>${colItems.length}</span>
                 </div>
               </div>
               <div class="tv-kanban-cards">
