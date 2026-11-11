@@ -6859,6 +6859,7 @@
       CURRENT_USER = null;
       checkAuthAndInit();
     }
+    window.handleLogout = handleLogout;
 
     function applyRolePermissions() {
       if (!CURRENT_USER) return;
