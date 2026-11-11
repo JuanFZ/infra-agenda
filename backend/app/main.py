@@ -343,6 +343,12 @@ def _repair_clickup_assignees():
 
         if repaired:
             db.commit()
+
+        # Normalizar registros de escalamientos que se hayan guardado con URL encoding (%20)
+        encoded_docs = db.query(EscalationDocument).filter(EscalationDocument.uploaded_by.like("%20%")).all()
+        for doc in encoded_docs:
+            doc.uploaded_by = urllib.parse.unquote(doc.uploaded_by).strip()
+            db.commit()
         db.close()
     except Exception as e:
         print(f"[Repair Assignees Error] {e}")
@@ -1984,8 +1990,8 @@ def api_create_escalation(
     if category not in VALID_ESCALATION_CATEGORIES:
         category = "Servicios"
 
-    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "Coordinador")).strip().capitalize()
-    user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "Adonis Lozada Figueroa")).strip() or "Adonis Lozada Figueroa"
+    role = (decode_header_val(x_user_role) if x_user_role else (decode_header_val(role_param) if role_param else "Coordinador")).capitalize()
+    user_name = (decode_header_val(x_user_name) if x_user_name else (decode_header_val(user_param) if user_param else "Adonis Lozada Figueroa")) or "Adonis Lozada Figueroa"
 
     clean_ibp, ibp_id = resolve_ibp(db, req.ibp, req.ibp_id)
     ibp_obj = db.query(IBP).filter(IBP.id == ibp_id).first() if ibp_id else None
@@ -2094,8 +2100,8 @@ def api_update_escalation(
     if not doc:
         raise HTTPException(status_code=404, detail="Documento de escalamiento no encontrado.")
 
-    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "Coordinador")).strip().capitalize()
-    user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "Adonis Lozada Figueroa")).strip() or "Adonis Lozada Figueroa"
+    role = (decode_header_val(x_user_role) if x_user_role else (decode_header_val(role_param) if role_param else "Coordinador")).capitalize()
+    user_name = (decode_header_val(x_user_name) if x_user_name else (decode_header_val(user_param) if user_param else "Adonis Lozada Figueroa")) or "Adonis Lozada Figueroa"
 
     if req.title is not None:
         t = req.title.strip()
@@ -2269,8 +2275,8 @@ def api_upload_escalation(
         print(f"[Upload Escalation Disk Error] {e}")
         raise HTTPException(status_code=500, detail="Error al guardar el archivo en el servidor de almacenamiento.")
 
-    user_name = (x_user_name.strip()) if isinstance(x_user_name, str) else "Adonis Lozada Figueroa"
-    user_role = (x_user_role.strip().capitalize()) if isinstance(x_user_role, str) else "Coordinador"
+    user_name = decode_header_val(x_user_name) or "Adonis Lozada Figueroa"
+    user_role = decode_header_val(x_user_role).capitalize() or "Coordinador"
 
     clean_ibp, ibp_id = resolve_ibp(db, req.ibp, req.ibp_id)
     ibp_obj = db.query(IBP).filter(IBP.id == ibp_id).first() if ibp_id else None

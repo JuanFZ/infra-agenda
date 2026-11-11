@@ -8234,8 +8234,8 @@
               ${typeBadge}
             </td>
             <td>
-              <div style="font-weight:600;font-size:12px">${escapeHtml(d.uploaded_by || 'Usuario')}</div>
-              <small class="muted" style="font-size:10.5px">${escapeHtml(d.uploaded_by_role || 'Coordinador')}</small>
+              <div style="font-weight:600;font-size:12px">${escapeHtml(decodeURIComponent(d.uploaded_by || 'Usuario'))}</div>
+              <small class="muted" style="font-size:10.5px">${escapeHtml(decodeURIComponent(d.uploaded_by_role || 'Coordinador'))}</small>
             </td>
             <td>
               <div style="font-size:11.5px;color:var(--text);white-space:nowrap"><span class="muted">Sycom:</span> <b>${escapeHtml(d.received_at_caracas || d.created_at_caracas || '—')}</b></div>
