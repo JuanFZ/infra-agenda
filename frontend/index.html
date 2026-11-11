@@ -5510,6 +5510,8 @@
       const slides = [
         { type: 'resumen', title: 'Panorama General del Equipo', sub: 'Indicadores globales y casos prioritarios en curso' },
         { type: 'kanban', title: 'Tablero Kanban en Sala', sub: 'Flujo de trabajo en 4 columnas: Pendientes · En curso · En espera · Cerrados' },
+        { type: 'tv_analytics_overview', title: 'Reporte Ejecutivo: Rendimiento & Carga de Equipo', sub: 'Indicadores globales, efectividad de cierre y capacidad operativa por especialista' },
+        { type: 'tv_analytics_distribution', title: 'Reporte Operativo: Categorías & Bancos (IBP)', sub: 'Distribución técnica por área, balance de plataformas y entidades bancarias' },
         { type: 'unassigned', title: 'Asuntos Sin Asignar', sub: 'Disponibles para asignación inmediata del equipo' }
       ];
       if (!CURRENT_USER || isCoordinator() || CURRENT_USER.username === 'modo.tv') {
@@ -5536,6 +5538,150 @@
       return slides;
     }
 
+    let TV_ANALYTICS_CACHE = null;
+    let TV_ANALYTICS_LOADING = false;
+
+    async function ensureTvAnalyticsData(force = false) {
+      if (TV_ANALYTICS_CACHE && !force) return TV_ANALYTICS_CACHE;
+      if (CURRENT_ANALYTICS_DATA && !force) {
+        TV_ANALYTICS_CACHE = CURRENT_ANALYTICS_DATA;
+        return TV_ANALYTICS_CACHE;
+      }
+      if (TV_ANALYTICS_LOADING) return null;
+      TV_ANALYTICS_LOADING = true;
+      try {
+        const params = new URLSearchParams();
+        if (CURRENT_USER) {
+          if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
+          if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
+          else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
+        }
+        const res = await fetch(`${API_URL}/reports/data?${params.toString()}`, {
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          const data = await res.json();
+          TV_ANALYTICS_CACHE = data;
+          CURRENT_ANALYTICS_DATA = data;
+          if (TV_MODE_ACTIVE) {
+            const slides = getTvSlides();
+            const curSlide = slides[TV_CURRENT_SLIDE];
+            if (curSlide && (curSlide.type === 'tv_analytics_overview' || curSlide.type === 'tv_analytics_distribution')) {
+              renderTvSlide();
+            }
+          }
+          return data;
+        }
+      } catch (err) {
+        console.error('Error cargando analítica para Modo TV:', err);
+      } finally {
+        TV_ANALYTICS_LOADING = false;
+      }
+      return null;
+    }
+
+    function getTvAnalyticsData() {
+      if (TV_ANALYTICS_CACHE && TV_ANALYTICS_CACHE.kpis) {
+        return TV_ANALYTICS_CACHE;
+      }
+      if (CURRENT_ANALYTICS_DATA && CURRENT_ANALYTICS_DATA.kpis) {
+        TV_ANALYTICS_CACHE = CURRENT_ANALYTICS_DATA;
+        return TV_ANALYTICS_CACHE;
+      }
+      ensureTvAnalyticsData();
+
+      // Cómputo local inmediato derivado de ALL_ITEMS para evitar pantallas vacías
+      const items = (ALL_ITEMS || []).filter(it => isItemVisibleForUser(it, CURRENT_USER));
+      const total = items.length;
+      const cerrados = items.filter(i => i.status === 'cerrado').length;
+      const enCurso = items.filter(i => i.status === 'curso').length;
+      const enEspera = items.filter(i => i.status === 'espera').length;
+      const pendientes = items.filter(i => i.status === 'pendiente').length;
+
+      let glpi = 0;
+      let clickup = 0;
+      items.forEach(i => {
+        if (i.source === 'GLPI') glpi++;
+        else if (i.source === 'ClickUp') clickup++;
+      });
+
+      const porEspecialista = TV_SPECIALISTS.map(spec => {
+        const specItems = items.filter(it => it.assignee_name && it.assignee_name.toLowerCase().includes(spec.key));
+        return {
+          name: spec.name,
+          role: spec.isCoord ? 'Coordinador' : 'Especialista',
+          total: specItems.length,
+          cerrados: specItems.filter(i => i.status === 'cerrado').length,
+          en_curso: specItems.filter(i => i.status === 'curso').length,
+          en_espera: specItems.filter(i => i.status === 'espera').length,
+          pendientes: specItems.filter(i => i.status === 'pendiente').length,
+          avg_time_str: '—'
+        };
+      });
+
+      const unassignedItems = items.filter(it => !it.assignee_name || it.assignee_name.toLowerCase().includes('sin asignar') || it.assignee_name.toLowerCase().includes('técnico glpi'));
+      if (unassignedItems.length > 0) {
+        porEspecialista.push({
+          name: 'Sin asignar',
+          role: 'Bolsa de trabajo',
+          total: unassignedItems.length,
+          cerrados: unassignedItems.filter(i => i.status === 'cerrado').length,
+          en_curso: unassignedItems.filter(i => i.status === 'curso').length,
+          en_espera: unassignedItems.filter(i => i.status === 'espera').length,
+          pendientes: unassignedItems.filter(i => i.status === 'pendiente').length,
+          avg_time_str: '—'
+        });
+      }
+
+      const catMap = {};
+      items.forEach(it => {
+        const cat = it.category || 'Infraestructura';
+        if (!catMap[cat]) catMap[cat] = { name: cat, total: 0, cerrados: 0, en_curso: 0, en_espera: 0, pendientes: 0 };
+        catMap[cat].total++;
+        if (it.status === 'cerrado') catMap[cat].cerrados++;
+        else if (it.status === 'curso') catMap[cat].en_curso++;
+        else if (it.status === 'espera') catMap[cat].en_espera++;
+        else catMap[cat].pendientes++;
+      });
+      const porCategoria = Object.values(catMap).sort((a, b) => b.total - a.total);
+
+      const ibpMap = {};
+      items.forEach(it => {
+        const ibp = it.ibp || 'General / Interno';
+        if (!ibpMap[ibp]) ibpMap[ibp] = { ibp_name: ibp, total: 0, cerrados: 0, en_curso: 0, en_espera: 0, pendientes: 0 };
+        ibpMap[ibp].total++;
+        if (it.status === 'cerrado') ibpMap[ibp].cerrados++;
+        else if (it.status === 'curso') ibpMap[ibp].en_curso++;
+        else if (it.status === 'espera') ibpMap[ibp].en_espera++;
+        else ibpMap[ibp].pendientes++;
+      });
+      const porIbp = Object.values(ibpMap).sort((a, b) => b.total - a.total);
+
+      const porPrioridad = {
+        'Crítica': items.filter(i => i.priority === 'Crítica').length,
+        'Alta': items.filter(i => i.priority === 'Alta').length,
+        'Media': items.filter(i => i.priority === 'Media').length,
+        'Baja': items.filter(i => i.priority === 'Baja').length
+      };
+
+      return {
+        kpis: {
+          total_items: total,
+          total_cerrados: cerrados,
+          total_en_curso: enCurso,
+          total_en_espera: enEspera,
+          total_pendientes: pendientes,
+          avg_resolution_str: '—'
+        },
+        por_origen: { GLPI: glpi, ClickUp: clickup },
+        por_especialista: porEspecialista,
+        por_categoria: porCategoria,
+        por_ibp: porIbp,
+        por_prioridad: porPrioridad,
+        items: items
+      };
+    }
+
     function toggleTvMode() {
       TV_MODE_ACTIVE = !TV_MODE_ACTIVE;
       const overlay = document.getElementById('tvOverlay');
@@ -5543,6 +5689,7 @@
         overlay.style.display = 'flex';
         TV_CURRENT_SLIDE = 0;
         TV_IS_PAUSED = false;
+        ensureTvAnalyticsData();
         renderTvSlide();
         startTvTimer();
         if (document.documentElement.requestFullscreen) {
@@ -5796,6 +5943,367 @@
         </div>
       `}
     `;
+      } else if (s.type === 'tv_analytics_overview') {
+        const data = getTvAnalyticsData();
+        const kpis = data.kpis || {};
+        const porOrigen = data.por_origen || {};
+        const totalItems = kpis.total_items || 0;
+        const totalClosed = kpis.total_cerrados || 0;
+        const closePct = totalItems > 0 ? ((totalClosed / totalItems) * 100).toFixed(1) : '100.0';
+        const activeItems = (kpis.total_en_curso || 0) + (kpis.total_pendientes || 0) + (kpis.total_en_espera || 0);
+        const glpiCount = porOrigen.GLPI || 0;
+        const cuCount = porOrigen.ClickUp || 0;
+
+        const cerradosOk = kpis.total_cerrados || 0;
+        const enCursoOk = kpis.total_en_curso || 0;
+        const enEsperaOk = kpis.total_en_espera || 0;
+        const pendientesOk = kpis.total_pendientes || 0;
+        const totalStatus = cerradosOk + enCursoOk + enEsperaOk + pendientesOk;
+
+        const cr = 58;
+        const cc = 2 * Math.PI * cr;
+        const sList = [
+          { label: 'Cerradas', count: cerradosOk, color: '#10b981' },
+          { label: 'En Curso', count: enCursoOk, color: '#3b82f6' },
+          { label: 'En Espera', count: enEsperaOk, color: '#f59e0b' },
+          { label: 'Pendientes', count: pendientesOk, color: '#06b6d4' }
+        ];
+
+        let accumulatedOffset = 0;
+        const donutPaths = sList.map(st => {
+          if (totalStatus === 0 || st.count === 0) return '';
+          const fraction = st.count / totalStatus;
+          const dash = fraction * cc;
+          const offset = -accumulatedOffset;
+          accumulatedOffset += dash;
+          return `<circle cx="80" cy="80" r="${cr}" fill="none" stroke="${st.color}" stroke-width="18" stroke-dasharray="${dash} ${cc}" stroke-dashoffset="${offset}" transform="rotate(-90 80 80)" style="transition:all .5s ease" />`;
+        }).join('');
+
+        const specialists = data.por_especialista || [];
+        const maxSpecTotal = Math.max(...specialists.map(x => x.total), 1);
+
+        container.innerHTML = `
+          <div class="tv-stat-row" style="margin-bottom:14px">
+            <div class="tv-stat-box" style="border-left:4px solid var(--accent)">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="muted" style="font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px">Total Gestionado</span>
+                <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:10px;font-weight:700">Período</span>
+              </div>
+              <div class="num">${totalItems}</div>
+              <div class="muted" style="font-size:11px;margin-top:2px">Actividades registradas</div>
+            </div>
+
+            <div class="tv-stat-box" style="border-left:4px solid #10b981">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="muted" style="font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px">Cerradas / Resueltas</span>
+                <span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:10px;font-weight:700">${closePct}% Cerradas</span>
+              </div>
+              <div class="num" style="color:#10b981">${totalClosed}</div>
+              <div class="muted" style="font-size:11px;margin-top:2px">${activeItems} activas en proceso</div>
+            </div>
+
+            <div class="tv-stat-box" style="border-left:4px solid #a78bfa">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="muted" style="font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px">Tiempo Resolución</span>
+                <span class="badge" style="background:rgba(167,139,250,0.15);color:#a78bfa;font-size:10px;font-weight:700">Promedio</span>
+              </div>
+              <div class="num" style="color:#a78bfa">${escapeHtml(kpis.avg_resolution_str || '—')}</div>
+              <div class="muted" style="font-size:11px;margin-top:2px">Duración media de atención</div>
+            </div>
+
+            <div class="tv-stat-box" style="border-left:4px solid #f39c12">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="muted" style="font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px">Balance Multi-Fuente</span>
+                <span class="badge" style="background:rgba(243,156,18,0.15);color:#f39c12;font-size:10px;font-weight:700">Plataformas</span>
+              </div>
+              <div class="num" style="font-size:22px;display:flex;align-items:baseline;gap:6px">
+                <span style="color:#f39c12">${glpiCount} <small style="font-size:12px;color:var(--muted);font-weight:400">GLPI</small></span>
+                <span class="muted" style="font-size:14px">/</span>
+                <span style="color:#7b68ee">${cuCount} <small style="font-size:12px;color:var(--muted);font-weight:400">ClickUp</small></span>
+              </div>
+              <div class="muted" style="font-size:11px;margin-top:2px">Mesa de ayuda y proyectos</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1.35fr;gap:16px;flex:1;min-height:0;align-items:stretch">
+            <!-- Columna Izquierda: Gráfico Donut de Estados -->
+            <div style="background:rgba(255,255,255,0.03);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:18px 22px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 6px 20px rgba(0,0,0,.22)">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div>
+                  <div style="font-size:15px;font-weight:700;color:#ffffff">Distribución de Estados</div>
+                  <div class="muted" style="font-size:11.5px">Efectividad y flujo de trabajo consolidado</div>
+                </div>
+                <span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-weight:700;font-size:11px">${closePct}% Resueltas</span>
+              </div>
+
+              <div style="display:flex;align-items:center;justify-content:center;gap:24px;margin:10px 0;flex-wrap:wrap">
+                <!-- SVG Donut -->
+                <div style="position:relative;width:160px;height:160px;flex-shrink:0">
+                  <svg viewBox="0 0 160 160" width="160" height="160">
+                    <circle cx="80" cy="80" r="${cr}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="18" />
+                    ${donutPaths}
+                  </svg>
+                  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+                    <span style="font-size:24px;font-weight:800;color:#ffffff;line-height:1">${closePct}%</span>
+                    <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#10b981;font-weight:700;margin-top:2px">Cerradas</span>
+                  </div>
+                </div>
+
+                <!-- Leyenda de Estados en Columna -->
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:170px">
+                  ${sList.map(st => {
+                    const pct = totalStatus > 0 ? ((st.count / totalStatus) * 100).toFixed(0) : '0';
+                    return `
+                      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px">
+                        <span style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text)">
+                          <span style="width:8px;height:8px;border-radius:2px;background:${st.color}"></span>
+                          ${st.label}
+                        </span>
+                        <div style="display:flex;align-items:center;gap:6px">
+                          <strong style="font-size:12.5px;color:#ffffff">${st.count}</strong>
+                          <span class="muted" style="font-size:10.5px">(${pct}%)</span>
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+
+              <div style="padding:10px 14px;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:space-between;font-size:11.5px">
+                <span class="muted">Total en evaluación: <strong style="color:var(--text)">${totalStatus} actividades</strong></span>
+                <span style="color:#10b981;font-weight:700">Tasa de resolución alta</span>
+              </div>
+            </div>
+
+            <!-- Columna Derecha: Carga de Especialistas -->
+            <div style="background:rgba(255,255,255,0.03);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:18px 22px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 6px 20px rgba(0,0,0,.22);overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div>
+                  <div style="font-size:15px;font-weight:700;color:#ffffff">Capacidad y Asignaciones por Especialista</div>
+                  <div class="muted" style="font-size:11.5px">Carga activa, efectividad de entrega y tiempo de atención</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;font-size:10px;color:var(--muted)">
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:2px;background:#10b981"></span>Cerradas</span>
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:2px;background:#3b82f6"></span>En Curso</span>
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:2px;background:#f59e0b"></span>En Espera</span>
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:2px;background:#06b6d4"></span>Pendientes</span>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px;flex:1;justify-content:space-around">
+                ${specialists.slice(0, 5).map(spec => {
+                  const isCoord = (spec.role || '').toLowerCase().includes('coordinador');
+                  const isBolsa = (spec.name || '').toLowerCase().includes('sin asignar');
+                  const roleBadge = isCoord 
+                    ? `<span class="badge notranslate" translate="no" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:9.5px;padding:1px 6px">Coordinador</span>`
+                    : (isBolsa ? `<span class="badge" style="background:rgba(243,156,18,0.15);color:#f39c12;font-size:9.5px;padding:1px 6px">Bolsa</span>`
+                               : `<span class="badge notranslate" translate="no" style="background:rgba(167,139,250,0.15);color:#a78bfa;font-size:9.5px;padding:1px 6px">Especialista</span>`);
+
+                  const widthPct = spec.total > 0 ? Math.max((spec.total / maxSpecTotal) * 100, 8) : 0;
+                  const cPct = spec.total > 0 ? (spec.cerrados / spec.total) * 100 : 0;
+                  const curPct = spec.total > 0 ? (spec.en_curso / spec.total) * 100 : 0;
+                  const espPct = spec.total > 0 ? ((spec.en_espera || 0) / spec.total) * 100 : 0;
+                  const pendPct = spec.total > 0 ? ((spec.pendientes || 0) / spec.total) * 100 : 0;
+
+                  return `
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:9px;padding:8px 12px">
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+                        <div style="display:flex;align-items:center;gap:7px">
+                          <strong style="font-size:12.5px;color:#ffffff">${escapeHtml(spec.name)}</strong>
+                          ${roleBadge}
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px">
+                          <span style="font-size:12px;color:var(--text)"><strong>${spec.total}</strong> <small class="muted">actividades</small></span>
+                          ${spec.avg_time_str && spec.avg_time_str !== '—' ? `<span class="badge" style="background:rgba(255,255,255,0.06);color:var(--text);font-size:10px;padding:1px 5px">T. Prom: ${escapeHtml(spec.avg_time_str)}</span>` : ''}
+                        </div>
+                      </div>
+
+                      <div style="background:rgba(255,255,255,0.06);height:7px;border-radius:4px;overflow:hidden">
+                        <div style="width:${widthPct}%;height:100%;display:flex;gap:1px;border-radius:4px;overflow:hidden">
+                          ${cPct > 0 ? `<div style="width:${cPct}%;background:#10b981;height:100%"></div>` : ''}
+                          ${curPct > 0 ? `<div style="width:${curPct}%;background:#3b82f6;height:100%"></div>` : ''}
+                          ${espPct > 0 ? `<div style="width:${espPct}%;background:#f59e0b;height:100%"></div>` : ''}
+                          ${pendPct > 0 ? `<div style="width:${pendPct}%;background:#06b6d4;height:100%"></div>` : ''}
+                        </div>
+                      </div>
+
+                      <div style="display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:4px">
+                        <span>${spec.cerrados} cerradas · ${spec.en_curso} en curso${spec.en_espera ? ` · ${spec.en_espera} en espera` : ''}${spec.pendientes ? ` · ${spec.pendientes} pendientes` : ''}</span>
+                        <span style="color:#10b981;font-weight:600">${spec.total > 0 ? Math.round((spec.cerrados / spec.total) * 100) : 0}% efectividad</span>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (s.type === 'tv_analytics_distribution') {
+        const data = getTvAnalyticsData();
+        const categories = (data.por_categoria || []).slice(0, 6);
+        const maxCatTotal = Math.max(...categories.map(c => c.total), 1);
+        const sumCatTotal = categories.reduce((acc, c) => acc + c.total, 0);
+
+        const ibps = (data.por_ibp || []).slice(0, 5);
+        const maxIbpTotal = Math.max(...ibps.map(i => i.total), 1);
+
+        const porOrigen = data.por_origen || {};
+        const glpi = porOrigen.GLPI || 0;
+        const clickup = porOrigen.ClickUp || 0;
+        const totalOrig = glpi + clickup;
+        const glpiPct = totalOrig > 0 ? ((glpi / totalOrig) * 100).toFixed(1) : '0.0';
+        const cuPct = totalOrig > 0 ? ((clickup / totalOrig) * 100).toFixed(1) : '0.0';
+
+        const porPrioridad = data.por_prioridad || {};
+        const prios = [
+          { label: 'Crítica', count: porPrioridad['Crítica'] || 0, color: '#ff5d5d' },
+          { label: 'Alta', count: porPrioridad['Alta'] || 0, color: '#f97316' },
+          { label: 'Media', count: porPrioridad['Media'] || 0, color: '#4f8cff' },
+          { label: 'Baja', count: porPrioridad['Baja'] || 0, color: '#10b981' }
+        ];
+        const totalPrio = prios.reduce((a, b) => a + b.count, 0);
+
+        container.innerHTML = `
+          <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:18px;flex:1;min-height:0;align-items:stretch">
+            <!-- Columna 1: Categorías Técnicas -->
+            <div style="background:rgba(255,255,255,0.03);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:18px 22px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 6px 20px rgba(0,0,0,.22);overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div>
+                  <div style="font-size:15px;font-weight:700;color:#ffffff">Categorías Técnicas de Impacto</div>
+                  <div class="muted" style="font-size:11.5px">Volumen de incidencias y tareas por área tecnológica</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;font-size:10px;color:var(--muted)">
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:2px;background:#10b981"></span>Cerradas</span>
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:2px;background:#3b82f6"></span>En Curso</span>
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:2px;background:#f59e0b"></span>En Espera</span>
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:2px;background:#06b6d4"></span>Pendientes</span>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px;flex:1;justify-content:space-around">
+                ${categories.map(cat => {
+                  const catColor = RPT_CAT_COLORS[cat.name] || '#06b6d4';
+                  const widthPct = cat.total > 0 ? Math.max((cat.total / maxCatTotal) * 100, 6) : 0;
+                  const sharePct = sumCatTotal > 0 ? Math.round((cat.total / sumCatTotal) * 100) : 0;
+                  const cPct = cat.total > 0 ? (cat.cerrados / cat.total) * 100 : 0;
+                  const curPct = cat.total > 0 ? (cat.en_curso / cat.total) * 100 : 0;
+                  const espPct = cat.total > 0 ? ((cat.en_espera || 0) / cat.total) * 100 : 0;
+                  const pendPct = cat.total > 0 ? ((cat.pendientes || 0) / cat.total) * 100 : 0;
+
+                  return `
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:9px;padding:8px 12px">
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+                        <span style="display:flex;align-items:center;gap:7px;font-weight:700;color:${catColor};font-size:12.5px">
+                          <span style="width:8px;height:8px;border-radius:2px;background:${catColor}"></span>
+                          ${escapeHtml(cat.name)}
+                        </span>
+                        <div style="display:flex;align-items:center;gap:8px;font-size:11.5px">
+                          <strong style="color:#ffffff">${cat.total}</strong>
+                          <span class="muted">(${sharePct}%)</span>
+                        </div>
+                      </div>
+
+                      <div style="background:rgba(255,255,255,0.06);height:7px;border-radius:4px;overflow:hidden">
+                        <div style="width:${widthPct}%;height:100%;display:flex;gap:1px;border-radius:4px;overflow:hidden">
+                          ${cPct > 0 ? `<div style="width:${cPct}%;background:#10b981;height:100%"></div>` : ''}
+                          ${curPct > 0 ? `<div style="width:${curPct}%;background:#3b82f6;height:100%"></div>` : ''}
+                          ${espPct > 0 ? `<div style="width:${espPct}%;background:#f59e0b;height:100%"></div>` : ''}
+                          ${pendPct > 0 ? `<div style="width:${pendPct}%;background:#06b6d4;height:100%"></div>` : ''}
+                        </div>
+                      </div>
+
+                      <div style="display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:4px">
+                        <span>${cat.cerrados} resueltas · ${cat.en_curso} en atención</span>
+                        <span style="color:#10b981;font-weight:600">${cat.total > 0 ? Math.round((cat.cerrados / cat.total) * 100) : 0}% efectividad</span>
+                      </div>
+                    </div>
+                  `;
+                }).join('') || '<div class="muted" style="padding:30px;text-align:center">Sin datos de categorías en este período</div>'}
+              </div>
+            </div>
+
+            <!-- Columna 2: Bancos (IBP) + Plataforma y Prioridad -->
+            <div style="display:flex;flex-direction:column;gap:14px;min-height:0;justify-content:space-between">
+              <!-- Subcard: Top Bancos (IBP) -->
+              <div style="background:rgba(255,255,255,0.03);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px 20px;flex:1.2;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 6px 20px rgba(0,0,0,.22);overflow:hidden">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <div>
+                    <div style="font-size:14.5px;font-weight:700;color:#ffffff">Top Bancos e Instituciones (IBP)</div>
+                    <div class="muted" style="font-size:11px">Escalamientos y soporte bancario especializado</div>
+                  </div>
+                  <span class="badge" style="background:rgba(34,195,214,0.15);color:var(--cyan);font-weight:700;font-size:10.5px">Entidades</span>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:7px;flex:1;justify-content:space-around">
+                  ${ibps.map((ibp, idx) => {
+                    const barPct = maxIbpTotal > 0 ? Math.max((ibp.total / maxIbpTotal) * 100, 8) : 0;
+                    return `
+                      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:7px 11px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                          <span style="font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%">
+                            <span style="color:var(--cyan);font-weight:700;margin-right:4px">#${idx + 1}</span>
+                            ${escapeHtml(ibp.ibp_name || ibp.ibp || 'General / Interno')}
+                          </span>
+                          <span style="font-weight:700;color:#ffffff">${ibp.total} <small class="muted" style="font-weight:400">casos</small></span>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.06);height:5px;border-radius:3px;overflow:hidden">
+                          <div style="width:${barPct}%;background:linear-gradient(90deg, #22c3d6, #4f8cff);height:100%"></div>
+                        </div>
+                      </div>
+                    `;
+                  }).join('') || '<div class="muted" style="padding:20px;text-align:center">Sin datos de IBP</div>'}
+                </div>
+              </div>
+
+              <!-- Subcard: Mini grid Plataformas y Prioridad -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:0.85">
+                <!-- Plataformas -->
+                <div style="background:rgba(255,255,255,0.03);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between">
+                  <div style="font-size:12.5px;font-weight:700;color:#ffffff;margin-bottom:6px">Plataforma Origen</div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div>
+                      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+                        <span style="color:#f39c12;font-weight:700">GLPI</span>
+                        <span style="font-weight:700">${glpi} <small class="muted">(${glpiPct}%)</small></span>
+                      </div>
+                      <div style="background:rgba(255,255,255,0.06);height:5px;border-radius:3px;overflow:hidden">
+                        <div style="width:${glpiPct}%;background:#f39c12;height:100%"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+                        <span style="color:#7b68ee;font-weight:700">ClickUp</span>
+                        <span style="font-weight:700">${clickup} <small class="muted">(${cuPct}%)</small></span>
+                      </div>
+                      <div style="background:rgba(255,255,255,0.06);height:5px;border-radius:3px;overflow:hidden">
+                        <div style="width:${cuPct}%;background:#7b68ee;height:100%"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Prioridad -->
+                <div style="background:rgba(255,255,255,0.03);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between">
+                  <div style="font-size:12.5px;font-weight:700;color:#ffffff;margin-bottom:6px">Nivel de Criticidad</div>
+                  <div style="display:flex;flex-direction:column;gap:5px">
+                    ${prios.map(p => {
+                      const pct = totalPrio > 0 ? Math.round((p.count / totalPrio) * 100) : 0;
+                      return `
+                        <div style="display:flex;align-items:center;justify-content:space-between;font-size:10.5px">
+                          <span style="display:flex;align-items:center;gap:5px;color:var(--text)">
+                            <span style="width:6px;height:6px;border-radius:50%;background:${p.color}"></span>
+                            ${p.label}
+                          </span>
+                          <span style="font-weight:700">${p.count} <small class="muted">(${pct}%)</small></span>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
       } else if (s.type === 'specialist') {
         const spec = s.spec;
         const items = ALL_ITEMS.filter(it => it.status !== 'cerrado' && it.assignee_name && it.assignee_name.toLowerCase().includes(spec.key));
