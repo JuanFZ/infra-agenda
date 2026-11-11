@@ -7,6 +7,11 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
+# Instalar utilidades del sistema (sqlite3 para diagnóstico y consultas directas)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copiar dependencias e instalarlas sin cache
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
