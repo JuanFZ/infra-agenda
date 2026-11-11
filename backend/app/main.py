@@ -662,10 +662,16 @@ def trigger_sync():
     sync_all()
     return {"message": "Sincronización completada con éxito"}
 
+def to_iso_z(dt: datetime.datetime | None) -> str | None:
+    if not dt:
+        return None
+    s = dt.isoformat()
+    return s if s.endswith("Z") or ("+" in s or "-" in s[10:]) else s + "Z"
+
 def serialize_item(item: Item) -> dict:
     """Serializa una actividad con sus campos cronológicos puros (received_at, escalated_at, duración)."""
-    rec_iso = item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None)
-    esc_iso = item.escalated_at.isoformat() if item.escalated_at else (item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None))
+    rec_dt = item.received_at or item.created_at
+    esc_dt = item.escalated_at or item.received_at or item.created_at
     
     is_recent_closed = False
     if item.status == "cerrado":
@@ -688,14 +694,14 @@ def serialize_item(item: Item) -> dict:
         "status": item.status,
         "status_origin": item.status_origin,
         "created_by": getattr(item, "created_by", None),
-        "created_at": item.created_at.isoformat() if item.created_at else None,
-        "received_at": rec_iso,
-        "escalated_at": esc_iso,
-        "assigned_at": item.assigned_at.isoformat() if item.assigned_at else None,
-        "due_at": item.due_at.isoformat() if item.due_at else None,
-        "closed_at": item.closed_at.isoformat() if item.closed_at else None,
-        "updated_at": item.updated_at.isoformat() if item.updated_at else None,
-        "synced_at": item.synced_at.isoformat() if item.synced_at else None,
+        "created_at": to_iso_z(item.created_at),
+        "received_at": to_iso_z(rec_dt),
+        "escalated_at": to_iso_z(esc_dt),
+        "assigned_at": to_iso_z(item.assigned_at),
+        "due_at": to_iso_z(item.due_at),
+        "closed_at": to_iso_z(item.closed_at),
+        "updated_at": to_iso_z(item.updated_at),
+        "synced_at": to_iso_z(item.synced_at),
         "description": item.description,
         "escalation_id": item.escalation_id,
         "recommendations": item.recommendations,

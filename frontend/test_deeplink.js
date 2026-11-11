@@ -657,5 +657,31 @@ function simulateDeepLink(opts) {
   assert(mockContainer.innerHTML.includes('onclick="onTestChange(2)"'), 'Next button should point to page 2');
   console.log('✓ Test 9: 10-item pagination with centered page controls and slice boundaries verified');
 
+  // Test 10: Accurate UTC parsing and getTimeAgo without local-time offset distortion
+  const parseUtcMatch = content.match(/function parseUtcDate\(dateStr\)[\s\S]*?\n    \}/);
+  const timeAgoMatch = content.match(/function getTimeAgo\(dateStr\)[\s\S]*?\n    \}/);
+  assert(parseUtcMatch && timeAgoMatch, 'parseUtcDate / getTimeAgo extraction failed');
+
+  const timeAgoRunner = new Function(`
+    ${parseUtcMatch[0]}
+    ${timeAgoMatch[0]}
+    return { parseUtcDate, getTimeAgo };
+  `)();
+
+  // Test parseUtcDate
+  const parsed1 = timeAgoRunner.parseUtcDate('2026-11-10T20:03:00');
+  const parsed2 = timeAgoRunner.parseUtcDate('2026-11-10T20:03:00Z');
+  assert.strictEqual(parsed1.getTime(), parsed2.getTime(), 'parseUtcDate must treat naive ISO as UTC');
+
+  // Test 24 hours and 3 minutes ago
+  const nowMs = Date.now();
+  const past24h3m = new Date(nowMs - (24 * 3600 + 3 * 60) * 1000).toISOString();
+  assert.strictEqual(timeAgoRunner.getTimeAgo(past24h3m), 'hace 1d', '24h3m ago should return hace 1d');
+
+  // Test 20 hours ago
+  const past20h = new Date(nowMs - 20 * 3600 * 1000).toISOString();
+  assert.strictEqual(timeAgoRunner.getTimeAgo(past20h), 'hace 20h 0m', '20h ago should return hace 20h 0m');
+  console.log('✓ Test 10: Accurate UTC timezone parsing and getTimeAgo verified');
+
   console.log('ALL FRONTEND TESTS PASSED SUCCESSFULLY!');
 })();

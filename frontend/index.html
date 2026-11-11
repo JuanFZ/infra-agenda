@@ -3664,6 +3664,18 @@
       return false;
     }
 
+    function parseUtcDate(dateStr) {
+      if (!dateStr) return null;
+      if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+      let s = String(dateStr).trim();
+      if (!s) return null;
+      if (!s.endsWith('Z') && !/[+-]\d{2}(:\d{2})?$/.test(s)) {
+        s = s.replace(' ', 'T') + 'Z';
+      }
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
     function isItemRecentClosed(i) {
       if (!i) return false;
       if (typeof i.is_recent_closed === 'boolean') {
@@ -3671,9 +3683,9 @@
       }
       const dateStr = i.closed_at || i.updated_at;
       if (!dateStr) return false;
-      const itemMs = new Date(dateStr).getTime();
-      if (isNaN(itemMs)) return false;
-      const diff = Date.now() - itemMs;
+      const d = parseUtcDate(dateStr);
+      if (!d) return false;
+      const diff = Date.now() - d.getTime();
       return diff >= 0 && diff <= 24 * 60 * 60 * 1000;
     }
 
@@ -3730,9 +3742,8 @@
 
     function formatDate(dateStr, includeTime = false) {
       if (!dateStr) return '—';
-      const s = (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+')) ? dateStr + 'Z' : dateStr;
-      const d = new Date(s);
-      if (isNaN(d.getTime())) return dateStr;
+      const d = parseUtcDate(dateStr);
+      if (!d) return dateStr;
       const day = String(d.getDate()).padStart(2, '0');
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const year = d.getFullYear();
@@ -3746,9 +3757,8 @@
 
     function isoToDateTimeLocal(dateStr) {
       if (!dateStr) return formatDateTimeLocal(new Date());
-      const s = (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+')) ? dateStr + 'Z' : dateStr;
-      const d = new Date(s);
-      if (isNaN(d.getTime())) return formatDateTimeLocal(new Date());
+      const d = parseUtcDate(dateStr);
+      if (!d) return formatDateTimeLocal(new Date());
       return formatDateTimeLocal(d);
     }
 
@@ -3756,8 +3766,14 @@
       if (it.time_attention_label) return it.time_attention_label;
       if (!it.created_at) return (it.status === 'cerrado' ? 'Cerrado' : 'Activo');
       const startRef = it.received_at || it.created_at;
-      const created = new Date(startRef).getTime();
-      const ref = (it.status === 'cerrado' && it.closed_at) ? new Date(it.closed_at).getTime() : Date.now();
+      const startD = parseUtcDate(startRef);
+      if (!startD) return (it.status === 'cerrado' ? 'Cerrado' : 'Activo');
+      const created = startD.getTime();
+      let ref = Date.now();
+      if (it.status === 'cerrado' && it.closed_at) {
+        const closedD = parseUtcDate(it.closed_at);
+        if (closedD) ref = closedD.getTime();
+      }
       const diffSec = Math.max(0, Math.floor((ref - created) / 1000));
       const mins = Math.floor(diffSec / 60);
       const hours = Math.floor(mins / 60);
@@ -4304,16 +4320,21 @@
 
     function getTimeAgo(dateStr) {
       if (!dateStr) return '';
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return '';
-      const diffSec = Math.floor((new Date() - d) / 1000);
+      const d = parseUtcDate(dateStr);
+      if (!d) return '';
+      const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+      if (diffSec < 0) return 'hace un momento';
       if (diffSec < 45) return 'hace un momento';
       const diffMin = Math.floor(diffSec / 60);
       if (diffMin < 60) return `hace ${diffMin} min`;
       const diffHours = Math.floor(diffMin / 60);
-      if (diffHours < 24) return `hace ${diffHours}h ${diffMin % 60} m`;
+      if (diffHours < 24) return `hace ${diffHours}h ${diffMin % 60}m`;
       const diffDays = Math.floor(diffHours / 24);
-      return `hace ${diffDays} d`;
+      const remHours = diffHours % 24;
+      if (remHours > 0) {
+        return `hace ${diffDays}d ${remHours}h`;
+      }
+      return `hace ${diffDays}d`;
     }
 
     function renderSelectedAssigneeChips(itemId) {
