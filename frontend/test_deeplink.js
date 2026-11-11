@@ -447,8 +447,8 @@ function simulateDeepLink(opts) {
     kanbanOriginBadge: { textContent: '', style: {} },
     kanbanSubText: { textContent: '' },
     kpisContainer: { innerHTML: '' },
-    navOver: { textContent: '' },
-    navEspera: { textContent: '' },
+    navOver: { textContent: '', style: {} },
+    navEspera: { textContent: '', style: {} },
     kanbanGrid: {
       innerHTML: '',
       classList: {
@@ -541,6 +541,15 @@ function simulateDeepLink(opts) {
   assert.strictEqual(kanbanGridClasses.has('cols-3'), false, '#kanbanGrid should not have cols-3 for GLPI');
   assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="espera"'), 'Kanban must render En espera column for GLPI');
   assert(mockKanbanEls.kpisContainer.innerHTML.includes('data-kpi="espera"'), 'KPIs must render En Espera card for GLPI');
+
+  // 5B2: Verify badge hides when 0 and shows when >= 1
+  kanbanRunner.renderKPIs({ pendientes: 0, en_curso: 0, en_espera: 0, cerrados: 0, total_actividades: 0 });
+  assert.strictEqual(mockKanbanEls.navEspera.style.display, 'none', 'navEspera must be hidden when en_espera is 0');
+  assert.strictEqual(mockKanbanEls.navEspera.textContent, '', 'navEspera textContent must be empty when 0');
+
+  kanbanRunner.renderKPIs({ pendientes: 0, en_curso: 0, en_espera: 2, cerrados: 0, total_actividades: 2 });
+  assert.strictEqual(mockKanbanEls.navEspera.style.display, '', 'navEspera must be visible when en_espera > 0');
+  assert.strictEqual(mockKanbanEls.navEspera.textContent, 2, 'navEspera textContent must be count when > 0');
 
   // 5C: Switch origin to '' (Todos) and test dragging a ClickUp item onto 'espera' column -> successfully moves to 'espera'
   kanbanRunner.setOriginFilter('');

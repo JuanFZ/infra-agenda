@@ -314,6 +314,10 @@
       font-weight: 700
     }
 
+    .nav .count:empty {
+      display: none !important;
+    }
+
     aside.collapsed .nav .count {
       position: absolute;
       top: 4px;
@@ -2680,7 +2684,7 @@
         <polyline points="12 6 12 12 16 14" />
       </svg>
       <span class="label">En Espera</span>
-      <span class="count" id="navEspera">0</span>
+      <span class="count" id="navEspera" style="display:none"></span>
     </div>
 
     <div class="nav" data-view="escalamientos" id="sidebarNavEscalations" title="Repositorio de Escalamientos">
@@ -3855,9 +3859,17 @@
     </div>
   `).join('');
       const navEsperaEl = document.getElementById('navEspera');
-      if (navEsperaEl) navEsperaEl.textContent = k.en_espera;
+      if (navEsperaEl) {
+        const val = Number(k.en_espera) || 0;
+        navEsperaEl.textContent = val > 0 ? val : '';
+        navEsperaEl.style.display = val > 0 ? '' : 'none';
+      }
       const navOverEl = document.getElementById('navOver');
-      if (navOverEl) navOverEl.textContent = k.en_espera;
+      if (navOverEl) {
+        const val = Number(k.en_espera) || 0;
+        navOverEl.textContent = val > 0 ? val : '';
+        navOverEl.style.display = val > 0 ? '' : 'none';
+      }
     }
 
     function toggleKpiFilter(key) {
