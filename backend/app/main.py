@@ -241,6 +241,8 @@ def ensure_db_schema():
                 cursor.execute("ALTER TABLE items ADD COLUMN description TEXT")
             if "project_name" not in cols:
                 cursor.execute("ALTER TABLE items ADD COLUMN project_name VARCHAR(150)")
+            if "created_by" not in cols:
+                cursor.execute("ALTER TABLE items ADD COLUMN created_by VARCHAR(150)")
             
             cursor.execute("PRAGMA table_info(users)")
             u_cols = [row[1] for row in cursor.fetchall()]
@@ -404,6 +406,29 @@ def is_item_assigned_to_user_name(assignee_name: str | None, user_name_raw: str 
         spec_user = strip_accents_str(spec["email"].split("@")[0])
         if user_norm in (spec_norm, spec["key"], spec_user) or (first_norm and first_norm in spec_norm):
             if spec["key"] in assignee_norm or spec_norm in assignee_norm:
+                return True
+    return False
+
+
+def is_user_creator_of_item(created_by: str | None, user_name_raw: str | None) -> bool:
+    """Comprueba si un usuario coincide con el creador (created_by) de una actividad."""
+    user_clean = decode_header_val(user_name_raw)
+    creator_clean = decode_header_val(created_by)
+    if not user_clean or not creator_clean:
+        return False
+    user_norm = strip_accents_str(user_clean)
+    creator_norm = strip_accents_str(creator_clean)
+    if user_norm and creator_norm and (user_norm in creator_norm or creator_norm in user_norm):
+        return True
+    parts = [p for p in user_norm.replace(".", " ").split() if len(p) >= 3]
+    first_norm = parts[0] if parts else user_norm
+    if first_norm and len(first_norm) >= 3 and first_norm in creator_norm:
+        return True
+    for spec in SPECIALISTS_MAP.values():
+        spec_norm = strip_accents_str(spec["name"])
+        spec_user = strip_accents_str(spec["email"].split("@")[0])
+        if user_norm in (spec_norm, spec["key"], spec_user) or (first_norm and first_norm in spec_norm):
+            if spec["key"] in creator_norm or spec_norm in creator_norm or spec_user in creator_norm:
                 return True
     return False
 
@@ -662,6 +687,7 @@ def serialize_item(item: Item) -> dict:
         "priority": item.priority,
         "status": item.status,
         "status_origin": item.status_origin,
+        "created_by": getattr(item, "created_by", None),
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "received_at": rec_iso,
         "escalated_at": esc_iso,
@@ -1251,7 +1277,16 @@ def update_item_status(
     }
 
 @app.post("/api/items")
-def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_or_specialist_role)):
+def create_item(
+    req: CreateItemRequest,
+    db: Session = Depends(get_db),
+    _role: str = Depends(verify_coordinator_or_specialist_role),
+    x_user_name: str | None = Header(None, alias="X-User-Name")
+):
+    creator_clean = decode_header_val(x_user_name)
+    if not creator_clean:
+        creator_clean = "Coordinador" if _role in ("coordinador", "admin", "administrador") else "Especialista"
+
     src = req.source.strip()
     if src.lower() in ["clickup", "click_up"]:
         source = "ClickUp"
@@ -1356,6 +1391,7 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
         url=url,
         title=title,
         description=req.description,
+        created_by=creator_clean,
         category=category,
         client_name=client_name,
         project_name=project_name,
@@ -1525,10 +1561,35 @@ def update_item_details(
 
 
 @app.delete("/api/items/{item_id}")
-def delete_item(item_id: int, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
+def delete_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    role_param: str = Query(None, alias="role"),
+    user_param: str = Query(None, alias="user")
+):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Actividad no encontrada")
+
+    role = decode_header_val(x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).lower()
+    user_name_raw = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")) or ""
+
+    is_coord = role in ("coordinador", "admin", "administrador")
+    is_spec = role in ("especialista", "specialist")
+
+    if not is_coord:
+        if not is_spec:
+            raise HTTPException(
+                status_code=403,
+                detail="Acceso restringido: Solo el rol Coordinador o el Especialista que creó la actividad tienen permisos para eliminarla."
+            )
+        if not is_user_creator_of_item(item.created_by, user_name_raw):
+            raise HTTPException(
+                status_code=403,
+                detail="Permiso denegado: Como Especialista, solo puedes eliminar actividades creadas por ti."
+            )
 
     source = item.source
     ext_id = item.external_id
@@ -1551,10 +1612,12 @@ def delete_item(item_id: int, db: Session = Depends(get_db), _role: str = Depend
         import html
         from .notifications.telegram_notifier import send_telegram_message
         now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
+        deleter_name = decode_header_val(user_name_raw) or ("Coordinador" if is_coord else "Especialista")
         msg = (
             f"🗑 <b>Actividad Eliminada</b>\n\n"
             f"📌 <b>Asunto:</b> {html.escape(title)}\n"
             f"🏷 <b>Origen:</b> {html.escape(source)} #{ext_id}\n"
+            f"👤 <b>Eliminada por:</b> {html.escape(deleter_name)}\n"
             f"🕒 <b>Hora eliminación:</b> {now_str}\n"
             f"⚡ <i>Eliminada desde la Agenda de Infraestructura</i>"
         )

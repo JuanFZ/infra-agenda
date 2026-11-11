@@ -19,6 +19,7 @@ class Item(Base):
     status = Column(String(50), default="pendiente") # pendiente, curso, espera, cerrado
     status_origin = Column(String(100), nullable=True) # Estado original en origen
     description = Column(Text, nullable=True)       # Detalle o alcance técnico de la actividad
+    created_by = Column(String(150), nullable=True) # Usuario creador de la actividad (Coordinador o Especialista)
     
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     received_at = Column(DateTime, nullable=True)   # Fecha de Recibimiento en Sycom

@@ -1371,6 +1371,69 @@ class TestEscalationFeatures(unittest.TestCase):
         })
         self.assertEqual(rev_res.status_code, 200)
 
+    @patch("app.sync.clickup_client.ClickUpClient.delete_task")
+    @patch("app.sync.clickup_client.ClickUpClient.create_task")
+    def test_25_specialist_can_delete_own_activity_and_blocked_on_others(self, mock_cu_create, mock_cu_delete):
+        """Test that Specialists can delete items they created, but are blocked from deleting others."""
+        mock_cu_create.return_value = {"id": "cu_del_1", "url": "https://app.clickup.com/t/cu_del_1"}
+        mock_cu_delete.return_value = True
+
+        # 1. Specialist Juan creates activity
+        create_res = self.client.post("/api/items", json={
+            "source": "ClickUp",
+            "title": "Actividad de Juan para eliminar",
+            "priority": "Media",
+            "project_name": "SIMF"
+        }, headers={"X-User-Role": "Especialista", "X-User-Name": "Juan Fernandez"})
+        self.assertEqual(create_res.status_code, 200)
+        item_id = create_res.json()["item"]["id"]
+        self.assertEqual(create_res.json()["item"]["created_by"], "Juan Fernandez")
+
+        # 2. Specialist Yoxaide tries to delete Juan's activity -> 403 Forbidden
+        del_by_yox = self.client.delete(
+            f"/api/items/{item_id}",
+            headers={"X-User-Role": "Especialista", "X-User-Name": "Yoxaide Jimenez"}
+        )
+        self.assertEqual(del_by_yox.status_code, 403)
+        self.assertIn("solo puedes eliminar actividades creadas por ti", del_by_yox.json()["detail"].lower())
+
+        # 3. Analyst tries to delete Juan's activity -> 403 Forbidden
+        del_by_analyst = self.client.delete(
+            f"/api/items/{item_id}",
+            headers={"X-User-Role": "Analista", "X-User-Name": "Luis Acosta"}
+        )
+        self.assertEqual(del_by_analyst.status_code, 403)
+
+        # 4. Specialist Juan deletes his own activity -> 200 OK
+        del_by_juan = self.client.delete(
+            f"/api/items/{item_id}",
+            headers={"X-User-Role": "Especialista", "X-User-Name": "Juan Fernandez"}
+        )
+        self.assertEqual(del_by_juan.status_code, 200)
+        self.assertEqual(del_by_juan.json()["status"], "OK")
+
+        # Verify it's gone from database
+        db = TestingSessionLocal()
+        it_db = db.query(Item).filter(Item.id == item_id).first()
+        self.assertIsNone(it_db)
+        db.close()
+
+        # 5. Coordinator can delete any activity
+        mock_cu_create.return_value = {"id": "cu_del_2", "url": "https://app.clickup.com/t/cu_del_2"}
+        c_res = self.client.post("/api/items", json={
+            "source": "ClickUp",
+            "title": "Actividad para borrar por coordinador",
+            "priority": "Baja",
+            "project_name": "SIMF"
+        }, headers={"X-User-Role": "Especialista", "X-User-Name": "Juan Fernandez"})
+        c_item_id = c_res.json()["item"]["id"]
+
+        del_by_coord = self.client.delete(
+            f"/api/items/{c_item_id}",
+            headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+        )
+        self.assertEqual(del_by_coord.status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()
