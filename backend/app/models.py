@@ -117,6 +117,10 @@ class User(Base):
     telegram_username = Column(String(100), nullable=True) # @Juuan8, etc.
     role = Column(String(50), default="especialista") # 'coordinador', 'especialista', 'analista'
     password_hash = Column(String(200), nullable=True)
+    avatar_data = Column(Text, nullable=True) # Data URI base64 de la foto de perfil o URL
+    phone = Column(String(50), nullable=True) # Teléfono de contacto
+    job_title = Column(String(100), nullable=True) # Cargo o puesto
+    bio = Column(String(255), nullable=True) # Resumen o biografía corta
     is_active = Column(Integer, default=1)
     last_login = Column(DateTime, nullable=True)
 

@@ -2324,11 +2324,23 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      transition: all .18s ease;
+    }
+
+    .sidebar-user:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(79, 140, 255, 0.4);
+      transform: translateY(-1px);
     }
 
     body.light .sidebar-user {
       background: rgba(0, 0, 0, 0.03);
       border-color: rgba(0, 0, 0, 0.08);
+    }
+
+    body.light .sidebar-user:hover {
+      background: rgba(0, 0, 0, 0.06);
+      border-color: rgba(79, 140, 255, 0.4);
     }
 
     .sidebar-user-info {
@@ -2350,6 +2362,7 @@
       font-size: 12px;
       color: #fff;
       flex-shrink: 0;
+      overflow: hidden;
       background: linear-gradient(135deg, #10b981, #059669);
     }
 
@@ -2561,8 +2574,17 @@
       <span class="label">Reportes</span>
     </div>
 
+    <div class="nav" data-view="perfil" id="sidebarNavProfile" title="Mi Perfil de Usuario" onclick="openUserProfileModal()">
+      <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </svg>
+      <span class="label">Mi Perfil</span>
+    </div>
+
     <!-- Perfil de Usuario Activo en Sidebar -->
-    <div class="sidebar-user" id="sidebarUserBox">
+    <div class="sidebar-user" id="sidebarUserBox" onclick="openUserProfileModal()" title="Ver y gestionar mi perfil" style="cursor:pointer">
       <div class="sidebar-user-info">
         <div class="sidebar-avatar" id="sidebarAvatar">A</div>
         <div class="sidebar-details">
@@ -2570,7 +2592,7 @@
           <div class="sidebar-user-role" id="sidebarUserRole">Coordinador</div>
         </div>
       </div>
-      <button class="btn-logout" onclick="handleLogout()" title="Cerrar Sesión">
+      <button class="btn-logout" onclick="event.stopPropagation(); handleLogout()" title="Cerrar Sesión">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -2635,6 +2657,9 @@
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
           </svg>
+        </button>
+        <button class="btn btn-icon" id="btnHeaderProfile" onclick="openUserProfileModal()" title="Mi Perfil de Usuario" style="padding:4px">
+          <div id="headerAvatarMini" style="width:22px;height:22px;border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">U</div>
         </button>
         <button class="btn primary btn-icon" id="btnTvMode" onclick="toggleTvMode()"
           title="Modo TV / Pantalla completa para sala de operaciones y reuniones">
@@ -6492,22 +6517,8 @@
       const isAnal = role === 'analista';
       const roleName = formatRoleName(role);
 
-      // 1. Sidebar user widget
-      const av = document.getElementById('sidebarAvatar');
-      const uName = document.getElementById('sidebarUserName');
-      const uRole = document.getElementById('sidebarUserRole');
-
-      if (av) {
-        av.textContent = (CURRENT_USER.full_name || 'U').charAt(0).toUpperCase();
-        av.style.background = isCoord
-          ? 'linear-gradient(135deg, #10b981, #059669)'
-          : (isAnal ? 'linear-gradient(135deg, #a855f7, #7e22ce)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)');
-      }
-      if (uName) uName.textContent = CURRENT_USER.full_name || CURRENT_USER.username;
-      if (uRole) {
-        uRole.textContent = roleName;
-        uRole.style.color = isCoord ? '#34d399' : (isAnal ? '#c084fc' : '#60a5fa');
-      }
+      // 1. Sidebar user widget y avatar
+      updateUserAvatarDisplay();
 
       // 2. Botón Crear Actividad y Reportes en cabecera principal y Role Badge
       const btnHeadCreate = document.getElementById('btnNewActivityHeader');
@@ -6614,6 +6625,511 @@
       } else {
         if (overlay) overlay.style.display = 'none';
         applyRolePermissions();
+        fetchCurrentUserProfile();
+      }
+    }
+
+    function updateUserAvatarDisplay() {
+      if (!CURRENT_USER) return;
+      const isCoord = isCoordinator();
+      const isAnal = isAnalyst();
+      const roleName = formatRoleName(CURRENT_USER.role);
+      const bgGradient = isCoord
+        ? 'linear-gradient(135deg, #10b981, #059669)'
+        : (isAnal ? 'linear-gradient(135deg, #a855f7, #7e22ce)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)');
+      const initial = (CURRENT_USER.full_name || 'U').charAt(0).toUpperCase();
+
+      const av = document.getElementById('sidebarAvatar');
+      if (av) {
+        if (CURRENT_USER.avatar_data) {
+          av.innerHTML = `<img src="${CURRENT_USER.avatar_data}" alt="Foto" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">`;
+          av.style.background = 'transparent';
+          av.style.padding = '0';
+        } else {
+          av.textContent = initial;
+          av.style.background = bgGradient;
+          av.style.color = '#fff';
+        }
+      }
+
+      const hAv = document.getElementById('headerAvatarMini');
+      if (hAv) {
+        if (CURRENT_USER.avatar_data) {
+          hAv.innerHTML = `<img src="${CURRENT_USER.avatar_data}" alt="Foto" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">`;
+          hAv.style.background = 'transparent';
+        } else {
+          hAv.textContent = initial;
+          hAv.style.background = bgGradient;
+          hAv.style.color = '#fff';
+        }
+      }
+
+      const uName = document.getElementById('sidebarUserName');
+      const uRole = document.getElementById('sidebarUserRole');
+      if (uName) uName.textContent = CURRENT_USER.full_name || CURRENT_USER.username;
+      if (uRole) {
+        uRole.textContent = roleName;
+        uRole.style.color = isCoord ? '#34d399' : (isAnal ? '#c084fc' : '#60a5fa');
+      }
+    }
+
+    async function fetchCurrentUserProfile() {
+      if (!CURRENT_USER) return;
+      try {
+        const res = await fetch(`${API_URL}/users/me`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const user = await res.json();
+          CURRENT_USER = { ...CURRENT_USER, ...user };
+          localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
+          updateUserAvatarDisplay();
+        }
+      } catch (err) {
+        console.warn('No se pudo sincronizar el perfil con el servidor:', err);
+      }
+    }
+
+    // ==========================================
+    // SECCIÓN / MODAL DE USUARIO (PERFIL, FOTO, CLAVE)
+    // ==========================================
+    let CURRENT_PROFILE_TAB = 'datos'; // 'datos' | 'foto' | 'password'
+    let PENDING_AVATAR_DATA = null;
+
+    function openUserProfileModal(activeTab = 'datos') {
+      if (!CURRENT_USER) {
+        showToast('Acceso Requerido', 'Inicia sesión para gestionar tu perfil', 'error');
+        return;
+      }
+      CURRENT_PROFILE_TAB = activeTab;
+      PENDING_AVATAR_DATA = CURRENT_USER.avatar_data || null;
+
+      const modalBg = document.getElementById('modalBg');
+      const modalContent = document.getElementById('modalContent');
+      if (!modalBg || !modalContent) return;
+
+      modalContent.style.maxWidth = '640px';
+      renderUserProfileModalContent();
+      modalBg.classList.add('show');
+    }
+
+    function switchProfileTab(tab) {
+      CURRENT_PROFILE_TAB = tab;
+      renderUserProfileModalContent();
+    }
+
+    function renderUserProfileModalContent() {
+      const modalContent = document.getElementById('modalContent');
+      if (!modalContent) return;
+
+      const isCoord = isCoordinator();
+      const isAnal = isAnalyst();
+      const roleName = formatRoleName(CURRENT_USER.role);
+      const roleColor = isCoord ? '#10b981' : (isAnal ? '#c084fc' : '#60a5fa');
+      const initial = (CURRENT_USER.full_name || 'U').charAt(0).toUpperCase();
+      const previewAvatar = PENDING_AVATAR_DATA !== null ? PENDING_AVATAR_DATA : CURRENT_USER.avatar_data;
+
+      modalContent.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:14px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;border-radius:50%;background:rgba(79,140,255,0.15);border:1px solid rgba(79,140,255,0.3);display:flex;align-items:center;justify-content:center;color:var(--accent);flex-shrink:0">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <div>
+              <div style="font-size:17px;font-weight:700;color:#ffffff">Mi Perfil de Usuario</div>
+              <div class="muted" style="font-size:11.5px">Datos personales, foto de perfil y credenciales de acceso</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-icon" onclick="closeModal()" title="Cerrar ventana" style="padding:6px;border-radius:8px">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Pestañas de Navegación -->
+        <div style="display:flex;gap:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:4px;margin-bottom:18px">
+          <button type="button" onclick="switchProfileTab('datos')" style="flex:1;padding:8px 12px;font-size:12px;font-weight:700;border-radius:7px;cursor:pointer;border:none;transition:all .15s;${CURRENT_PROFILE_TAB === 'datos' ? 'background:rgba(79,140,255,0.22);color:var(--accent);box-shadow:0 2px 8px rgba(79,140,255,0.15)' : 'background:transparent;color:var(--muted)'}">
+            Datos Personales
+          </button>
+          <button type="button" onclick="switchProfileTab('foto')" style="flex:1;padding:8px 12px;font-size:12px;font-weight:700;border-radius:7px;cursor:pointer;border:none;transition:all .15s;${CURRENT_PROFILE_TAB === 'foto' ? 'background:rgba(79,140,255,0.22);color:var(--accent);box-shadow:0 2px 8px rgba(79,140,255,0.15)' : 'background:transparent;color:var(--muted)'}">
+            Foto de Perfil
+          </button>
+          <button type="button" onclick="switchProfileTab('password')" style="flex:1;padding:8px 12px;font-size:12px;font-weight:700;border-radius:7px;cursor:pointer;border:none;transition:all .15s;${CURRENT_PROFILE_TAB === 'password' ? 'background:rgba(79,140,255,0.22);color:var(--accent);box-shadow:0 2px 8px rgba(79,140,255,0.15)' : 'background:transparent;color:var(--muted)'}">
+            Cambiar Contraseña
+          </button>
+        </div>
+
+        <div id="profileTabBody">
+          ${renderProfileTabContent(previewAvatar, roleName, roleColor, initial, isCoord, isAnal)}
+        </div>
+      `;
+    }
+
+    function renderProfileTabContent(previewAvatar, roleName, roleColor, initial, isCoord, isAnal) {
+      if (CURRENT_PROFILE_TAB === 'datos') {
+        return `
+          <form id="formProfileData" onsubmit="handleSaveProfileData(event)" style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Nombre y Apellido</label>
+                <input type="text" id="profFullName" required value="${escapeHtml(CURRENT_USER.full_name || '')}" style="width:100%;box-sizing:border-box">
+              </div>
+              <div>
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Usuario de Acceso</label>
+                <input type="text" id="profUsername" value="${escapeHtml(CURRENT_USER.username || '')}" disabled style="width:100%;box-sizing:border-box;opacity:0.65;cursor:not-allowed">
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Correo Electrónico</label>
+                <input type="email" id="profEmail" placeholder="usuario@sycom.com.ve" value="${escapeHtml(CURRENT_USER.email || '')}" style="width:100%;box-sizing:border-box">
+              </div>
+              <div>
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Rol en la Plataforma</label>
+                <div style="padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-size:12.5px;font-weight:700;color:${roleColor}">${escapeHtml(roleName)}</span>
+                  <span class="badge" style="background:rgba(255,255,255,0.06);color:var(--muted);font-size:9.5px">Asignado por Sistema</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Teléfono / Móvil</label>
+                <input type="tel" id="profPhone" placeholder="+58 412 1234567" value="${escapeHtml(CURRENT_USER.phone || '')}" style="width:100%;box-sizing:border-box">
+              </div>
+              <div>
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Usuario Telegram (Alertas)</label>
+                <input type="text" id="profTelegram" placeholder="@usuario" value="${escapeHtml(CURRENT_USER.telegram_username || '')}" style="width:100%;box-sizing:border-box">
+              </div>
+            </div>
+
+            <div>
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Cargo o Especialidad Técnica</label>
+              <input type="text" id="profJobTitle" placeholder="Ej: Especialista en Infraestructura & Base de Datos" value="${escapeHtml(CURRENT_USER.job_title || '')}" style="width:100%;box-sizing:border-box">
+            </div>
+
+            <div>
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Breve Descripción / Funciones</label>
+              <textarea id="profBio" rows="2" placeholder="Resumen de funciones o responsabilidades..." style="width:100%;box-sizing:border-box">${escapeHtml(CURRENT_USER.bio || '')}</textarea>
+            </div>
+
+            <div id="profDataAlert" style="display:none;padding:9px 12px;border-radius:8px;font-size:12px;margin-top:2px"></div>
+
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">
+              <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+              <button type="submit" class="btn primary" id="btnSaveProfileData" style="font-weight:700;padding:8px 18px">
+                <span>Guardar Cambios</span>
+              </button>
+            </div>
+          </form>
+        `;
+      } else if (CURRENT_PROFILE_TAB === 'foto') {
+        const bgGrad = isCoord
+          ? 'linear-gradient(135deg, #10b981, #059669)'
+          : (isAnal ? 'linear-gradient(135deg, #a855f7, #7e22ce)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)');
+
+        return `
+          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:8px 0">
+            <div style="position:relative;width:115px;height:115px;border-radius:50%;overflow:hidden;border:3px solid var(--accent);box-shadow:0 0 25px rgba(79,140,255,0.25);background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center">
+              ${previewAvatar ? `
+                <img id="profAvatarPreviewImg" src="${previewAvatar}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover;display:block">
+              ` : `
+                <div id="profAvatarPreviewInitial" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:42px;font-weight:800;color:#fff;background:${bgGrad}">
+                  ${initial}
+                </div>
+              `}
+            </div>
+
+            <div>
+              <strong style="font-size:15px;color:#ffffff;display:block">${escapeHtml(CURRENT_USER.full_name || CURRENT_USER.username)}</strong>
+              <span class="muted" style="font-size:11.5px">Formatos permitidos: JPG, PNG o WebP. Se optimiza automáticamente.</span>
+            </div>
+
+            <input type="file" id="profAvatarFileInput" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="handleProfileAvatarSelected(event)">
+
+            <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;justify-content:center">
+              <button type="button" class="btn" onclick="document.getElementById('profAvatarFileInput').click()" style="display:inline-flex;align-items:center;gap:6px">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span>Subir Nueva Imagen</span>
+              </button>
+              ${previewAvatar ? `
+                <button type="button" class="btn danger" onclick="handleRemoveAvatar()" style="display:inline-flex;align-items:center;gap:6px">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                  <span>Quitar Foto</span>
+                </button>
+              ` : ''}
+            </div>
+
+            <div id="profAvatarAlert" style="display:none;width:100%;padding:9px 12px;border-radius:8px;font-size:12px;margin-top:2px"></div>
+
+            <div style="display:flex;justify-content:flex-end;width:100%;gap:10px;margin-top:10px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">
+              <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+              <button type="button" class="btn primary" id="btnSaveAvatar" onclick="handleSaveAvatar()" style="font-weight:700;padding:8px 18px">
+                <span>Guardar Foto</span>
+              </button>
+            </div>
+          </div>
+        `;
+      } else if (CURRENT_PROFILE_TAB === 'password') {
+        return `
+          <form id="formProfilePassword" onsubmit="handleSaveProfilePassword(event)" style="display:flex;flex-direction:column;gap:12px">
+            <div style="background:rgba(79,140,255,0.06);border:1px solid rgba(79,140,255,0.18);border-radius:10px;padding:10px 12px;font-size:11.5px;color:var(--text)">
+              <strong style="color:var(--accent);display:block;margin-bottom:2px">Seguridad de la Cuenta</strong>
+              Ingresa tu contraseña actual y define una nueva clave de acceso de al menos 4 caracteres.
+            </div>
+
+            <div>
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Contraseña Actual</label>
+              <div style="position:relative">
+                <input type="password" id="profOldPassword" required placeholder="Tu contraseña actual" style="width:100%;box-sizing:border-box;padding-right:38px">
+                <button type="button" onclick="togglePassInput('profOldPassword', this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Nueva Contraseña</label>
+              <div style="position:relative">
+                <input type="password" id="profNewPassword" required minlength="4" placeholder="Mínimo 4 caracteres" style="width:100%;box-sizing:border-box;padding-right:38px">
+                <button type="button" onclick="togglePassInput('profNewPassword', this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Confirmar Nueva Contraseña</label>
+              <div style="position:relative">
+                <input type="password" id="profConfirmPassword" required minlength="4" placeholder="Repite la nueva contraseña" style="width:100%;box-sizing:border-box;padding-right:38px">
+                <button type="button" onclick="togglePassInput('profConfirmPassword', this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div id="profPassAlert" style="display:none;padding:9px 12px;border-radius:8px;font-size:12px;margin-top:2px"></div>
+
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">
+              <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+              <button type="submit" class="btn primary" id="btnSavePassword" style="font-weight:700;padding:8px 18px">
+                <span>Actualizar Contraseña</span>
+              </button>
+            </div>
+          </form>
+        `;
+      }
+      return '';
+    }
+
+    function showProfileAlert(alertId, msg, type = 'error') {
+      const el = document.getElementById(alertId);
+      if (!el) return;
+      el.style.display = 'block';
+      if (type === 'error') {
+        el.style.background = 'rgba(239, 68, 68, 0.14)';
+        el.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+        el.style.color = '#f87171';
+      } else {
+        el.style.background = 'rgba(16, 185, 129, 0.14)';
+        el.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+        el.style.color = '#34d399';
+      }
+      el.textContent = msg;
+    }
+
+    function togglePassInput(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+      } else {
+        input.type = 'password';
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+      }
+    }
+
+    function handleProfileAvatarSelected(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      if (file.size > 8 * 1024 * 1024) {
+        showProfileAlert('profAvatarAlert', 'El archivo es demasiado grande (máximo 8MB).', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const img = new Image();
+        img.onload = function() {
+          const maxDim = 360;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          PENDING_AVATAR_DATA = canvas.toDataURL('image/jpeg', 0.88);
+          renderUserProfileModalContent();
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleRemoveAvatar() {
+      PENDING_AVATAR_DATA = '';
+      renderUserProfileModalContent();
+    }
+
+    async function handleSaveAvatar() {
+      const btn = document.getElementById('btnSaveAvatar');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Guardando...';
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/users/me`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            avatar_data: PENDING_AVATAR_DATA || ''
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'Error al guardar foto de perfil');
+        }
+        CURRENT_USER = { ...CURRENT_USER, ...data.user };
+        localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
+        updateUserAvatarDisplay();
+        showToast('Foto Actualizada', 'Tu foto de perfil se ha guardado exitosamente.', 'success');
+        closeModal();
+      } catch (err) {
+        showProfileAlert('profAvatarAlert', err.message, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Guardar Foto';
+        }
+      }
+    }
+
+    async function handleSaveProfileData(e) {
+      e.preventDefault();
+      const fullName = (document.getElementById('profFullName').value || '').trim();
+      const email = (document.getElementById('profEmail').value || '').trim();
+      const phone = (document.getElementById('profPhone').value || '').trim();
+      const telegram = (document.getElementById('profTelegram').value || '').trim();
+      const jobTitle = (document.getElementById('profJobTitle').value || '').trim();
+      const bio = (document.getElementById('profBio').value || '').trim();
+
+      const btn = document.getElementById('btnSaveProfileData');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Guardando...';
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/users/me`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            full_name: fullName,
+            email: email,
+            phone: phone,
+            telegram_username: telegram,
+            job_title: jobTitle,
+            bio: bio
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'Error al guardar datos personales');
+        }
+        CURRENT_USER = { ...CURRENT_USER, ...data.user };
+        localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
+        updateUserAvatarDisplay();
+        showToast('Perfil Actualizado', 'Tus datos personales se han guardado con éxito.', 'success');
+        closeModal();
+      } catch (err) {
+        showProfileAlert('profDataAlert', err.message, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Guardar Cambios';
+        }
+      }
+    }
+
+    async function handleSaveProfilePassword(e) {
+      e.preventDefault();
+      const oldPass = (document.getElementById('profOldPassword').value || '').trim();
+      const newPass = (document.getElementById('profNewPassword').value || '').trim();
+      const confirmPass = (document.getElementById('profConfirmPassword').value || '').trim();
+
+      if (newPass !== confirmPass) {
+        showProfileAlert('profPassAlert', 'Las nuevas contraseñas no coinciden.', 'error');
+        return;
+      }
+      if (newPass.length < 4) {
+        showProfileAlert('profPassAlert', 'La nueva contraseña debe tener al menos 4 caracteres.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btnSavePassword');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Actualizando...';
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/auth/change-password`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            username: CURRENT_USER.username,
+            old_password: oldPass,
+            new_password: newPass
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || 'Error al actualizar contraseña');
+        }
+        showToast('Contraseña Actualizada', 'Tu contraseña se ha cambiado correctamente.', 'success');
+        closeModal();
+      } catch (err) {
+        showProfileAlert('profPassAlert', err.message, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Actualizar Contraseña';
+        }
       }
     }
 

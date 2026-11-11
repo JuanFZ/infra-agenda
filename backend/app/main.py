@@ -248,6 +248,14 @@ def ensure_db_schema():
                 cursor.execute("ALTER TABLE users ADD COLUMN password_hash VARCHAR(200)")
             if "last_login" not in u_cols:
                 cursor.execute("ALTER TABLE users ADD COLUMN last_login DATETIME")
+            if "avatar_data" not in u_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN avatar_data TEXT")
+            if "phone" not in u_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN phone VARCHAR(50)")
+            if "job_title" not in u_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN job_title VARCHAR(100)")
+            if "bio" not in u_cols:
+                cursor.execute("ALTER TABLE users ADD COLUMN bio VARCHAR(255)")
 
             cursor.execute("PRAGMA table_info(escalation_documents)")
             esc_cols = [row[1] for row in cursor.fetchall()]
@@ -531,6 +539,15 @@ class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
 
+class UpdateUserProfileRequest(BaseModel):
+    full_name: str | None = None
+    email: str | None = None
+    telegram_username: str | None = None
+    phone: str | None = None
+    job_title: str | None = None
+    bio: str | None = None
+    avatar_data: str | None = None
+
 DEFAULT_USERS = [
     {"full_name": "Adonis Lozada", "username": "a.lozada", "email": "a.lozada@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
     {"full_name": "Administrador", "username": "admin", "email": "admin@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
@@ -786,6 +803,21 @@ def get_users(db: Session = Depends(get_db)):
         "role": u.role
     } for u in users]
 
+def _serialize_user(user: User) -> dict:
+    return {
+        "id": user.id,
+        "full_name": user.full_name,
+        "username": user.username,
+        "email": user.email,
+        "telegram_username": user.telegram_username,
+        "role": user.role,
+        "phone": getattr(user, "phone", None),
+        "job_title": getattr(user, "job_title", None),
+        "bio": getattr(user, "bio", None),
+        "avatar_data": getattr(user, "avatar_data", None),
+        "last_login": user.last_login.isoformat() if user.last_login else None
+    }
+
 @app.post("/api/auth/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     u_str = req.username.strip()
@@ -810,27 +842,96 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     
     return {
         "status": "ok",
-        "user": {
-            "id": user.id,
-            "full_name": user.full_name,
-            "username": user.username,
-            "email": user.email,
-            "telegram_username": user.telegram_username,
-            "role": user.role
-        }
+        "user": _serialize_user(user)
     }
 
 @app.get("/api/auth/users")
 def get_auth_users(db: Session = Depends(get_db)):
     """Retorna los usuarios activos para el selector rápido del formulario de acceso."""
     users = db.query(User).filter(User.is_active == 1).all()
-    return [{
-        "id": u.id,
-        "full_name": u.full_name,
-        "username": u.username,
-        "email": u.email,
-        "role": u.role
-    } for u in users]
+    return [_serialize_user(u) for u in users]
+
+@app.get("/api/users/me")
+def get_current_user_profile(
+    db: Session = Depends(get_db),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    username: str | None = Query(None)
+):
+    """Consulta el perfil completo del usuario autenticado."""
+    target = None
+    if x_user_name:
+        try:
+            target = urllib.parse.unquote(x_user_name).strip()
+        except Exception:
+            target = x_user_name.strip()
+    if not target and username:
+        target = username.strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="Identificador de usuario requerido (X-User-Name o username).")
+
+    user = db.query(User).filter(
+        or_(
+            User.username.ilike(target),
+            User.email.ilike(target),
+            User.full_name.ilike(target)
+        )
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    return _serialize_user(user)
+
+@app.put("/api/users/me")
+def update_current_user_profile(
+    req: UpdateUserProfileRequest,
+    db: Session = Depends(get_db),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    username: str | None = Query(None)
+):
+    """Actualiza los datos personales y foto de perfil del usuario autenticado."""
+    target = None
+    if x_user_name:
+        try:
+            target = urllib.parse.unquote(x_user_name).strip()
+        except Exception:
+            target = x_user_name.strip()
+    if not target and username:
+        target = username.strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="Identificador de usuario requerido (X-User-Name o username).")
+
+    user = db.query(User).filter(
+        or_(
+            User.username.ilike(target),
+            User.email.ilike(target),
+            User.full_name.ilike(target)
+        )
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    if req.full_name is not None and req.full_name.strip():
+        user.full_name = req.full_name.strip()
+    if req.email is not None and req.email.strip():
+        user.email = req.email.strip()
+    if req.telegram_username is not None:
+        user.telegram_username = req.telegram_username.strip()
+    if req.phone is not None:
+        user.phone = req.phone.strip()
+    if req.job_title is not None:
+        user.job_title = req.job_title.strip()
+    if req.bio is not None:
+        user.bio = req.bio.strip()
+    if req.avatar_data is not None:
+        user.avatar_data = req.avatar_data
+
+    db.commit()
+    db.refresh(user)
+    return {
+        "status": "ok",
+        "message": "Datos personales y perfil actualizados con éxito",
+        "user": _serialize_user(user)
+    }
 
 @app.post("/api/auth/change-password")
 def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):

@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.models import Item, EscalationDocument, User, IBP
-from app.main import app, VALID_ESCALATION_CATEGORIES, ensure_db_schema, IBP_INVENTORY, normalize_ibp
+from app.main import app, VALID_ESCALATION_CATEGORIES, ensure_db_schema, IBP_INVENTORY, normalize_ibp, hash_password
 
 test_engine = create_engine(
     "sqlite:///:memory:",
@@ -1311,6 +1311,65 @@ class TestEscalationFeatures(unittest.TestCase):
             "title": "Intento de creación por Analista"
         }, headers={"X-User-Role": "Analista"})
         self.assertEqual(analyst_res.status_code, 403)
+
+    def test_user_profile_and_password_management(self):
+        """Verifica la consulta y actualización de datos personales, foto y cambio de clave."""
+        db = TestingSessionLocal()
+        try:
+            u = db.query(User).filter(User.username == "j.fernandez").first()
+            if not u:
+                u = User(
+                    full_name="Juan Fernandez",
+                    username="j.fernandez",
+                    email="j.fernandez@sycom.com.ve",
+                    telegram_username="@Juuan8",
+                    role="especialista",
+                    password_hash=hash_password("sycom2026"),
+                    is_active=1
+                )
+                db.add(u)
+                db.commit()
+        finally:
+            db.close()
+
+        # 1. Consulta del perfil actual
+        res_me = self.client.get("/api/users/me", headers={"X-User-Name": "Juan Fernandez"})
+        self.assertEqual(res_me.status_code, 200)
+        u_data = res_me.json()
+        self.assertIn("username", u_data)
+        self.assertIn("role", u_data)
+        self.assertIn("avatar_data", u_data)
+        self.assertIn("phone", u_data)
+
+        # 2. Actualización de datos personales y foto
+        new_avatar = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        update_res = self.client.put("/api/users/me", json={
+            "phone": "+58 412 9998877",
+            "job_title": "Especialista en Infraestructura & BD",
+            "bio": "Administrador de sistemas y bases de datos",
+            "avatar_data": new_avatar
+        }, headers={"X-User-Name": "Juan Fernandez"})
+        self.assertEqual(update_res.status_code, 200)
+        up_data = update_res.json()["user"]
+        self.assertEqual(up_data["phone"], "+58 412 9998877")
+        self.assertEqual(up_data["job_title"], "Especialista en Infraestructura & BD")
+        self.assertEqual(up_data["avatar_data"], new_avatar)
+
+        # 3. Cambio de contraseña
+        pw_res = self.client.post("/api/auth/change-password", json={
+            "username": "j.fernandez",
+            "old_password": "sycom2026",
+            "new_password": "newpassword2026"
+        })
+        self.assertEqual(pw_res.status_code, 200)
+
+        # 4. Revertir contraseña para no afectar otros tests
+        rev_res = self.client.post("/api/auth/change-password", json={
+            "username": "j.fernandez",
+            "old_password": "newpassword2026",
+            "new_password": "sycom2026"
+        })
+        self.assertEqual(rev_res.status_code, 200)
 
 
 if __name__ == "__main__":
