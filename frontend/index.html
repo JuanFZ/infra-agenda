@@ -2933,8 +2933,17 @@
       <!-- Selector de Pestañas / Sub-navegación -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
         <div style="display:inline-flex;background:rgba(255,255,255,0.04);padding:4px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);gap:4px">
-          <button type="button" id="tabBtnReportHistory" onclick="switchReportsSubView('history')"
+          <button type="button" id="tabBtnReportAnalytics" onclick="switchReportsSubView('analytics')"
             style="padding:8px 16px;font-size:12.5px;font-weight:700;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .2s ease">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            <span>Indicadores y Gráficos KPI</span>
+          </button>
+          <button type="button" id="tabBtnReportHistory" onclick="switchReportsSubView('history')"
+            style="padding:8px 16px;font-size:12.5px;font-weight:600;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .2s ease">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
@@ -2944,20 +2953,11 @@
             </svg>
             <span>Historial de Reportes</span>
           </button>
-          <button type="button" id="tabBtnReportAnalytics" onclick="switchReportsSubView('analytics')"
-            style="padding:8px 16px;font-size:12.5px;font-weight:600;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .2s ease">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="20" x2="18" y2="10"/>
-              <line x1="12" y1="20" x2="12" y2="4"/>
-              <line x1="6" y1="20" x2="6" y2="14"/>
-            </svg>
-            <span>Indicadores y Gráficos KPI</span>
-          </button>
         </div>
       </div>
 
-      <!-- Sub-vista 1: Historial de Reportes Ejecutivos -->
-      <div id="subViewReportsHistory">
+      <!-- Sub-vista: Historial de Reportes Ejecutivos -->
+      <div id="subViewReportsHistory" style="display:none">
         <div class="card">
           <div
             style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
@@ -3049,8 +3049,8 @@
         </div>
       </div>
 
-      <!-- Sub-vista 2: Indicadores y Gráficos KPI de Gestión -->
-      <div id="subViewReportsAnalytics" style="display:none">
+      <!-- Sub-vista: Indicadores y Gráficos KPI de Gestión (por defecto) -->
+      <div id="subViewReportsAnalytics">
         <div class="card" style="margin-bottom:20px">
           <!-- Cabecera del Dashboard con Filtros Integrados -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
@@ -3144,11 +3144,11 @@
 
               <button class="btn" onclick="switchReportsSubView('history')"
                 style="background:rgba(255,255,255,0.04);color:var(--muted);border-color:rgba(255,255,255,0.1);display:inline-flex;align-items:center;gap:6px;padding:6px 12px"
-                title="Regresar a la tabla de reportes ejecutivos">
+                title="Ir a la tabla de historial de reportes ejecutivos">
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
                 </svg>
-                <span>Volver al Historial</span>
+                <span>Historial de Reportes</span>
               </button>
             </div>
           </div>
@@ -3242,6 +3242,23 @@
               </div>
             </div>
 
+          </div>
+
+          <!-- 2C. Matriz de Calor IBP × Categoría Técnica -->
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:20px">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+              <div>
+                <h4 style="margin:0;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f472b6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+                  <span>Matriz IBP × Categoría Técnica (Mapa de Calor)</span>
+                </h4>
+                <span class="muted" style="font-size:11.5px">Concentración de casos por banco y tipo de incidencia · Clic en una celda para filtrar el tablero</span>
+              </div>
+              <span class="muted" style="font-size:11px" id="lblMatrixInfo">—</span>
+            </div>
+            <div id="chartIbpCategoryMatrix">
+              <!-- Generado por JS -->
+            </div>
           </div>
 
           <!-- 3. Gráficos Secundarios: Plataformas, Prioridad y Clientes Top -->
@@ -6995,7 +7012,7 @@
     // =========================================================================
     // MÓDULO DE REPORTES: SUB-VISTA DE ANALÍTICA, KPIS Y GRÁFICOS DE GESTIÓN
     // =========================================================================
-    let CURRENT_REPORTS_SUBVIEW = 'history'; // 'history' | 'analytics'
+    let CURRENT_REPORTS_SUBVIEW = 'analytics'; // 'analytics' | 'history'
     let CURRENT_ANALYTICS_DATA = null;
 
     function switchReportsSubView(subview) {
@@ -7194,8 +7211,9 @@
       renderAnalyticsKpis(data.kpis || {}, data.por_origen || {});
       renderSlaDonutChart(data.kpis || {});
       renderSpecialistsChart(data.por_especialista || []);
-      renderCategoryChart(data.por_categoria || []);
-      renderIbpChart(data.por_ibp || []);
+      renderCategoryChart(data.por_categoria || [], data.items || []);
+      renderIbpChart(data.por_ibp || [], data.items || []);
+      renderIbpCategoryMatrix(data);
       renderPlatformChart(data.por_origen || {});
       renderPriorityChart(data.por_prioridad || {});
       renderClientsChart(data.por_cliente || []);
@@ -7467,7 +7485,7 @@
               ${escapeHtml(shortName)}
             </strong>
             <div style="margin-top:3px">${roleBadge}</div>
-            <div style="font-size:10px;font-weight:700;color:${slaColor};margin-top:3px">${sla.toFixed(0)}% SLA</div>
+            <div style="font-size:10px;font-weight:700;color:${s.total > 0 ? slaColor : '#94a3b8'};margin-top:3px">${s.total > 0 ? `${sla.toFixed(0)}% SLA` : '— SLA'}</div>
           </div>
         `;
       }).join('');
@@ -7488,7 +7506,7 @@
             </div>
             <div style="display:flex;align-items:center;gap:10px">
               <span><strong>${s.total}</strong> casos (<span style="color:#10b981">${s.cerrados} c.</span> / <span style="color:#4f8cff">${s.en_curso} act.</span>${s.fuera_sla > 0 ? ` / <span style="color:#ef4444">${s.fuera_sla} atr.</span>` : ''})</span>
-              <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:9.5px;font-weight:700">${sla.toFixed(0)}% SLA</span>
+              ${rptSlaBadge(s.cumplimiento_pct, s.total > 0)}
             </div>
           </div>
         `;
@@ -7635,94 +7653,394 @@
       }).join('');
     }
 
-    function renderCategoryChart(list) {
+    // -------------------------------------------------------------------------
+    // Helpers compartidos: gráficos por Categoría, por IBP y Matriz IBP × Categoría
+    // -------------------------------------------------------------------------
+    const RPT_GENERAL_IBP = 'General / Interno';
+    const RPT_CAT_COLORS = {
+      'CPU': '#ef4444',
+      'RAM': '#f97316',
+      'Disco': '#eab308',
+      'Antivirus': '#10b981',
+      'PostgreSQL': '#3b82f6',
+      'Servicios': '#8b5cf6',
+      'Infraestructura': '#06b6d4',
+      'Proyectos y Tareas': '#ec4899'
+    };
+    // Segmentos mutuamente excluyentes de las barras apiladas
+    const RPT_SEGMENTS = [
+      { key: 'ok_closed', label: 'Resueltas en SLA', short: 'resueltas', one: 'resuelta', color: '#10b981' },
+      { key: 'ok_active', label: 'En curso en SLA', short: 'en curso', one: 'en curso', color: '#3b82f6' },
+      { key: 'overdue', label: 'Fuera de SLA', short: 'fuera SLA', one: 'fuera SLA', color: '#ef4444' },
+      { key: 'esc_only', label: 'Escalamiento sin actividad', short: 'esc. sin act.', one: 'esc. sin act.', color: '#a78bfa' }
+    ];
+
+    function rptIsOverdue(it) {
+      return !!(it && (it.is_overdue || it.semaphore === 'rojo'));
+    }
+
+    // Etiqueta SLA con semáforo; gris "—" cuando no hay actividades medibles
+    function rptSlaBadge(pct, measurable) {
+      if (!measurable) {
+        return `<span class="badge" title="Sin actividades medibles en este período" style="background:rgba(148,163,184,0.12);color:#94a3b8;border:1px solid rgba(148,163,184,0.25);font-size:10px;padding:2px 6px;font-weight:700;white-space:nowrap">— SLA</span>`;
+      }
+      const sla = Number(pct) || 0;
+      const c = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
+      return `<span class="badge" style="background:${c}22;color:${c};border:1px solid ${c}44;font-size:10px;padding:2px 6px;font-weight:700;white-space:nowrap">${sla.toFixed(0)}% SLA</span>`;
+    }
+
+    // Agrupa los items del período por campo ('ibp' | 'category') en segmentos de estado
+    function rptBuildBreakdown(items, field) {
+      const map = {};
+      (items || []).forEach(it => {
+        const k = it[field] || (field === 'ibp' ? RPT_GENERAL_IBP : 'Infraestructura');
+        const b = map[k] || (map[k] = { ok_closed: 0, ok_active: 0, overdue: 0 });
+        if (rptIsOverdue(it)) b.overdue++;
+        else if (it.status === 'cerrado') b.ok_closed++;
+        else b.ok_active++;
+      });
+      return map;
+    }
+
+    // Segmentos de una fila agregada (por_categoria / por_ibp)
+    function rptRowSegments(row, breakdown) {
+      const totalItems = row.total_items || 0;
+      let b = breakdown || null;
+      if (!b || (b.ok_closed + b.ok_active + b.overdue) !== totalItems) {
+        // Respaldo con los campos agregados del backend
+        const overdue = Math.min(row.fuera_sla || 0, totalItems);
+        const closed = Math.min(row.cerrados || 0, totalItems - overdue);
+        b = { ok_closed: closed, ok_active: Math.max(totalItems - overdue - closed, 0), overdue };
+      }
+      return { ...b, esc_only: Math.max((row.total || 0) - totalItems, 0) };
+    }
+
+    function rptStackedBarHtml(segs, total, widthPct) {
+      const parts = RPT_SEGMENTS.filter(s => segs[s.key] > 0).map(s =>
+        `<div title="${s.label}: ${segs[s.key]}" style="width:${(segs[s.key] / total) * 100}%;background:${s.color};height:100%"></div>`
+      ).join('');
+      return `
+        <div style="background:rgba(255,255,255,0.06);height:8px;border-radius:4px;overflow:hidden">
+          <div style="width:${widthPct}%;height:100%;display:flex;gap:1px;border-radius:4px;overflow:hidden">${parts}</div>
+        </div>`;
+    }
+
+    function rptSegmentsDetailHtml(segs) {
+      return RPT_SEGMENTS.filter(s => segs[s.key] > 0).map(s =>
+        `<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:${s.color}"></span>${segs[s.key]} ${segs[s.key] === 1 ? s.one : s.short}</span>`
+      ).join('');
+    }
+
+    function rptSegmentsLegendHtml() {
+      return `
+        <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:10.5px;color:var(--muted);margin-bottom:10px">
+          ${RPT_SEGMENTS.map(s => `<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:2px;background:${s.color}"></span>${s.label}</span>`).join('')}
+        </div>`;
+    }
+
+    // Fila de barra apilada clicable (filtra el tablero por esa IBP o categoría)
+    function rptBarRowHtml(opts) {
+      const { label, labelColor, dotColor, segs, total, maxTotal, sumTotal, slaPct, measurable, drillAttr, drillValue, active, muted } = opts;
+      const widthPct = total > 0 ? Math.max((total / maxTotal) * 100, 4) : 0;
+      const share = sumTotal > 0 ? ((total / sumTotal) * 100).toFixed(0) : '0';
+      return `
+        <div ${drillAttr}="${escapeHtml(drillValue)}" onclick="applyAnalyticsDrilldown(this.dataset.drillIbp, this.dataset.drillCat)"
+          title="Clic para ${active ? 'quitar el filtro' : 'filtrar el tablero por'} ${escapeHtml(label)}"
+          style="cursor:pointer;background:${active ? 'rgba(79,140,255,0.08)' : 'rgba(255,255,255,0.02)'};padding:9px 11px;border-radius:8px;border:1px solid ${active ? 'rgba(79,140,255,0.45)' : 'rgba(255,255,255,0.05)'};opacity:${muted ? '0.8' : '1'};transition:background .15s,border-color .15s"
+          onmouseover="this.style.borderColor='rgba(79,140,255,0.35)'" onmouseout="this.style.borderColor='${active ? 'rgba(79,140,255,0.45)' : 'rgba(255,255,255,0.05)'}'">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;margin-bottom:6px">
+            <span style="display:flex;align-items:center;gap:7px;font-weight:700;color:${labelColor};min-width:0;overflow:hidden">
+              ${dotColor ? `<span style="width:9px;height:9px;border-radius:2px;background:${dotColor};display:inline-block;flex-shrink:0"></span>` : ''}
+              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(label)}</span>
+            </span>
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px;flex-shrink:0">
+              <span style="color:var(--text)"><strong style="font-size:13px">${total}</strong> <span class="muted">(${share}%)</span></span>
+              ${rptSlaBadge(slaPct, measurable)}
+            </div>
+          </div>
+          ${rptStackedBarHtml(segs, total, widthPct)}
+          <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:10.5px;color:var(--muted);margin-top:5px">${rptSegmentsDetailHtml(segs)}</div>
+        </div>`;
+    }
+
+    function rptSetSelectValue(sel, val) {
+      if (!sel) return;
+      if (!val) { sel.value = ''; return; }
+      let opt = Array.from(sel.options).find(o => o.value === val);
+      if (!opt) {
+        opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = val;
+        sel.appendChild(opt);
+      }
+      sel.value = val;
+    }
+
+    // Drill-down: aplica (o quita, si ya está activo) el filtro de IBP y/o Categoría
+    function applyAnalyticsDrilldown(ibp, cat) {
+      ensureAnalyticsIbpOptions();
+      const ibpSel = document.getElementById('analyticsIbpSelect');
+      const catSel = document.getElementById('analyticsCategorySelect');
+      const curIbp = ibpSel ? ibpSel.value : '';
+      const curCat = catSel ? catSel.value : '';
+
+      if (ibp !== undefined && cat !== undefined) {
+        const same = (curIbp === ibp && curCat === cat);
+        rptSetSelectValue(ibpSel, same ? '' : ibp);
+        rptSetSelectValue(catSel, same ? '' : cat);
+      } else if (ibp !== undefined) {
+        rptSetSelectValue(ibpSel, curIbp === ibp ? '' : ibp);
+      } else if (cat !== undefined) {
+        rptSetSelectValue(catSel, curCat === cat ? '' : cat);
+      } else {
+        return;
+      }
+      loadAnalyticsData();
+    }
+
+    function renderCategoryChart(list, items) {
       const container = document.getElementById('chartCategoryContainer');
       const countEl = document.getElementById('lblCategoryCount');
       if (!container) return;
 
       if (!list || !list.length) {
+        if (countEl) countEl.textContent = '—';
         container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--muted)">Sin datos de categorías en este filtro.</div>`;
         return;
       }
 
-      if (countEl) countEl.textContent = `${list.length} categorías`;
-      const maxTotal = Math.max(...list.map(c => c.total || 0), 1);
-      const catColors = {
-        'CPU': '#ef4444',
-        'RAM': '#f97316',
-        'Disco': '#eab308',
-        'Antivirus': '#10b981',
-        'PostgreSQL': '#3b82f6',
-        'Servicios': '#8b5cf6',
-        'Infraestructura': '#06b6d4'
-      };
+      const activeList = list.filter(c => (c.total || 0) > 0);
+      const zeroList = list.filter(c => !(c.total > 0));
+      if (countEl) countEl.textContent = `${activeList.length} con actividad · ${list.length} categorías`;
 
-      container.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">` + list.map(c => {
-        const sla = Number(c.cumplimiento_pct) || 0;
-        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
-        const barColor = catColors[c.category] || '#4f8cff';
-        const barPct = c.total > 0 ? Math.max((c.total / maxTotal) * 100, 4) : 0;
+      const catSel = document.getElementById('analyticsCategorySelect');
+      const currentCat = catSel ? catSel.value : '';
+      const breakdown = rptBuildBreakdown(items, 'category');
+      const maxTotal = Math.max(...activeList.map(c => c.total || 0), 1);
+      const sumTotal = activeList.reduce((a, c) => a + (c.total || 0), 0);
 
-        return `
-          <div style="background:rgba(255,255,255,0.02);padding:8px 11px;border-radius:8px;border:1px solid rgba(255,255,255,0.05)">
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:5px">
-              <span style="display:flex;align-items:center;gap:7px;font-weight:700;color:var(--text)">
-                <span style="width:9px;height:9px;border-radius:2px;background:${barColor};display:inline-block"></span>
-                ${escapeHtml(c.category)}
-              </span>
-              <div style="display:flex;align-items:center;gap:8px;font-size:11px">
-                <span style="color:var(--muted)"><strong>${c.total}</strong> total (${c.total_items || 0} act. / ${c.total_escalamientos || 0} esc.)</span>
-                <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:10px;padding:2px 6px;font-weight:700">
-                  ${sla.toFixed(0)}% SLA
-                </span>
-              </div>
-            </div>
-            <div style="background:rgba(255,255,255,0.06);height:6px;border-radius:3px;overflow:hidden">
-              <div style="width:${barPct}%;background:${barColor};height:100%"></div>
-            </div>
-          </div>
-        `;
-      }).join('') + `</div>`;
+      const rowsHtml = activeList.map(c => rptBarRowHtml({
+        label: c.category,
+        labelColor: 'var(--text)',
+        dotColor: RPT_CAT_COLORS[c.category] || '#4f8cff',
+        segs: rptRowSegments(c, breakdown[c.category]),
+        total: c.total || 0,
+        maxTotal,
+        sumTotal,
+        slaPct: c.cumplimiento_pct,
+        measurable: (c.total_items || 0) > 0,
+        drillAttr: 'data-drill-cat',
+        drillValue: c.category,
+        active: currentCat === c.category
+      })).join('');
+
+      const zeroHtml = zeroList.length ? `
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 11px;border-radius:8px;border:1px dashed rgba(255,255,255,0.08);font-size:11px">
+          <span class="muted" style="font-weight:600">Sin actividad:</span>
+          ${zeroList.map(c => `<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.04);color:var(--muted)"><span style="width:6px;height:6px;border-radius:2px;background:${RPT_CAT_COLORS[c.category] || '#4f8cff'};opacity:0.6"></span>${escapeHtml(c.category)}</span>`).join('')}
+        </div>` : '';
+
+      container.innerHTML = `
+        ${activeList.length ? rptSegmentsLegendHtml() : ''}
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${rowsHtml || `<div style="text-align:center;padding:18px;color:var(--muted)">Ninguna categoría registra actividad en este período.</div>`}
+          ${zeroHtml}
+        </div>`;
     }
 
-    function renderIbpChart(list) {
+    function renderIbpChart(list, items) {
       const container = document.getElementById('chartIbpContainer');
       const countEl = document.getElementById('lblIbpCount');
       if (!container) return;
 
-      if (!list || !list.length) {
+      const activeList = (list || []).filter(i => (i.total || 0) > 0);
+      if (!activeList.length) {
+        if (countEl) countEl.textContent = '—';
         container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--muted)">Sin registros por IBP en este filtro.</div>`;
         return;
       }
 
-      if (countEl) countEl.textContent = `${list.length} IBPs con actividad`;
-      const topIbps = list.slice(0, 8);
-      const maxTotal = Math.max(...topIbps.map(i => i.total || 0), 1);
+      const banks = activeList.filter(i => i.ibp !== RPT_GENERAL_IBP);
+      const general = activeList.find(i => i.ibp === RPT_GENERAL_IBP);
+      if (countEl) countEl.textContent = `${banks.length} IBP${banks.length === 1 ? '' : 's'} con actividad`;
 
-      container.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">` + topIbps.map(item => {
-        const sla = Number(item.cumplimiento_pct) || 0;
-        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
-        const barPct = item.total > 0 ? Math.max((item.total / maxTotal) * 100, 4) : 0;
+      const ibpSel = document.getElementById('analyticsIbpSelect');
+      const currentIbp = ibpSel ? ibpSel.value : '';
+      const breakdown = rptBuildBreakdown(items, 'ibp');
+      const MAX_ROWS = 8;
+      const topBanks = banks.slice(0, MAX_ROWS);
+      const hiddenBanks = banks.slice(MAX_ROWS);
+      const maxTotal = Math.max(...activeList.map(i => i.total || 0), 1);
+      const sumTotal = activeList.reduce((a, i) => a + (i.total || 0), 0);
+
+      const rowFor = (item, isGeneral) => rptBarRowHtml({
+        label: item.ibp,
+        labelColor: isGeneral ? 'var(--muted)' : '#38bdf8',
+        dotColor: null,
+        segs: rptRowSegments(item, breakdown[item.ibp]),
+        total: item.total || 0,
+        maxTotal,
+        sumTotal,
+        slaPct: item.cumplimiento_pct,
+        measurable: (item.total_items || 0) > 0,
+        drillAttr: 'data-drill-ibp',
+        drillValue: item.ibp,
+        active: currentIbp === item.ibp,
+        muted: isGeneral
+      });
+
+      const banksHtml = topBanks.length
+        ? topBanks.map(b => rowFor(b, false)).join('')
+        : `<div style="text-align:center;padding:14px;color:var(--muted);font-size:12px">Ninguna institución bancaria registra actividad en este período.</div>`;
+
+      const hiddenHtml = hiddenBanks.length ? `
+        <div class="muted" style="font-size:11px;padding:2px 4px">
+          +${hiddenBanks.length} IBP${hiddenBanks.length === 1 ? '' : 's'} más con ${hiddenBanks.reduce((a, b) => a + (b.total || 0), 0)} casos (ver matriz inferior)
+        </div>` : '';
+
+      const generalHtml = general ? `
+        <div style="display:flex;align-items:center;gap:8px;margin:4px 0 0 0">
+          <span style="flex:1;height:1px;background:rgba(255,255,255,0.07)"></span>
+          <span class="muted" style="font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px">Sin IBP asociada</span>
+          <span style="flex:1;height:1px;background:rgba(255,255,255,0.07)"></span>
+        </div>
+        ${rowFor(general, true)}` : '';
+
+      container.innerHTML = `
+        ${rptSegmentsLegendHtml()}
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${banksHtml}
+          ${hiddenHtml}
+          ${generalHtml}
+        </div>`;
+    }
+
+    // Matriz de calor IBP × Categoría (filas = IBP, columnas = categorías con actividad)
+    function renderIbpCategoryMatrix(data) {
+      const container = document.getElementById('chartIbpCategoryMatrix');
+      const infoEl = document.getElementById('lblMatrixInfo');
+      if (!container) return;
+
+      const items = (data && data.items) || [];
+      const escs = (data && data.escalations) || [];
+      const linkedEscIds = new Set(items.map(it => it.escalation_id).filter(Boolean));
+
+      const cells = {};
+      const rowTotals = {};
+      const colTotals = {};
+      const add = (ibp, cat, kind, overdue) => {
+        const key = `${ibp}\u0000${cat}`;
+        const c = cells[key] || (cells[key] = { total: 0, items: 0, esc: 0, overdue: 0 });
+        c.total++;
+        if (kind === 'item') c.items++; else c.esc++;
+        if (overdue) c.overdue++;
+        rowTotals[ibp] = (rowTotals[ibp] || 0) + 1;
+        colTotals[cat] = (colTotals[cat] || 0) + 1;
+      };
+      items.forEach(it => add(it.ibp || RPT_GENERAL_IBP, it.category || 'Infraestructura', 'item', rptIsOverdue(it)));
+      // Escalamientos sin actividad vinculada (evita doble conteo)
+      escs.forEach(e => {
+        if (linkedEscIds.has(e.id)) return;
+        add((e.ibp || RPT_GENERAL_IBP).trim(), (e.category || 'Infraestructura').trim(), 'esc', false);
+      });
+
+      const rows = Object.keys(rowTotals).sort((a, b) => {
+        if (a === RPT_GENERAL_IBP) return 1;
+        if (b === RPT_GENERAL_IBP) return -1;
+        return rowTotals[b] - rowTotals[a] || a.localeCompare(b);
+      });
+      const cols = Object.keys(colTotals).sort((a, b) => colTotals[b] - colTotals[a] || a.localeCompare(b));
+
+      if (!rows.length || !cols.length) {
+        if (infoEl) infoEl.textContent = '—';
+        container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--muted)">Sin casos para cruzar en este período.</div>`;
+        return;
+      }
+
+      const grand = rows.reduce((a, r) => a + rowTotals[r], 0);
+      const maxCell = Math.max(...Object.values(cells).map(c => c.total), 1);
+      if (infoEl) infoEl.textContent = `${rows.length} IBP${rows.length === 1 ? '' : 's'} × ${cols.length} categoría${cols.length === 1 ? '' : 's'} · ${grand} casos`;
+
+      const ibpSel = document.getElementById('analyticsIbpSelect');
+      const catSel = document.getElementById('analyticsCategorySelect');
+      const curIbp = ibpSel ? ibpSel.value : '';
+      const curCat = catSel ? catSel.value : '';
+
+      const thStyle = 'padding:6px 8px;font-size:11px;font-weight:700;color:var(--muted);text-align:center;white-space:nowrap';
+      const headHtml = cols.map(cat => `
+        <th style="${thStyle};cursor:pointer" data-drill-cat="${escapeHtml(cat)}" onclick="applyAnalyticsDrilldown(undefined, this.dataset.drillCat)" title="Filtrar por ${escapeHtml(cat)}">
+          <span style="display:inline-flex;align-items:center;gap:5px;${curCat === cat ? 'color:var(--accent)' : ''}">
+            <span style="width:8px;height:8px;border-radius:2px;background:${RPT_CAT_COLORS[cat] || '#4f8cff'}"></span>${escapeHtml(cat)}
+          </span>
+        </th>`).join('');
+
+      const bodyHtml = rows.map(ibp => {
+        const isGeneral = ibp === RPT_GENERAL_IBP;
+        const cellsHtml = cols.map(cat => {
+          const c = cells[`${ibp}\u0000${cat}`];
+          if (!c) {
+            return `<td style="text-align:center;padding:0;height:34px;min-width:62px;border-radius:6px;background:rgba(255,255,255,0.015);color:rgba(255,255,255,0.15);font-size:11px">·</td>`;
+          }
+          const alpha = 0.14 + 0.66 * (c.total / maxCell);
+          const strong = alpha > 0.45;
+          const isActive = curIbp === ibp && curCat === cat;
+          const ring = c.overdue > 0
+            ? 'box-shadow:inset 0 0 0 2px #ef4444;'
+            : (isActive ? 'box-shadow:inset 0 0 0 2px #ffffff;' : '');
+          const tip = `${ibp} · ${cat}: ${c.total} caso${c.total === 1 ? '' : 's'} (${c.items} act. / ${c.esc} esc. sin act.)${c.overdue ? ` · ${c.overdue} fuera de SLA` : ''}`;
+          return `
+            <td data-drill-ibp="${escapeHtml(ibp)}" data-drill-cat="${escapeHtml(cat)}"
+              onclick="applyAnalyticsDrilldown(this.dataset.drillIbp, this.dataset.drillCat)" title="${escapeHtml(tip)}"
+              style="cursor:pointer;text-align:center;padding:0;height:34px;min-width:62px;border-radius:6px;background:rgba(56,189,248,${alpha.toFixed(2)});${ring}color:${strong ? '#ffffff' : 'var(--text)'};font-size:12.5px;font-weight:800;position:relative;transition:transform .12s"
+              onmouseover="this.style.transform='scale(1.06)'" onmouseout="this.style.transform='none'">
+              ${c.total}
+              ${c.overdue ? `<span style="position:absolute;top:2px;right:4px;font-size:9px;font-weight:800;color:#fecaca">${c.overdue}!</span>` : ''}
+            </td>`;
+        }).join('');
 
         return `
-          <div style="background:rgba(255,255,255,0.02);padding:8px 11px;border-radius:8px;border:1px solid rgba(255,255,255,0.05)">
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:5px">
-              <span style="font-weight:700;color:#38bdf8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:210px" title="${escapeHtml(item.ibp)}">
-                ${escapeHtml(item.ibp)}
-              </span>
-              <div style="display:flex;align-items:center;gap:8px;font-size:11px">
-                <span style="color:var(--muted)"><strong>${item.total}</strong> (${item.total_items || 0} act. / ${item.total_escalamientos || 0} esc.)</span>
-                <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:10px;padding:2px 6px;font-weight:700">
-                  ${sla.toFixed(0)}% SLA
-                </span>
-              </div>
-            </div>
-            <div style="background:rgba(255,255,255,0.06);height:6px;border-radius:3px;overflow:hidden">
-              <div style="width:${barPct}%;background:linear-gradient(90deg, #38bdf8, #2563eb);height:100%"></div>
-            </div>
-          </div>
-        `;
-      }).join('') + `</div>`;
+          <tr>
+            <th data-drill-ibp="${escapeHtml(ibp)}" onclick="applyAnalyticsDrilldown(this.dataset.drillIbp, undefined)" title="Filtrar por ${escapeHtml(ibp)}"
+              style="cursor:pointer;text-align:left;padding:6px 10px 6px 4px;font-size:12px;font-weight:700;white-space:nowrap;color:${curIbp === ibp ? 'var(--accent)' : (isGeneral ? 'var(--muted)' : '#38bdf8')};position:sticky;left:0;background:var(--bg);z-index:1">
+              ${escapeHtml(ibp)}
+            </th>
+            ${cellsHtml}
+            <td style="text-align:center;padding:0 8px;font-size:12px;font-weight:800;color:var(--text);border-left:1px solid rgba(255,255,255,0.08)">${rowTotals[ibp]}</td>
+          </tr>`;
+      }).join('');
+
+      const footHtml = `
+        <tr>
+          <th style="text-align:left;padding:8px 10px 4px 4px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;position:sticky;left:0;background:var(--bg);z-index:1">Total</th>
+          ${cols.map(cat => `<td style="text-align:center;padding-top:8px;font-size:12px;font-weight:800;color:var(--text);border-top:1px solid rgba(255,255,255,0.08)">${colTotals[cat]}</td>`).join('')}
+          <td style="text-align:center;padding:8px 8px 0 8px;font-size:12.5px;font-weight:900;color:var(--accent);border-top:1px solid rgba(255,255,255,0.08);border-left:1px solid rgba(255,255,255,0.08)">${grand}</td>
+        </tr>`;
+
+      container.innerHTML = `
+        <div style="overflow-x:auto">
+          <table style="border-collapse:separate;border-spacing:4px;width:100%">
+            <thead>
+              <tr>
+                <th style="${thStyle};text-align:left;position:sticky;left:0;background:var(--bg);z-index:1">IBP \\ Categoría</th>
+                ${headHtml}
+                <th style="${thStyle}">Total</th>
+              </tr>
+            </thead>
+            <tbody>${bodyHtml}${footHtml}</tbody>
+          </table>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-top:12px;font-size:10.5px;color:var(--muted)">
+          <span style="display:inline-flex;align-items:center;gap:6px">
+            Menos
+            <span style="width:90px;height:8px;border-radius:4px;background:linear-gradient(90deg, rgba(56,189,248,0.14), rgba(56,189,248,0.80))"></span>
+            Más casos
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:6px">
+            <span style="width:14px;height:12px;border-radius:3px;box-shadow:inset 0 0 0 2px #ef4444"></span>
+            Con casos fuera de SLA (n! = cantidad)
+          </span>
+          <span>Clic en IBP, categoría o celda para filtrar · clic de nuevo para quitar</span>
+        </div>`;
     }
 
     // =========================================================================

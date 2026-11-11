@@ -7,6 +7,7 @@ Soporta exportación en Excel (.xlsx) con openpyxl y vista ejecutiva imprimible 
 import io
 import math
 import datetime
+from html import escape as html_escape
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
@@ -465,6 +466,7 @@ def get_report_data(
             "client_type": it.client_type or "Interno",
             "ibp": item_ibp_map.get(it.id, "General / Interno"),
             "category": item_cat_map.get(it.id, "Infraestructura"),
+            "escalation_id": it.escalation_id,
             "assignee_name": it.assignee_name or "Sin asignar",
             "priority": it.priority or "Media",
             "status": it.status or "pendiente",
@@ -1027,6 +1029,181 @@ def _build_svg_donut_chart(kpis: Dict[str, Any]) -> str:
     """
 
 
+# ---------------------------------------------------------------------------
+# Helpers del PDF: barras apiladas por estado, SLA "—" sin datos y matriz IBP × Categoría
+# ---------------------------------------------------------------------------
+GENERAL_IBP_LABEL = "General / Interno"
+
+PDF_CAT_COLORS = {
+    "CPU": "#ef4444",
+    "RAM": "#f97316",
+    "Disco": "#eab308",
+    "Antivirus": "#10b981",
+    "PostgreSQL": "#3b82f6",
+    "Servicios": "#8b5cf6",
+    "Infraestructura": "#06b6d4",
+    "Proyectos y Tareas": "#ec4899",
+}
+
+# (clave, etiqueta, plural, singular, color) — segmentos mutuamente excluyentes
+PDF_SEGMENTS = [
+    ("ok_closed", "Resueltas en SLA", "resueltas", "resuelta", "#10b981"),
+    ("ok_active", "En curso en SLA", "en curso", "en curso", "#0ea5e9"),
+    ("overdue", "Fuera de SLA", "fuera SLA", "fuera SLA", "#ef4444"),
+    ("esc_only", "Escalamiento sin actividad", "esc. sin act.", "esc. sin act.", "#8b5cf6"),
+]
+
+
+def _sla_color(pct: float) -> str:
+    return "#10b981" if pct >= 90 else ("#f59e0b" if pct >= 80 else "#ef4444")
+
+
+def _item_is_overdue(it: Dict[str, Any]) -> bool:
+    return bool(it.get("is_overdue") or it.get("semaphore") == "rojo")
+
+
+def _pdf_sla_html(pct: float, measurable: bool) -> str:
+    if not measurable:
+        return '<strong style="color:#94a3b8" title="Sin actividades medibles">— SLA</strong>'
+    return f'<strong style="color:{_sla_color(pct)}">{pct:.0f}% SLA</strong>'
+
+
+def _pdf_breakdown(items: List[Dict[str, Any]], field: str, default: str) -> Dict[str, Dict[str, int]]:
+    """Agrupa los items del período por IBP o categoría en segmentos de estado."""
+    out: Dict[str, Dict[str, int]] = {}
+    for it in items:
+        key = it.get(field) or default
+        b = out.setdefault(key, {"ok_closed": 0, "ok_active": 0, "overdue": 0})
+        if _item_is_overdue(it):
+            b["overdue"] += 1
+        elif it.get("status") == "cerrado":
+            b["ok_closed"] += 1
+        else:
+            b["ok_active"] += 1
+    return out
+
+
+def _pdf_row_segments(row: Dict[str, Any], b: Optional[Dict[str, int]]) -> Dict[str, int]:
+    total_items = row.get("total_items", 0) or 0
+    if not b or sum(b.values()) != total_items:
+        overdue = min(row.get("fuera_sla", 0) or 0, total_items)
+        closed = min(row.get("cerrados", 0) or 0, total_items - overdue)
+        b = {"ok_closed": closed, "ok_active": max(total_items - overdue - closed, 0), "overdue": overdue}
+    return {**b, "esc_only": max((row.get("total", 0) or 0) - total_items, 0)}
+
+
+def _pdf_segments_legend() -> str:
+    chips = "".join(
+        f'<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px">'
+        f'<span style="width:8px;height:8px;border-radius:2px;background:{color};display:inline-block"></span>{label}</span>'
+        for _, label, _, _, color in PDF_SEGMENTS
+    )
+    return f'<div style="font-size:9px;color:#475569;margin-bottom:6px;display:flex;flex-wrap:wrap">{chips}</div>'
+
+
+def _pdf_bar_row(label: str, label_color: str, dot_color: Optional[str], segs: Dict[str, int],
+                 total: int, max_total: int, sum_total: int, sla_pct: float, measurable: bool) -> str:
+    width = max((total / max_total) * 100.0, 4.0) if total > 0 and max_total > 0 else 0.0
+    share = (total / sum_total) * 100.0 if sum_total > 0 else 0.0
+    parts = "".join(
+        f'<div style="width:{(segs[k] / total) * 100.0:.2f}%;background:{color};height:100%"></div>'
+        for k, _, _, _, color in PDF_SEGMENTS if total > 0 and segs.get(k, 0) > 0
+    )
+    detail = " · ".join(
+        f'<span style="color:{color}">{segs[k]} {one if segs[k] == 1 else plural}</span>'
+        for k, _, plural, one, color in PDF_SEGMENTS if segs.get(k, 0) > 0
+    )
+    dot = (f'<span style="width:8px;height:8px;border-radius:2px;background:{dot_color};display:inline-block"></span>'
+           if dot_color else "")
+    return f"""
+        <div style="margin-bottom:7px">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;margin-bottom:2px">
+                <span style="font-weight:700;color:{label_color};display:flex;align-items:center;gap:5px">{dot}{html_escape(label)}</span>
+                <span style="font-size:10px;color:#334155"><strong>{total}</strong> ({share:.0f}%) · {_pdf_sla_html(sla_pct, measurable)}</span>
+            </div>
+            <div style="background:#e2e8f0;height:7px;border-radius:4px;overflow:hidden">
+                <div style="width:{width:.1f}%;height:100%;display:flex">{parts}</div>
+            </div>
+            <div style="font-size:9px;margin-top:2px">{detail}</div>
+        </div>
+    """
+
+
+def _pdf_ibp_category_matrix(data: Dict[str, Any]) -> str:
+    """Tabla de calor IBP × Categoría para el informe imprimible."""
+    items = data.get("items", []) or []
+    escs = data.get("escalations", []) or []
+    linked_ids = {it.get("escalation_id") for it in items if it.get("escalation_id")}
+
+    cells: Dict[tuple, Dict[str, int]] = {}
+    row_tot: Dict[str, int] = {}
+    col_tot: Dict[str, int] = {}
+
+    def _add(ibp: str, cat: str, overdue: bool) -> None:
+        c = cells.setdefault((ibp, cat), {"total": 0, "overdue": 0})
+        c["total"] += 1
+        if overdue:
+            c["overdue"] += 1
+        row_tot[ibp] = row_tot.get(ibp, 0) + 1
+        col_tot[cat] = col_tot.get(cat, 0) + 1
+
+    for it in items:
+        _add(it.get("ibp") or GENERAL_IBP_LABEL, it.get("category") or "Infraestructura", _item_is_overdue(it))
+    for e in escs:
+        if e.get("id") in linked_ids:
+            continue
+        _add((e.get("ibp") or GENERAL_IBP_LABEL).strip(), (e.get("category") or "Infraestructura").strip(), False)
+
+    if not row_tot:
+        return '<div style="padding:12px;text-align:center;color:#64748b;font-size:11px">Sin casos para cruzar en este período.</div>'
+
+    rows = sorted(row_tot.keys(), key=lambda r: (r == GENERAL_IBP_LABEL, -row_tot[r], r))
+    cols = sorted(col_tot.keys(), key=lambda c: (-col_tot[c], c))
+    max_cell = max(c["total"] for c in cells.values()) or 1
+    grand = sum(row_tot.values())
+
+    head = "".join(
+        f'<th style="text-align:center;white-space:nowrap">'
+        f'<span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:{PDF_CAT_COLORS.get(c, "#2563eb")};margin-right:4px"></span>'
+        f'{html_escape(c)}</th>'
+        for c in cols
+    )
+    body = ""
+    for r in rows:
+        tds = ""
+        for c in cols:
+            cell = cells.get((r, c))
+            if not cell:
+                tds += '<td style="text-align:center;color:#cbd5e1;background:#ffffff">·</td>'
+                continue
+            alpha = 0.12 + 0.68 * (cell["total"] / max_cell)
+            strong = alpha > 0.45
+            ring = "box-shadow:inset 0 0 0 2px #ef4444;" if cell["overdue"] else ""
+            flag = (f' <span style="font-size:8px;color:{"#fecaca" if strong else "#ef4444"}">({cell["overdue"]}!)</span>'
+                    if cell["overdue"] else "")
+            tds += (f'<td style="text-align:center;font-weight:800;background:rgba(37,99,235,{alpha:.2f});'
+                    f'color:{"#ffffff" if strong else "#0f172a"};{ring}">{cell["total"]}{flag}</td>')
+        name_color = "#64748b" if r == GENERAL_IBP_LABEL else "#1b365d"
+        body += (f'<tr><td style="font-weight:700;white-space:nowrap;color:{name_color};background:#ffffff">{html_escape(r)}</td>'
+                 f'{tds}<td style="text-align:center;font-weight:800;background:#f1f5f9">{row_tot[r]}</td></tr>')
+    foot = "".join(f'<td style="text-align:center;font-weight:800;background:#f1f5f9">{col_tot[c]}</td>' for c in cols)
+    body += (f'<tr><td style="font-weight:800;text-transform:uppercase;font-size:9.5px;background:#f1f5f9">Total</td>{foot}'
+             f'<td style="text-align:center;font-weight:900;color:#1b365d;background:#e2e8f0">{grand}</td></tr>')
+
+    return f"""
+        <table style="margin-bottom:6px">
+            <thead><tr><th>IBP \\ Categoría</th>{head}<th style="text-align:center">Total</th></tr></thead>
+            <tbody>{body}</tbody>
+        </table>
+        <div style="font-size:9px;color:#64748b;display:flex;gap:16px;align-items:center">
+            <span>Intensidad = volumen de casos
+                <span style="display:inline-block;width:70px;height:7px;border-radius:4px;vertical-align:middle;margin-left:4px;background:linear-gradient(90deg, rgba(37,99,235,0.12), rgba(37,99,235,0.80))"></span>
+            </span>
+            <span><span style="display:inline-block;width:12px;height:9px;border-radius:2px;vertical-align:middle;box-shadow:inset 0 0 0 2px #ef4444"></span> Con casos fuera de SLA (n! = cantidad)</span>
+        </div>
+    """
+
+
 def generate_executive_html(data: Dict[str, Any]) -> str:
     """
     Genera un informe visual ejecutivo imprimible en PDF con KPIs, gráficos vectoriales (SVG/Barras)
@@ -1058,7 +1235,6 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
     for s in spec_list:
         pct_w = (s["total"] / max_spec_total) * 100.0 if max_spec_total > 0 else 0.0
         sla_v = s["cumplimiento_pct"]
-        s_color = "#10b981" if sla_v >= 90 else ("#f59e0b" if sla_v >= 75 else "#ef4444")
         short_name = "Sin asignar" if "sin asignar" in s["name"].lower() else s["name"]
         spec_chart_bars += f"""
         <div style="margin-bottom:7px">
@@ -1067,7 +1243,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 <span>
                     <strong>{s['total']}</strong> casos
                     (<span style="color:#10b981">{s['cerrados']} c.</span> / <span style="color:#0ea5e9">{s['en_curso']} act.</span>)
-                    · <strong style="color:{s_color}">{sla_v:.0f}% SLA</strong>
+                    · {_pdf_sla_html(sla_v, s['total'] > 0)}
                 </span>
             </div>
             <div style="background:#e2e8f0;height:7px;border-radius:4px;overflow:hidden">
@@ -1076,41 +1252,47 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
         </div>
         """
 
-    # 3. Gráfico Comparativo por Categoría Técnica
+    # 3. Gráfico Comparativo por Categoría Técnica (barras apiladas + colapso de filas en 0)
+    items_for_pdf = data.get("items", []) or []
+    cat_breakdown = _pdf_breakdown(items_for_pdf, "category", "Infraestructura")
     cat_list = data.get("por_categoria", [])
-    max_cat_total = max([c["total"] for c in cat_list] + [1])
-    cat_colors = {
-        "CPU": "#ef4444",
-        "RAM": "#f97316",
-        "Disco": "#eab308",
-        "Antivirus": "#10b981",
-        "PostgreSQL": "#3b82f6",
-        "Servicios": "#8b5cf6",
-        "Infraestructura": "#06b6d4",
-    }
-    cat_chart_html = ""
+    active_cats = [c for c in cat_list if (c.get("total") or 0) > 0]
+    zero_cats = [c for c in cat_list if not (c.get("total") or 0) > 0]
+    max_cat_total = max([c["total"] for c in active_cats] + [1])
+    sum_cat_total = sum(c["total"] for c in active_cats)
+
+    cat_chart_html = _pdf_segments_legend() if active_cats else ""
     cat_table_rows = ""
+    if active_cats:
+        for c in active_cats:
+            c_col = PDF_CAT_COLORS.get(c["category"], "#2563eb")
+            segs = _pdf_row_segments(c, cat_breakdown.get(c["category"]))
+            cat_chart_html += _pdf_bar_row(
+                label=c["category"],
+                label_color="#0f172a",
+                dot_color=c_col,
+                segs=segs,
+                total=c["total"],
+                max_total=max_cat_total,
+                sum_total=sum_cat_total,
+                sla_pct=c["cumplimiento_pct"],
+                measurable=(c.get("total_items") or 0) > 0,
+            )
+    else:
+        cat_chart_html = '<div style="padding:12px;text-align:center;color:#64748b;font-size:10.5px">Ninguna categoría registra actividad en este período.</div>'
+
+    if zero_cats:
+        zero_chips = " · ".join(html_escape(c["category"]) for c in zero_cats)
+        cat_chart_html += (
+            f'<div style="margin-top:6px;padding:5px 8px;border:1px dashed #cbd5e1;border-radius:5px;font-size:9.5px;color:#64748b">'
+            f'<strong>Sin actividad:</strong> {zero_chips}</div>'
+        )
+
     for c in cat_list:
-        bar_w = (c["total"] / max_cat_total) * 100.0 if max_cat_total > 0 else 0.0
-        c_col = cat_colors.get(c["category"], "#2563eb")
-        sla_col = "#10b981" if c["cumplimiento_pct"] >= 90 else ("#f59e0b" if c["cumplimiento_pct"] >= 75 else "#ef4444")
-        cat_chart_html += f"""
-        <div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;margin-bottom:2px">
-                <span style="font-weight:700;color:#0f172a;display:flex;align-items:center;gap:5px">
-                    <span style="width:8px;height:8px;border-radius:2px;background:{c_col};display:inline-block"></span>
-                    {c['category']}
-                </span>
-                <span style="font-size:10px;color:#334155">
-                    <strong>{c['total']}</strong> ({c['total_items']} act. / {c['total_escalamientos']} esc.)
-                    · <strong style="color:{sla_col}">{c['cumplimiento_pct']:.0f}% SLA</strong>
-                </span>
-            </div>
-            <div style="background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden">
-                <div style="width:{max(bar_w, 3 if c['total'] > 0 else 0):.1f}%;background:{c_col};height:100%"></div>
-            </div>
-        </div>
-        """
+        has_items = (c.get("total_items") or 0) > 0
+        sla_col = _sla_color(c["cumplimiento_pct"]) if has_items else "#94a3b8"
+        sla_cell = f"{c['cumplimiento_pct']:.1f}%" if has_items else "—"
+        team_cell = f"{c['team_cumplimiento_pct']:.1f}%" if has_items else "—"
         cat_table_rows += f"""
         <tr>
             <td><strong>{c['category']}</strong></td>
@@ -1119,36 +1301,58 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             <td style="text-align:center;color:#2563eb;font-weight:600">{c['total_escalamientos']}</td>
             <td style="text-align:center;color:#10b981">{c['cerrados']}</td>
             <td style="text-align:center;color:{'#ef4444' if c['fuera_sla'] > 0 else '#64748b'}">{c['fuera_sla']}</td>
-            <td style="text-align:center;font-weight:700;color:{sla_col}">{c['cumplimiento_pct']:.1f}%</td>
-            <td style="text-align:center;font-weight:700;color:#0ea5e9">{c['team_cumplimiento_pct']:.1f}%</td>
+            <td style="text-align:center;font-weight:700;color:{sla_col}">{sla_cell}</td>
+            <td style="text-align:center;font-weight:700;color:{'#0ea5e9' if has_items else '#94a3b8'}">{team_cell}</td>
         </tr>
         """
 
-    # 4. Gráfico Comparativo por IBP (Banco Participante)
+    # 4. Gráfico Comparativo por IBP (Banco Participante, con General/Interno separado)
+    ibp_breakdown = _pdf_breakdown(items_for_pdf, "ibp", GENERAL_IBP_LABEL)
     ibp_list = data.get("por_ibp", [])
-    max_ibp_total = max([i["total"] for i in ibp_list] + [1])
+    active_ibps = [i for i in ibp_list if (i.get("total") or 0) > 0]
+    ibp_banks = [i for i in active_ibps if i["ibp"] != GENERAL_IBP_LABEL]
+    ibp_general = next((i for i in active_ibps if i["ibp"] == GENERAL_IBP_LABEL), None)
+    max_ibp_total = max([i["total"] for i in active_ibps] + [1])
+    sum_ibp_total = sum(i["total"] for i in active_ibps)
     ibp_chart_html = ""
     ibp_table_rows = ""
-    if ibp_list:
-        for idx, ibp_item in enumerate(ibp_list[:10]):
-            bar_w = (ibp_item["total"] / max_ibp_total) * 100.0 if max_ibp_total > 0 else 0.0
-            sla_col = "#10b981" if ibp_item["cumplimiento_pct"] >= 90 else ("#f59e0b" if ibp_item["cumplimiento_pct"] >= 75 else "#ef4444")
-            ibp_chart_html += f"""
-            <div style="margin-bottom:6px">
-                <div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;margin-bottom:2px">
-                    <span style="font-weight:700;color:#1b365d">{ibp_item['ibp']}</span>
-                    <span style="font-size:10px;color:#334155">
-                        <strong>{ibp_item['total']}</strong> ({ibp_item['total_items']} act. / {ibp_item['total_escalamientos']} esc.)
-                        · <strong style="color:{sla_col}">{ibp_item['cumplimiento_pct']:.0f}% SLA</strong>
-                    </span>
-                </div>
-                <div style="background:#e2e8f0;height:6px;border-radius:3px;overflow:hidden">
-                    <div style="width:{max(bar_w, 4 if ibp_item['total'] > 0 else 0):.1f}%;background:#1b365d;height:100%"></div>
-                </div>
-            </div>
-            """
+    if active_ibps:
+        ibp_chart_html = _pdf_segments_legend()
+        for ibp_item in ibp_banks[:8]:
+            segs = _pdf_row_segments(ibp_item, ibp_breakdown.get(ibp_item["ibp"]))
+            ibp_chart_html += _pdf_bar_row(
+                label=ibp_item["ibp"],
+                label_color="#1b365d",
+                dot_color=None,
+                segs=segs,
+                total=ibp_item["total"],
+                max_total=max_ibp_total,
+                sum_total=sum_ibp_total,
+                sla_pct=ibp_item["cumplimiento_pct"],
+                measurable=(ibp_item.get("total_items") or 0) > 0,
+            )
+        if ibp_general:
+            segs = _pdf_row_segments(ibp_general, ibp_breakdown.get(ibp_general["ibp"]))
+            ibp_chart_html += (
+                '<div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;'
+                'border-top:1px dashed #cbd5e1;padding-top:4px;margin:4px 0 3px 0">Sin IBP asociada</div>'
+            )
+            ibp_chart_html += _pdf_bar_row(
+                label=ibp_general["ibp"],
+                label_color="#64748b",
+                dot_color=None,
+                segs=segs,
+                total=ibp_general["total"],
+                max_total=max_ibp_total,
+                sum_total=sum_ibp_total,
+                sla_pct=ibp_general["cumplimiento_pct"],
+                measurable=(ibp_general.get("total_items") or 0) > 0,
+            )
         for ibp_item in ibp_list:
-            sla_col = "#10b981" if ibp_item["cumplimiento_pct"] >= 90 else ("#f59e0b" if ibp_item["cumplimiento_pct"] >= 75 else "#ef4444")
+            has_items = (ibp_item.get("total_items") or 0) > 0
+            sla_col = _sla_color(ibp_item["cumplimiento_pct"]) if has_items else "#94a3b8"
+            sla_cell = f"{ibp_item['cumplimiento_pct']:.1f}%" if has_items else "—"
+            team_cell = f"{ibp_item['team_cumplimiento_pct']:.1f}%" if has_items else "—"
             ibp_table_rows += f"""
             <tr>
                 <td><strong>{ibp_item['ibp']}</strong></td>
@@ -1157,13 +1361,15 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 <td style="text-align:center;color:#2563eb;font-weight:600">{ibp_item['total_escalamientos']}</td>
                 <td style="text-align:center;color:#10b981">{ibp_item['cerrados']}</td>
                 <td style="text-align:center;color:{'#ef4444' if ibp_item['fuera_sla'] > 0 else '#64748b'}">{ibp_item['fuera_sla']}</td>
-                <td style="text-align:center;font-weight:700;color:{sla_col}">{ibp_item['cumplimiento_pct']:.1f}%</td>
-                <td style="text-align:center;font-weight:700;color:#0ea5e9">{ibp_item['team_cumplimiento_pct']:.1f}%</td>
+                <td style="text-align:center;font-weight:700;color:{sla_col}">{sla_cell}</td>
+                <td style="text-align:center;font-weight:700;color:{'#0ea5e9' if has_items else '#94a3b8'}">{team_cell}</td>
             </tr>
             """
     else:
         ibp_chart_html = '<div style="padding:14px;text-align:center;color:#64748b;font-size:11px">Sin registros de IBP en este filtro.</div>'
         ibp_table_rows = '<tr><td colspan="8" style="text-align:center;color:#64748b">Sin registros de IBP en este filtro.</td></tr>'
+
+    matrix_html = _pdf_ibp_category_matrix(data)
 
     # 5. Gráficos de Plataforma de Origen y Prioridad
     glpi_cnt = data["por_origen"].get("GLPI", 0)
@@ -1193,7 +1399,15 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
     spec_rows = ""
     for s in data["por_especialista"]:
         pct = s["cumplimiento_pct"]
-        bar_color = "#10b981" if pct >= 90 else ("#f59e0b" if pct >= 75 else "#ef4444")
+        has_spec_items = (s.get("total") or 0) > 0
+        bar_color = _sla_color(pct) if has_spec_items else "#94a3b8"
+        sla_block = (
+            f'<div style="font-weight:700;color:{bar_color}">{pct:.1f}%</div>'
+            f'<div style="background:#e2e8f0;border-radius:4px;height:5px;width:100%;margin-top:3px;overflow:hidden">'
+            f'<div style="background:{bar_color};height:100%;width:{min(100, pct)}%"></div></div>'
+            if has_spec_items
+            else '<div style="font-weight:700;color:#94a3b8">—</div>'
+        )
         spec_rows += f"""
         <tr>
             <td>
@@ -1205,12 +1419,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             <td style="text-align:center;color:#0ea5e9;font-weight:600">{s['en_curso']}</td>
             <td style="text-align:center">{s['pendientes']}</td>
             <td style="text-align:center;color:{'#ef4444' if s['fuera_sla'] > 0 else '#64748b'}">{s['fuera_sla']}</td>
-            <td style="text-align:center">
-                <div style="font-weight:700;color:{bar_color}">{pct:.1f}%</div>
-                <div style="background:#e2e8f0;border-radius:4px;height:5px;width:100%;margin-top:3px;overflow:hidden">
-                    <div style="background:{bar_color};height:100%;width:{min(100, pct)}%"></div>
-                </div>
-            </td>
+            <td style="text-align:center">{sla_block}</td>
             <td style="text-align:center">{s['avg_time_str']}</td>
         </tr>
         """
@@ -1560,6 +1769,11 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                     {prio_bars_html}
                 </div>
             </div>
+        </div>
+
+        <div class="chart-box" style="margin-bottom:14px">
+            <div class="chart-box-title">Matriz IBP × Categoría Técnica (Mapa de Calor)</div>
+            {matrix_html}
         </div>
 
         <div class="section-title">2. Desglose Ejecutivo por IBP (Banco Participante)</div>
