@@ -158,8 +158,8 @@ def check_and_notify_alerts(db: Session):
     """
     Revisa los tickets activos y envía notificaciones a Telegram:
     - 🆕 Nuevo requerimiento asignado (creado en las últimas 4 horas)
-    - 🟡 SLA entre 75% y 99% (Alerta Preventiva)
-    - 🔴 SLA >= 100% o atrasado (Alerta Crítica / Fuera de SLA)
+    - 🟡 Alerta Preventiva por atención prolongada
+    - 🔴 Alerta Crítica por atención extendida
     Usa la tabla AlertLog para garantizar que cada ticket se alerte solo UNA vez por nivel.
     """
     if not config.TELEGRAM_BOT_TOKEN or not config.TELEGRAM_CHAT_ID:
@@ -168,6 +168,10 @@ def check_and_notify_alerts(db: Session):
     now = datetime.datetime.utcnow()
     open_items = db.query(Item).filter(Item.status != "cerrado").all()
     for item in open_items:
+        rec_str = format_caracas_time(item.received_at or item.created_at, "%d-%m-%Y %I:%M %p")
+        esc_str = format_caracas_time(item.escalated_at or item.received_at or item.created_at, "%d-%m-%Y %I:%M %p")
+        dur_label = item.time_attention_label
+
         # 1. Alerta de NUEVO requerimiento asignado (si fue creado en los últimos 20 minutos para no saturar)
         diff_sec = (now - item.created_at).total_seconds() if item.created_at else 999999
         if -600 < diff_sec < 1200:
@@ -178,7 +182,6 @@ def check_and_notify_alerts(db: Session):
 
             if not new_alerted:
                 assignee_str = resolve_assignee_mention(db, item.assignee_name, is_critical=False)
-                due_str = format_caracas_time(item.due_at, "%d-%m-%Y %I:%M %p") if item.due_at else "No especificada"
                 agenda_url = get_agenda_deep_link(item.id, view="kanban")
                 safe_title = html.escape(item.title or "")
                 safe_source = html.escape(item.source or "")
@@ -193,7 +196,9 @@ def check_and_notify_alerts(db: Session):
                     f"🏢 <b>Cliente / Espacio:</b> {safe_client}\n"
                     f"👤 <b>Responsable:</b> {assignee_str}\n"
                     f"⚡ <b>Prioridad:</b> {safe_priority}\n"
-                    f"⏰ <b>Vence:</b> {due_str}\n"
+                    f"📥 <b>Recibido en Sycom:</b> {rec_str}\n"
+                    f"🚀 <b>Escalado a Infra & BD:</b> {esc_str}\n"
+                    f"⏱ <b>Tiempo de Atención:</b> {dur_label}\n"
                     f"🔗 <a href=\"{agenda_url}\"><b>Abrir Agenda</b></a>"
                 )
                 ok = send_telegram_message(msg_nuevo, parse_mode="HTML")
@@ -203,7 +208,7 @@ def check_and_notify_alerts(db: Session):
                     db.commit()
                     print(f"[Telegram Notifier] Alerta 'nuevo' enviada para #{item.external_id} ({item.source})")
 
-        # 2. Alertas de SLA Preventiva y Crítica
+        # 2. Alertas de atención prolongada y crítica
         sem = item.semaphore
         if sem not in ("amarillo", "rojo"):
             continue
@@ -218,7 +223,6 @@ def check_and_notify_alerts(db: Session):
 
         is_critical = (sem == "rojo")
         assignee_str = resolve_assignee_mention(db, item.assignee_name, is_critical=is_critical)
-        due_str = format_caracas_time(item.due_at, "%d-%m-%Y %I:%M %p") if item.due_at else "No especificada"
         agenda_url = get_agenda_deep_link(item.id, view="kanban")
         safe_title = html.escape(item.title or "")
         safe_source = html.escape(item.source or "")
@@ -228,24 +232,28 @@ def check_and_notify_alerts(db: Session):
 
         if sem == "amarillo":
             msg = (
-                f"🟡 <b>ALERTA PREVENTIVA · SLA al {item.sla_percent}%</b>\n"
+                f"🟡 <b>ALERTA PREVENTIVA · ATENCIÓN PROLONGADA</b>\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"📋 <b>{safe_source} #{safe_ext_id}:</b> {safe_title}\n"
                 f"🏢 <b>Cliente / Entidad:</b> {safe_client}\n"
                 f"👤 <b>Responsable:</b> {assignee_str}\n"
                 f"⚡ <b>Prioridad:</b> {safe_priority}\n"
-                f"⏰ <b>Vence:</b> {due_str}\n"
+                f"📥 <b>Recibido en Sycom:</b> {rec_str}\n"
+                f"🚀 <b>Escalado a Infra & BD:</b> {esc_str}\n"
+                f"⏱ <b>Tiempo de Atención:</b> {dur_label}\n"
                 f"🔗 <a href=\"{agenda_url}\"><b>Abrir Agenda</b></a>"
             )
         else: # rojo
             msg = (
-                f"🚨 <b>¡ATENCIÓN! TICKET FUERA DE SLA ({item.sla_percent}%)</b>\n"
+                f"🚨 <b>¡ATENCIÓN! ATENCIÓN CRÍTICA</b>\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"📋 <b>{safe_source} #{safe_ext_id}:</b> {safe_title}\n"
                 f"🏢 <b>Cliente / Entidad:</b> {safe_client}\n"
                 f"👤 <b>Responsable:</b> {assignee_str}\n"
                 f"⚡ <b>Prioridad:</b> {safe_priority}\n"
-                f"⏰ <b>Venció:</b> {due_str}\n"
+                f"📥 <b>Recibido en Sycom:</b> {rec_str}\n"
+                f"🚀 <b>Escalado a Infra & BD:</b> {esc_str}\n"
+                f"⏱ <b>Tiempo de Atención:</b> {dur_label}\n"
                 f"🔗 <a href=\"{agenda_url}\"><b>Abrir Agenda</b></a>"
             )
 

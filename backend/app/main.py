@@ -319,14 +319,6 @@ def _repair_clickup_assignees():
                     it.assigned_at = it.created_at or datetime.datetime.utcnow()
                 repaired = True
 
-        # ClickUp no maneja el estado 'espera'; normalizar cualquier registro residual a 'curso'
-        cu_espera = db.query(Item).filter(Item.source == "ClickUp", Item.status == "espera").all()
-        for it in cu_espera:
-            it.status = "curso"
-            if not it.status_origin or it.status_origin.lower() in ("espera", "en espera", "waiting"):
-                it.status_origin = "in progress"
-            repaired = True
-
         # Normalizar tickets GLPI que tengan 'Entidad #1' / 'Entidad #0' / 'Entidad #2' o menciones de Microfilms
         glpi_items = db.query(Item).filter(Item.source == "GLPI").all()
         for it in glpi_items:
@@ -481,8 +473,8 @@ class CreateItemRequest(BaseModel):
     description: str | None = None
     priority: str = "Media"
     specialist_keys: list[str] | None = None
-    received_at: str | None = None   # Fecha y hora en que la solicitud llegó a Sycom (SLA Empresa)
-    escalated_at: str | None = None  # Fecha y hora en que fue escalada a Infra & BD (SLA Equipo)
+    received_at: str | None = None   # Fecha y hora en que la solicitud llegó a Sycom
+    escalated_at: str | None = None  # Fecha y hora en que fue escalada a Infra & BD
     due_at: str | None = None        # Opcional, calculado automáticamente por prioridad a partir de escalated_at
     escalation_id: int | None = None
     project_name: str | None = None  # SIMF, SGLPAR, etc. para ClickUp
@@ -612,9 +604,9 @@ def trigger_sync():
     return {"message": "Sincronización completada con éxito"}
 
 def serialize_item(item: Item) -> dict:
-    """Serializa una actividad con sus campos y métricas calculadas de doble SLA (Sycom y Equipo)."""
-    c_due = item.company_due_at
-    t_due = item.team_due_at
+    """Serializa una actividad con sus campos cronológicos puros (received_at, escalated_at, duración)."""
+    rec_iso = item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None)
+    esc_iso = item.escalated_at.isoformat() if item.escalated_at else (item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None))
     return {
         "id": item.id,
         "source": item.source,
@@ -630,30 +622,18 @@ def serialize_item(item: Item) -> dict:
         "status": item.status,
         "status_origin": item.status_origin,
         "created_at": item.created_at.isoformat() if item.created_at else None,
-        "received_at": item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None),
-        "escalated_at": item.escalated_at.isoformat() if item.escalated_at else (item.received_at.isoformat() if item.received_at else (item.created_at.isoformat() if item.created_at else None)),
+        "received_at": rec_iso,
+        "escalated_at": esc_iso,
         "assigned_at": item.assigned_at.isoformat() if item.assigned_at else None,
-        "due_at": c_due.isoformat() if c_due else None,
-        "company_due_at": c_due.isoformat() if c_due else None,
-        "team_due_at": t_due.isoformat() if t_due else None,
+        "due_at": item.due_at.isoformat() if item.due_at else None,
         "closed_at": item.closed_at.isoformat() if item.closed_at else None,
         "updated_at": item.updated_at.isoformat() if item.updated_at else None,
         "synced_at": item.synced_at.isoformat() if item.synced_at else None,
         "description": item.description,
         "escalation_id": item.escalation_id,
         "recommendations": item.recommendations,
-        "sla_hours_window": item.sla_hours_window,
-        "is_overdue": item.is_overdue,
-        "sla_percent": item.sla_percent,
-        "semaphore": item.semaphore,
         "duration_human": item.duration_human,
-        "time_sla_label": item.time_sla_label,
-        "sla_remaining_human": item.sla_remaining_human,
-        "team_is_overdue": item.team_is_overdue,
-        "team_sla_percent": item.team_sla_percent,
-        "team_semaphore": item.team_semaphore,
-        "team_duration_human": item.team_duration_human,
-        "team_sla_remaining_human": item.team_sla_remaining_human
+        "time_attention_label": item.time_attention_label
     }
 
 @app.get("/api/items")
@@ -756,29 +736,17 @@ def get_kpis(db: Session = Depends(get_db)):
     curso = sum(1 for i in all_items if i.status == "curso")
     espera = sum(1 for i in all_items if i.status == "espera")
     cerrados = [i for i in all_items if i.status == "cerrado"]
-    
-    # Atrasadas: únicamente actividades abiertas cuyo tiempo de SLA ha vencido
-    atrasados = sum(1 for i in all_items if i.status != "cerrado" and i.is_overdue)
-    vencen_hoy = sum(1 for i in all_items if i.status != "cerrado" and i.due_at and today_start <= i.due_at <= today_end)
     cerrados_7d = sum(1 for i in cerrados if i.closed_at and i.closed_at >= seven_days_ago)
-
-    # Cumplimiento SLA: cerrados dentro del plazo / total cerrados
-    if cerrados:
-        dentro_sla = sum(1 for i in cerrados if i.closed_at and i.due_at and i.closed_at <= i.due_at)
-        cumplimiento_sla = round((dentro_sla / len(cerrados)) * 100.0, 1)
-    else:
-        cumplimiento_sla = 100.0
 
     last_log = db.query(SyncLog).order_by(SyncLog.created_at.desc()).first()
 
     return {
+        "total_actividades": len(all_items),
         "pendientes": pendientes,
         "en_curso": curso,
         "en_espera": espera,
-        "atrasados": atrasados,
-        "vencen_hoy": vencen_hoy,
+        "cerrados": len(cerrados),
         "cerrados_7d": cerrados_7d,
-        "cumplimiento_sla": cumplimiento_sla,
         "total_activos": pendientes + curso + espera,
         "total_registrados": len(all_items),
         "last_sync": last_log.created_at.isoformat() if last_log else None,
@@ -792,12 +760,16 @@ def get_team_workload(db: Session = Depends(get_db)):
     for item in active_items:
         resp = item.assignee_name or "Sin asignar"
         if resp not in workload:
-            workload[resp] = {"name": resp, "total": 0, "criticos": 0, "atrasados": 0}
+            workload[resp] = {"name": resp, "total": 0, "criticos": 0, "en_curso": 0, "en_espera": 0, "pendientes": 0}
         workload[resp]["total"] += 1
         if item.priority == "Crítica":
             workload[resp]["criticos"] += 1
-        if item.is_overdue:
-            workload[resp]["atrasados"] += 1
+        if item.status == "curso":
+            workload[resp]["en_curso"] += 1
+        elif item.status == "espera":
+            workload[resp]["en_espera"] += 1
+        elif item.status == "pendiente":
+            workload[resp]["pendientes"] += 1
     return list(workload.values())
 
 @app.get("/api/users")
@@ -896,22 +868,27 @@ def get_clients_summary(db: Session = Depends(get_db)):
             clients[c_name] = {
                 "name": c_name,
                 "type": item.client_type,
+                "total": 0,
                 "abiertos": 0,
-                "atrasados": 0,
+                "en_curso": 0,
+                "en_espera": 0,
+                "pendientes": 0,
                 "criticos": 0,
-                "cerrados": 0,
-                "dentro_sla": 0
+                "cerrados": 0
             }
+        clients[c_name]["total"] += 1
         if item.status != "cerrado":
             clients[c_name]["abiertos"] += 1
-            if item.is_overdue:
-                clients[c_name]["atrasados"] += 1
+            if item.status == "curso":
+                clients[c_name]["en_curso"] += 1
+            elif item.status == "espera":
+                clients[c_name]["en_espera"] += 1
+            elif item.status == "pendiente":
+                clients[c_name]["pendientes"] += 1
             if item.priority == "Crítica":
                 clients[c_name]["criticos"] += 1
         else:
             clients[c_name]["cerrados"] += 1
-            if item.closed_at and item.due_at and item.closed_at <= item.due_at:
-                clients[c_name]["dentro_sla"] += 1
 
     return list(clients.values())
 
@@ -1059,13 +1036,6 @@ def update_item_status(
     source = item.source
     ext_id = item.external_id
 
-    # ClickUp solo admite TO DO (pendiente), IN PROGRESS (curso) y COMPLETE (cerrado)
-    if source == "ClickUp" and new_st == "espera":
-        raise HTTPException(
-            status_code=400, 
-            detail="El estado 'En espera' no aplica para tareas de ClickUp. Solo admite: Pendiente (TO DO), En curso (IN PROGRESS) y Cerrado (COMPLETE). 'En espera' es exclusivo de GLPI."
-        )
-
     success = False
 
     if source == "GLPI":
@@ -1093,8 +1063,6 @@ def update_item_status(
                 esc_esc_dt = linked_esc_status.escalated_at or esc_rec_dt
                 if esc_rec_dt:
                     item.received_at = esc_rec_dt
-                    sla_h = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(item.priority or "Media", 72)
-                    item.due_at = esc_rec_dt + datetime.timedelta(hours=sla_h)
                 if esc_esc_dt:
                     item.escalated_at = esc_esc_dt
 
@@ -1127,7 +1095,7 @@ def update_item_status(
         item.status_origin = "2 - En curso (asignado)" if source == "GLPI" else "in progress"
     elif new_st == "espera":
         item.closed_at = None
-        item.status_origin = "4 - En espera" if source == "GLPI" else "waiting"
+        item.status_origin = "4 - En espera" if source == "GLPI" else "en espera"
     elif new_st == "pendiente":
         item.closed_at = None
         item.status_origin = "1 - Nuevo" if source == "GLPI" else "to do"
@@ -1204,7 +1172,7 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
     if priority not in ["Baja", "Media", "Alta", "Crítica"]:
         priority = "Media"
 
-    # Procesar fecha de recibimiento en Sycom y fecha de escalada al equipo (Doble SLA)
+    # Procesar fecha de recibimiento en Sycom y fecha de escalada al equipo
     now_utc = datetime.datetime.utcnow()
     linked_esc = None
     if req.escalation_id and req.escalation_id > 0:
@@ -1222,14 +1190,7 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
     if not escalated_dt:
         escalated_dt = received_dt
 
-    # Cálculo automático del límite SLA:
-    # 1. Ambos SLA usan la misma tabla de horas por prioridad (4h, 24h, 72h, 120h)
-    # 2. El SLA principal y el criterio de Atrasadas cuentan desde la llegada a Sycom (received_dt)
-    sla_hours = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(priority, 72)
     due_dt = parse_iso_utc(req.due_at)
-    if not due_dt:
-        due_dt = received_dt + datetime.timedelta(hours=sla_hours)
-    team_due_dt = escalated_dt + datetime.timedelta(hours=sla_hours)
 
     # Identificar especialistas solicitados
     matched_list = []
@@ -1324,10 +1285,8 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
     try:
         import html
         from .notifications.telegram_notifier import send_telegram_message
-        mentions = ", ".join(f"{html.escape(m['name'])} ({m['telegram']})" for m in matched_list) if matched_list else "⚠️ <b>Sin asignar</b> (Atención: @adonislozada)"
+        mentions = ", ".join(f"{html.escape(m['name'])} ({m['telegram']})" for m in matched_list) if matched_list else "Sin asignar (Atención: @adonislozada)"
         plural_label = "Responsables" if len(matched_list) > 1 else "Responsable"
-        due_str = format_caracas_time(due_dt, '%d-%m-%Y %I:%M %p') if due_dt else "Sin límite"
-        team_due_str = format_caracas_time(team_due_dt, '%d-%m-%Y %I:%M %p') if team_due_dt else "Sin límite"
         now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
         safe_title = html.escape(title)
         safe_source = html.escape(source)
@@ -1343,10 +1302,8 @@ def create_item(req: CreateItemRequest, db: Session = Depends(get_db), _role: st
             f"🏷 <b>Origen:</b> {safe_source} #{external_id}\n"
             f"{prio_icon} <b>Prioridad:</b> {priority}\n"
             f"🎯 <b>{plural_label}:</b> {mentions}\n"
-            f"📥 <b>Recibido en Sycom (Empresa):</b> {rec_str}\n"
-            f"⏳ <b>Límite SLA Sycom (+{sla_hours}h):</b> {due_str}\n"
-            f"🚀 <b>Escalado a Infra (Equipo):</b> {esc_str}\n"
-            f"🛡 <b>Límite SLA Equipo (+{sla_hours}h):</b> {team_due_str}\n"
+            f"📥 <b>Recibido en Sycom:</b> {rec_str}\n"
+            f"🚀 <b>Escalado a Infra & BD:</b> {esc_str}\n"
             f"🕒 <b>Hora registro:</b> {now_str}\n"
             f"{safe_desc}"
             f"{link_html}"
@@ -1442,12 +1399,6 @@ def update_item_details(
                     recalc_due = True
                 if esc_esc_dt and req.escalated_at is None:
                     item.escalated_at = esc_esc_dt
-
-    if recalc_due:
-        sla_h = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(item.priority or "Media", 72)
-        base_rec = item.received_at or item.created_at
-        if base_rec:
-            item.due_at = base_rec + datetime.timedelta(hours=sla_h)
 
     if req.recommendations is not None:
         rec_clean = req.recommendations.strip()
@@ -1711,7 +1662,6 @@ def api_reports_history(
             generated_by="Adonis Lozada Figueroa",
             total_items=k.get("total_items", 0),
             total_closed=k.get("total_cerrados", 0),
-            sla_percent=float(k.get("cumplimiento_general", 100.0)),
             avg_resolution_time=k.get("avg_resolution_str", "0m"),
             created_at=datetime.datetime.utcnow()
         )
@@ -1732,7 +1682,6 @@ def api_reports_history(
             "generated_by": r.generated_by,
             "total_items": r.total_items,
             "total_closed": r.total_closed,
-            "sla_percent": r.sla_percent,
             "avg_resolution_time": r.avg_resolution_time,
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "created_at_caracas": format_caracas_time(r.created_at, "%d-%m-%Y %I:%M %p") if r.created_at else "—"
@@ -1796,7 +1745,6 @@ def api_reports_generate_and_save(
         generated_by=user_name,
         total_items=k.get("total_items", 0),
         total_closed=k.get("total_cerrados", 0),
-        sla_percent=float(k.get("cumplimiento_general", 100.0)),
         avg_resolution_time=k.get("avg_resolution_str", "0m"),
         created_at=datetime.datetime.utcnow()
     )
@@ -1817,7 +1765,6 @@ def api_reports_generate_and_save(
             "generated_by": report_entry.generated_by,
             "total_items": report_entry.total_items,
             "total_closed": report_entry.total_closed,
-            "sla_percent": report_entry.sla_percent,
             "avg_resolution_time": report_entry.avg_resolution_time,
             "created_at_caracas": format_caracas_time(report_entry.created_at, "%d-%m-%Y %I:%M %p")
         },
@@ -2142,7 +2089,7 @@ def api_update_escalation(
     role_param: str = Query(None, alias="role"),
     user_param: str = Query(None, alias="user")
 ):
-    """Actualiza los datos, fechas de SLA, categoría o recomendaciones de un escalamiento."""
+    """Actualiza los datos, fechas cronológicas, categoría o recomendaciones de un escalamiento."""
     doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Documento de escalamiento no encontrado.")
@@ -2201,8 +2148,6 @@ def api_update_escalation(
         for it in linked_items:
             if doc.received_at:
                 it.received_at = doc.received_at
-                sla_h = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(it.priority or "Media", 72)
-                it.due_at = doc.received_at + datetime.timedelta(hours=sla_h)
             if doc.escalated_at:
                 it.escalated_at = doc.escalated_at
 

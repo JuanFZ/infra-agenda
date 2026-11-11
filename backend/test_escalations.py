@@ -852,16 +852,18 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertEqual(doc["ibp_name"], "Banco Central de Integración")
         self.assertEqual(doc["category"], "Infraestructura")
 
+    @patch("app.sync.clickup_client.ClickUpClient.update_task_status")
     @patch("app.sync.glpi_client.GLPIClient.update_ticket_status")
-    def test_17_clickup_rejects_espera_status_while_glpi_allows_it(self, mock_glpi_status):
-        """Test that ClickUp tasks cannot be set to 'espera' (HTTP 400), while GLPI tickets can."""
+    def test_17_clickup_and_glpi_support_espera_status(self, mock_glpi_status, mock_cu_status):
+        """Test that both ClickUp tasks and GLPI tickets can be set to 'espera'."""
         mock_glpi_status.return_value = True
+        mock_cu_status.return_value = True
 
         db = TestingSessionLocal()
         cu_item = Item(
             source="ClickUp",
-            external_id="cu_no_espera",
-            title="Tarea ClickUp sin espera",
+            external_id="cu_espera_ok",
+            title="Tarea ClickUp con espera",
             status="curso",
             assignee_name="Adonis Lozada"
         )
@@ -878,29 +880,40 @@ class TestEscalationFeatures(unittest.TestCase):
         glpi_id = glpi_item.id
         db.close()
 
-        # Attempt to set ClickUp task to 'espera' -> must fail with 400
+        # ClickUp task can be set to 'espera' -> 200 OK
         res_cu = self.client.post(f"/api/items/{cu_id}/status", json={
             "status": "espera"
         }, headers={"X-User-Role": "Coordinador"})
-        self.assertEqual(res_cu.status_code, 400)
-        self.assertIn("El estado 'En espera' no aplica para tareas de ClickUp", res_cu.json()["detail"])
+        self.assertEqual(res_cu.status_code, 200)
+        self.assertEqual(res_cu.json()["item"]["status"], "espera")
+        self.assertEqual(res_cu.json()["item"]["status_origin"], "en espera")
+        mock_cu_status.assert_called_with("cu_espera_ok", "espera")
 
         # GLPI ticket can be set to 'espera' -> 200 OK
         res_glpi = self.client.post(f"/api/items/{glpi_id}/status", json={
             "status": "espera"
         }, headers={"X-User-Role": "Coordinador"})
         self.assertEqual(res_glpi.status_code, 200)
+        self.assertEqual(res_glpi.json()["item"]["status"], "espera")
 
-        # ClickUpClient.normalize_task maps any waiting/espera status to 'curso'
+        # ClickUpClient.normalize_task maps waiting/en espera to 'espera'
         from app.sync.clickup_client import ClickUpClient
         cu_client = ClickUpClient()
-        norm_cu = cu_client.normalize_task({
-            "id": "cu_raw_wait",
-            "name": "Tarea con estado waiting",
+        norm_cu1 = cu_client.normalize_task({
+            "id": "cu_raw_wait1",
+            "name": "Tarea con estado en espera",
             "status": {"status": "en espera"},
             "priority": {"priority": "normal"}
         })
-        self.assertEqual(norm_cu["status"], "curso")
+        self.assertEqual(norm_cu1["status"], "espera")
+
+        norm_cu2 = cu_client.normalize_task({
+            "id": "cu_raw_wait2",
+            "name": "Tarea con estado waiting",
+            "status": {"status": "waiting"},
+            "priority": {"priority": "normal"}
+        })
+        self.assertEqual(norm_cu2["status"], "espera")
 
     def test_18_glpi_entity_resolution(self):
         """Test GLPIClient entity mapping for SYCOM and Microfilms Center."""
@@ -978,20 +991,19 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertEqual(cu_simf.status, "curso")
         db.close()
 
-    def test_19_escalation_dual_sla_inheritance_and_sycom_overdue(self):
+    def test_19_escalation_chronological_inheritance_and_duration(self):
         """Test that EscalationDocument stores received_at & escalated_at, linked Items inherit them,
-        and main overdue status is governed by Sycom SLA while Team SLA is tracked in parallel."""
+        and pure chronological metrics (duration_human, time_attention_label) are computed without SLA."""
         from datetime import datetime, timedelta
         now_utc = datetime.utcnow()
-        # Sycom received 26h ago (Overdue for Alta = 24h), Team escalated 2h ago (On time for Alta = 24h)
         rec_dt = (now_utc - timedelta(hours=26)).replace(microsecond=0)
         esc_dt = (now_utc - timedelta(hours=2)).replace(microsecond=0)
 
         esc_res = self.client.post("/api/escalations", json={
-            "title": "SIMF-ES-7700 Dual SLA Test",
+            "title": "SIMF-ES-7700 Chronological Duration Test",
             "category": "PostgreSQL",
             "ibp": "0105 - Banco Mercantil",
-            "doc_url": "https://docs.google.com/document/d/dualsla7700",
+            "doc_url": "https://docs.google.com/document/d/dualchrono7700",
             "received_at": rec_dt.isoformat() + "Z",
             "escalated_at": esc_dt.isoformat() + "Z",
         }, headers={"X-User-Role": "Coordinador"})
@@ -1001,11 +1013,11 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertTrue(esc_doc["received_at"].startswith(rec_dt.isoformat()))
         self.assertTrue(esc_doc["escalated_at"].startswith(esc_dt.isoformat()))
 
-        # Create an activity with priority 'Alta' (24h) and link it via PATCH
+        # Create an activity with priority 'Alta' and link it via PATCH
         db = TestingSessionLocal()
         item = Item(
             source="ClickUp",
-            external_id="cu_dual_sla_1",
+            external_id="cu_dual_chrono_1",
             title="Optimización índice PostgreSQL",
             priority="Alta",
             status="curso",
@@ -1026,16 +1038,10 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertTrue(patched_item["received_at"].startswith(rec_dt.isoformat()))
         self.assertTrue(patched_item["escalated_at"].startswith(esc_dt.isoformat()))
 
-        # Rule 1 & 2: Both use 24h window; main overdue is governed by Sycom (received_at + 24h -> overdue),
-        # while Team SLA (escalated_at + 24h -> on time) is calculated in parallel
-        self.assertEqual(patched_item["sla_hours_window"], 24)
-        self.assertTrue(patched_item["is_overdue"])
-        self.assertEqual(patched_item["semaphore"], "rojo")
-        self.assertGreaterEqual(patched_item["sla_percent"], 100)
-
-        self.assertFalse(patched_item["team_is_overdue"])
-        self.assertEqual(patched_item["team_semaphore"], "verde")
-        self.assertLess(patched_item["team_sla_percent"], 25)
+        # Pure chronological metrics
+        self.assertIn("duration_human", patched_item)
+        self.assertIn("time_attention_label", patched_item)
+        self.assertTrue(patched_item["time_attention_label"].startswith("Lleva activa") or "activa" in patched_item["time_attention_label"])
 
         # Updating escalation dates propagates to linked items
         new_rec_dt = (now_utc - timedelta(hours=3)).replace(microsecond=0)
@@ -1049,8 +1055,8 @@ class TestEscalationFeatures(unittest.TestCase):
         items_res = self.client.get("/api/items")
         self.assertEqual(items_res.status_code, 200)
         updated_item = next(x for x in items_res.json() if x["id"] == item_id)
-        self.assertFalse(updated_item["is_overdue"])
-        self.assertEqual(updated_item["semaphore"], "verde")
+        self.assertTrue(updated_item["received_at"].startswith(new_rec_dt.isoformat()))
+        self.assertTrue(updated_item["escalated_at"].startswith(new_esc_dt.isoformat()))
 
     @patch("app.sync.clickup_client.ClickUpClient.assign_task")
     def test_20_specialist_visibility_url_encoded_and_sync_preserves_assignees(self, mock_cu_assign):
@@ -1198,6 +1204,91 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertIn("Gráfico por IBP / Banco Participante", html)
         self.assertIn("<svg viewBox=\"0 0 130 130\"", html)
         self.assertIn("Incrementar max_connections y ajustar PgBouncer.", html)
+
+    @patch("app.sync.clickup_client.ClickUpClient.update_task_status")
+    def test_22_clickup_espera_status_and_chronological_serialization(self, mock_update_status):
+        """Test that ClickUp tasks can transition to 'espera' without 400 error,
+        ClickUpClient receives 'espera', and serialized item has clean chronological fields without SLA."""
+        mock_update_status.return_value = True
+
+        db = TestingSessionLocal()
+        item = Item(
+            source="ClickUp",
+            external_id="cu_test_espera_99",
+            title="Tarea para validar transición a espera",
+            priority="Media",
+            status="curso",
+            status_origin="in progress",
+            assignee_name="Adonis Lozada"
+        )
+        db.add(item)
+        db.commit()
+        item_id = item.id
+        db.close()
+
+        # Update status to 'espera'
+        res = self.client.post(
+            f"/api/items/{item_id}/status",
+            json={"status": "espera"},
+            headers={"X-User-Role": "coordinador"}
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(mock_update_status.called)
+        args, kwargs = mock_update_status.call_args
+        self.assertEqual(args[0], "cu_test_espera_99")
+        self.assertEqual(args[1], "espera")
+
+        # Verify DB state
+        db = TestingSessionLocal()
+        refreshed = db.query(Item).filter(Item.id == item_id).first()
+        self.assertEqual(refreshed.status, "espera")
+        self.assertEqual(refreshed.status_origin, "en espera")
+        self.assertIsNone(refreshed.closed_at)
+        db.close()
+
+        # Verify serialized item returned by GET /api/items/{item_id}
+        res_get = self.client.get(f"/api/items/{item_id}")
+        self.assertEqual(res_get.status_code, 200)
+        data = res_get.json()
+        self.assertEqual(data["status"], "espera")
+        self.assertEqual(data["status_origin"], "en espera")
+        self.assertIn("duration_human", data)
+        self.assertIn("time_attention_label", data)
+        self.assertNotIn("time_sla_label", data)
+        self.assertNotIn("sla_percent", data)
+
+    def test_23_kpis_and_reports_data_no_sla(self):
+        """Test that /api/kpis and /api/reports/data return operational metrics without SLA traces."""
+        # 1. Check /api/kpis
+        res_kpis = self.client.get("/api/kpis")
+        self.assertEqual(res_kpis.status_code, 200)
+        kpis = res_kpis.json()
+        self.assertIn("total_actividades", kpis)
+        self.assertIn("pendientes", kpis)
+        self.assertIn("en_curso", kpis)
+        self.assertIn("en_espera", kpis)
+        self.assertIn("cerrados", kpis)
+        self.assertNotIn("cumplimiento_general", kpis)
+        self.assertNotIn("cumplimiento_equipo", kpis)
+        self.assertNotIn("fuera_sla", kpis)
+        self.assertNotIn("dentro_sla", kpis)
+        self.assertNotIn("sla_percent", kpis)
+
+        # 2. Check /api/reports/data
+        res_rep = self.client.get("/api/reports/data", headers={"X-User-Role": "coordinador"})
+        self.assertEqual(res_rep.status_code, 200)
+        rep = res_rep.json()
+        rep_kpis = rep.get("kpis", {})
+        self.assertIn("total_items", rep_kpis)
+        self.assertIn("total_cerrados", rep_kpis)
+        self.assertIn("total_en_curso", rep_kpis)
+        self.assertIn("total_pendientes", rep_kpis)
+        self.assertIn("total_en_espera", rep_kpis)
+        self.assertIn("avg_resolution_str", rep_kpis)
+        self.assertNotIn("cumplimiento_general", rep_kpis)
+        self.assertNotIn("cumplimiento_equipo", rep_kpis)
+        self.assertNotIn("fuera_sla", rep_kpis)
+        self.assertNotIn("dentro_sla", rep_kpis)
 
 
 if __name__ == "__main__":

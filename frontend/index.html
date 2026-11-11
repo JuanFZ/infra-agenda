@@ -2578,14 +2578,14 @@
       </svg>
       <span class="label">Tablero Kanban</span>
     </div>
-    <div class="nav" data-view="atrasados" title="Atrasadas">
+    <div class="nav" data-view="en_espera" title="En Espera">
       <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10" />
         <polyline points="12 6 12 12 16 14" />
       </svg>
-      <span class="label">Atrasadas</span>
-      <span class="count" id="navOver">0</span>
+      <span class="label">En Espera</span>
+      <span class="count" id="navEspera">0</span>
     </div>
 
     <div class="nav" data-view="escalamientos" id="sidebarNavEscalations" title="Repositorio de Escalamientos">
@@ -2768,8 +2768,8 @@
                 <th>Responsable</th>
                 <th>Prioridad</th>
                 <th>Estado</th>
-                <th>Tiempo / SLA</th>
-                <th>Vencimiento</th>
+                <th>Tiempo de Atención</th>
+                <th>Fecha Escalado</th>
               </tr>
             </thead>
             <tbody>
@@ -2818,18 +2818,19 @@
       <div class="kanban-grid" id="kanbanGrid"></div>
     </div>
 
-    <div class="view" id="v-atrasados">
+    <div class="view" id="v-en_espera">
       <div class="card">
-        <h3 style="color:var(--red)">Asuntos Fuera de SLA</h3>
+        <h3 style="color:var(--purple)">Actividades en Espera</h3>
         <div class="table-responsive">
-          <table id="tblOverdue">
+          <table id="tblEspera">
             <thead>
               <tr>
-                <th></th>
-                <th>ID</th>
+                <th>Origen / ID</th>
                 <th>Asunto</th>
+                <th>Responsable</th>
                 <th>Prioridad</th>
-                <th>SLA</th>
+                <th>Tiempo de Atención</th>
+                <th>Fecha Escalada</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -2975,7 +2976,7 @@
                 <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:11px">M9</span>
               </h3>
               <span class="muted" style="font-size:12px;margin-top:3px;display:block">Consulta, descarga y reimprime los
-                informes consolidados de gestión y cumplimiento SLA</span>
+                informes consolidados de gestión operativa y tiempos de resolución</span>
             </div>
 
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -3033,7 +3034,7 @@
                   <th>Generado Por</th>
                   <th>Fecha Generación</th>
                   <th style="text-align:center">Actividades</th>
-                  <th style="text-align:center">Cumplimiento SLA</th>
+                  <th style="text-align:center">Cerradas</th>
                   <th style="text-align:center">T. Promedio</th>
                   <th style="text-align:center">Acciones</th>
                 </tr>
@@ -3065,7 +3066,7 @@
                 <span class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:11px" id="lblAnalyticsStatus">En Vivo</span>
               </h3>
               <span class="muted" style="font-size:12px;margin-top:3px;display:block">
-                Analítica visual de rendimiento, cumplimiento de SLA, balance de carga y tiempos de atención
+                Analítica visual de rendimiento, balance de carga y tiempos de atención
               </span>
             </div>
 
@@ -3158,23 +3159,23 @@
             <div style="grid-column:1/-1;text-align:center;padding:24px" class="muted">Cargando indicadores...</div>
           </div>
 
-          <!-- 2. Gráficos Principales (Torta SLA y Barras por Especialista) -->
+          <!-- 2. Gráficos Principales (Distribución de Estados y Barras por Especialista) -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(380px, 1fr));gap:18px;margin-bottom:20px">
             
-            <!-- Gráfico 1: Torta de Cumplimiento de SLA & Estados -->
+            <!-- Gráfico 1: Torta de Distribución de Estados -->
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;display:flex;flex-direction:column;justify-content:space-between">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
                   <div>
                     <h4 style="margin:0;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-                      <span>Distribución de Estados &amp; Cumplimiento SLA (Torta)</span>
+                      <span>Distribución de Estados Operativos (Torta)</span>
                     </h4>
-                    <span class="muted" style="font-size:11.5px">Cerradas, en curso, pendientes y casos fuera de SLA</span>
+                    <span class="muted" style="font-size:11.5px">Cerradas, en curso, en espera y pendientes</span>
                   </div>
-                  <span class="badge" id="lblSlaBadgePct" style="background:rgba(16,185,129,0.15);color:#34d399;font-weight:700">—</span>
+                  <span class="badge" id="lblStatusBadgePct" style="background:rgba(16,185,129,0.15);color:#34d399;font-weight:700">—</span>
                 </div>
-                <div id="chartSlaDonutContainer" style="min-height:240px">
+                <div id="chartStatusDonutContainer" style="min-height:240px">
                   <!-- Generado por JS -->
                 </div>
               </div>
@@ -3204,7 +3205,7 @@
           <!-- 2B. Gráficos por Categoría Técnica y por IBP / Banco Participante -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(380px, 1fr));gap:18px;margin-bottom:20px">
 
-            <!-- Gráfico 3: Distribución y SLA por Categoría Técnica -->
+            <!-- Gráfico 3: Distribución por Categoría Técnica -->
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;display:flex;flex-direction:column;justify-content:space-between">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -3213,7 +3214,7 @@
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                       <span>Gráfico por Categoría Técnica (CPU, RAM, Disco, BD, etc.)</span>
                     </h4>
-                    <span class="muted" style="font-size:11.5px">Volumen de actividades, escalamientos y cumplimiento SLA por categoría</span>
+                    <span class="muted" style="font-size:11.5px">Volumen de actividades, escalamientos y tiempos por categoría</span>
                   </div>
                   <span class="muted" style="font-size:11px" id="lblCategoryCount">—</span>
                 </div>
@@ -3223,7 +3224,7 @@
               </div>
             </div>
 
-            <!-- Gráfico 4: Distribución y SLA por IBP (Banco Participante) -->
+            <!-- Gráfico 4: Distribución por IBP (Banco Participante) -->
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;display:flex;flex-direction:column;justify-content:space-between">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -3232,7 +3233,7 @@
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
                       <span>Gráfico por IBP / Institución Bancaria Participante</span>
                     </h4>
-                    <span class="muted" style="font-size:11.5px">Volumen operativo, escalamientos y cumplimiento SLA por banco (SIMF)</span>
+                    <span class="muted" style="font-size:11.5px">Volumen operativo, escalamientos y distribución por banco (SIMF)</span>
                   </div>
                   <span class="muted" style="font-size:11px" id="lblIbpCount">—</span>
                 </div>
@@ -3535,7 +3536,7 @@
     }
 
     function getItemTimeLabel(it) {
-      if (it.time_sla_label) return it.time_sla_label;
+      if (it.time_attention_label) return it.time_attention_label;
       if (!it.created_at) return (it.status === 'cerrado' ? 'Cerrado' : 'Activo');
       const startRef = it.received_at || it.created_at;
       const created = new Date(startRef).getTime();
@@ -3551,34 +3552,11 @@
       else dur = '< 1m';
 
       if (it.status === 'cerrado') return `Duró ${dur}`;
-      if (it.status === 'pendiente') return `Por iniciar: ${dur}`;
-      if (it.status === 'curso') return `En atención: ${dur}`;
-      if (it.status === 'espera') return `En espera: ${dur}`;
-      return `Transcurrido: ${dur}`;
+      return `Lleva activa ${dur}`;
     }
 
-    function getItemSlaRemaining(it) {
-      if (it.sla_remaining_human) return it.sla_remaining_human;
-      if (!it.due_at) return '';
-      const due = new Date(it.due_at).getTime();
-      const ref = (it.status === 'cerrado' && it.closed_at) ? new Date(it.closed_at).getTime() : Date.now();
-      const diffSec = Math.floor((due - ref) / 1000);
-      const absSec = Math.abs(diffSec);
-      const mins = Math.floor(absSec / 60);
-      const hours = Math.floor(mins / 60);
-      const days = Math.floor(hours / 24);
-      let str = '';
-      if (days > 0) str = `${days}d ${hours % 24}h`;
-      else if (hours > 0) str = `${hours}h ${mins % 60}m`;
-      else str = `${mins}m`;
-      return diffSec >= 0 ? `Restan ${str}` : `+${str} excedido`;
-    }
-
-    function getTeamSlaBadgeHtml(it) {
-      const tPct = (it.team_sla_percent !== undefined && it.team_sla_percent !== null) ? it.team_sla_percent : it.sla_percent;
-      const tSem = it.team_semaphore || it.semaphore || 'verde';
-      const tRem = it.team_sla_remaining_human || '';
-      return `<div class="muted" style="font-size:10.5px;margin-top:2px;display:flex;align-items:center;gap:4px" title="SLA Interno del Equipo Infra & BD"><span class="sem ${tSem}" style="width:6px;height:6px;display:inline-block;flex-shrink:0"></span><span>SLA Equipo: <b style="color:var(--text)">${tPct}%</b>${tRem ? ' · ' + tRem : ''}</span></div>`;
+    function getItemAttentionTime(it) {
+      return getItemTimeLabel(it);
     }
 
     async function loadData() {
@@ -3605,9 +3583,6 @@
       if (fSrc) {
         fSrc.value = src || '';
       }
-      if (src === 'ClickUp' && ACTIVE_KPI_FILTER === 'espera') {
-        ACTIVE_KPI_FILTER = null;
-      }
       syncKanbanOriginUI(src || '');
       renderAll();
     }
@@ -3615,9 +3590,6 @@
     function syncKanbanOriginUI(srcVal) {
       const fSrc = document.getElementById('fSrc');
       const currentSrc = (srcVal !== undefined && srcVal !== null) ? srcVal : (fSrc ? fSrc.value : '');
-      if (currentSrc === 'ClickUp' && ACTIVE_KPI_FILTER === 'espera') {
-        ACTIVE_KPI_FILTER = null;
-      }
       const selector = document.getElementById('kanbanOriginSelector');
       if (selector) {
         selector.querySelectorAll('.kanban-origin-pill').forEach(btn => {
@@ -3628,7 +3600,7 @@
       const badge = document.getElementById('kanbanOriginBadge');
       if (badge) {
         if (currentSrc === 'ClickUp') {
-          badge.textContent = 'Origen: ClickUp (3 estados: Pendientes · En curso · Cerrados)';
+          badge.textContent = 'Origen: ClickUp (4 estados: incluye En espera)';
           badge.style.background = 'rgba(155, 89, 182, 0.22)';
           badge.style.color = '#d7bde2';
           badge.style.borderColor = 'rgba(155, 89, 182, 0.45)';
@@ -3646,24 +3618,22 @@
       }
       const subText = document.getElementById('kanbanSubText');
       if (subText) {
-        subText.textContent = currentSrc === 'ClickUp'
-          ? 'Mostrando flujo ClickUp (sin columna En espera) · Arrastra actividades entre columnas para sincronizar su estado'
-          : 'Arrastra actividades entre columnas para sincronizar su estado';
+        subText.textContent = 'Arrastra actividades entre columnas para sincronizar su estado';
       }
     }
 
     function renderKPIs(k) {
       const srcVal = document.getElementById('fSrc') ? document.getElementById('fSrc').value : '';
       const isFiltered = !!(srcVal || document.getElementById('fPrio').value || document.getElementById('fResp').value || document.getElementById('fSearch').value);
-      const allCards = [
+      const totalVal = k.total_actividades !== undefined ? k.total_actividades : k.total_registrados;
+      const cerradasVal = k.cerradas !== undefined ? k.cerradas : (k.cerrados || 0);
+      const cards = [
+        { key: 'total', lbl: isFiltered ? 'Total Filtrado' : 'Total Actividades', val: totalVal, hint: isFiltered ? 'Coincidentes' : 'En base de datos', c: 'var(--accent)' },
         { key: 'pendiente', lbl: 'Pendientes', val: k.pendientes, hint: isFiltered ? 'Filtrados' : 'Por iniciar', c: 'var(--accent)' },
         { key: 'curso', lbl: 'En Curso', val: k.en_curso, hint: isFiltered ? 'Filtrados' : 'En atención', c: 'var(--cyan)' },
-        { key: 'espera', lbl: 'En Espera', val: k.en_espera, hint: isFiltered ? 'Filtrados' : 'Cliente / Proveedor', c: 'var(--purple)' },
-        { key: 'atrasados', lbl: 'Atrasadas', val: k.atrasados, hint: isFiltered ? 'Con SLA vencido' : 'SLA vencido', c: 'var(--red)' },
-        { key: 'cumplimiento', lbl: 'Cumplimiento SLA', val: `${k.cumplimiento_sla}%`, hint: 'Meta: 90%', c: k.cumplimiento_sla >= 90 ? 'var(--green)' : 'var(--yellow)' },
-        { key: 'total', lbl: isFiltered ? 'Total Filtrado' : 'Total Registrados', val: k.total_registrados, hint: isFiltered ? 'Coincidentes' : 'En base de datos', c: 'var(--accent)' }
+        { key: 'espera', lbl: 'En Espera', val: k.en_espera, hint: isFiltered ? 'Filtrados' : 'En espera', c: 'var(--purple)' },
+        { key: 'cerrado', lbl: 'Cerradas', val: cerradasVal, hint: isFiltered ? 'Filtradas' : 'Completadas', c: 'var(--green)' }
       ];
-      const cards = srcVal === 'ClickUp' ? allCards.filter(c => c.key !== 'espera') : allCards;
       document.getElementById('kpisContainer').innerHTML = cards.map(c => `
     <div class="kpi ${ACTIVE_KPI_FILTER === c.key ? 'selected' : ''}" style="--c:${c.c}" data-kpi="${c.key}" onclick="toggleKpiFilter('${c.key}')" title="Clic para filtrar por ${c.lbl}">
       <div class="lbl">${c.lbl}</div>
@@ -3671,7 +3641,10 @@
       <div class="hint">${c.hint}</div>
     </div>
   `).join('');
-      document.getElementById('navOver').textContent = k.atrasados;
+      const navEsperaEl = document.getElementById('navEspera');
+      if (navEsperaEl) navEsperaEl.textContent = k.en_espera;
+      const navOverEl = document.getElementById('navOver');
+      if (navOverEl) navOverEl.textContent = k.en_espera;
     }
 
     function toggleKpiFilter(key) {
@@ -3731,23 +3704,20 @@
     }
 
     function computeKpisFromItems(items) {
+      const total_actividades = items.length;
       const pendientes = items.filter(i => i.status === 'pendiente').length;
       const en_curso = items.filter(i => i.status === 'curso').length;
       const en_espera = items.filter(i => i.status === 'espera').length;
-      const atrasados = items.filter(i => i.status !== 'cerrado' && (i.is_overdue || i.semaphore === 'rojo')).length;
-      const cerrados = items.filter(i => i.status === 'cerrado');
-      let cumplimiento_sla = 100.0;
-      if (cerrados.length > 0) {
-        const dentro_sla = cerrados.filter(i => !i.is_overdue && i.semaphore !== 'rojo').length;
-        cumplimiento_sla = Math.round((dentro_sla / cerrados.length) * 1000) / 10;
-      }
+      const cerradas = items.filter(i => i.status === 'cerrado').length;
       return {
+        total_actividades,
         pendientes,
         en_curso,
         en_espera,
-        atrasados,
-        cumplimiento_sla,
-        total_registrados: items.length
+        cerradas,
+        cerrados: cerradas,
+        total_registrados: total_actividades,
+        atrasados: en_espera
       };
     }
 
@@ -3763,8 +3733,9 @@
         if (ACTIVE_KPI_FILTER === 'pendiente' && it.status !== 'pendiente') return false;
         if (ACTIVE_KPI_FILTER === 'curso' && it.status !== 'curso') return false;
         if (ACTIVE_KPI_FILTER === 'espera' && it.status !== 'espera') return false;
-        if (ACTIVE_KPI_FILTER === 'atrasados' && (it.status === 'cerrado' || !(it.is_overdue || it.semaphore === 'rojo'))) return false;
-        if (ACTIVE_KPI_FILTER === 'cumplimiento' && (it.is_overdue || it.semaphore === 'rojo')) return false;
+        if (ACTIVE_KPI_FILTER === 'cerrado' && it.status !== 'cerrado') return false;
+        if (ACTIVE_KPI_FILTER === 'en_espera' && it.status !== 'espera') return false;
+        if (ACTIVE_KPI_FILTER === 'atrasados' && it.status !== 'espera') return false;
         return true;
       });
     }
@@ -3785,10 +3756,10 @@
       } else {
         tbody.innerHTML = list.map(it => `
       <tr class="click ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new-row' : ''}" onclick="openModal(${it.id})">
-        <td><span class="sem ${it.semaphore}"></span></td>
+        <td><span class="badge" style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;padding:0"></span></td>
         <td><span class="badge src-${it.source}">${it.source}</span> #${it.external_id}</td>
-        <td><b>${it.title}</b></td>
-        <td>${it.client_name}</td>
+        <td><b>${escapeHtml(it.title)}</b></td>
+        <td>${escapeHtml(it.client_name || it.project_name || 'Interno')}</td>
         <td>
           ${it.status === 'cerrado'
             ? `<span style="font-weight:600;opacity:.85">${it.assignee_name || 'Sin asignar'}</span>`
@@ -3807,13 +3778,11 @@
         <td><span class="prio prio-${it.priority}">${it.priority}</span></td>
         <td>${it.status_origin || it.status}</td>
         <td>
-          <div style="font-weight:600;font-size:12px;color:var(--text)">${getItemTimeLabel(it)}</div>
-          <div class="muted" style="font-size:11px">SLA Sycom: <b style="color:var(--text)">${it.sla_percent}%</b>${getItemSlaRemaining(it) ? ' · ' + getItemSlaRemaining(it) : ''}</div>
-          ${getTeamSlaBadgeHtml(it)}
+          <div style="font-weight:600;font-size:12px;color:var(--text)">${getItemAttentionTime(it)}</div>
+          <div class="muted" style="font-size:11px">Recibido: ${formatDate(it.received_at || it.created_at)}</div>
         </td>
-        <td class="${it.is_overdue ? 'txt-red' : 'muted'}">
-          <div>${formatDate(it.due_at)}</div>
-          ${it.team_due_at ? `<div class="muted" style="font-size:10px" title="Vencimiento SLA Equipo">Eq: ${formatDate(it.team_due_at)}</div>` : ''}
+        <td class="muted">
+          <div>${formatDate(it.escalated_at || it.received_at || it.created_at)}</div>
         </td>
       </tr>
     `).join('');
@@ -3822,21 +3791,25 @@
       // 2. Kanban
       renderKanban(list);
 
-      // 3. Atrasados
-      const over = list.filter(i => i.status !== 'cerrado' && (i.is_overdue || i.semaphore === 'rojo'));
-      document.querySelector('#tblOverdue tbody').innerHTML = over.map(it => `
-    <tr class="click" onclick="openModal(${it.id})">
-      <td><span class="sem rojo"></span></td>
-      <td>${it.source} #${it.external_id}</td>
-      <td>${it.title}</td>
-      <td>${it.priority}</td>
-      <td style="color:var(--red)">
-        <div style="font-weight:600;font-size:12px">${getItemTimeLabel(it)}</div>
-        <div style="font-size:11px">SLA Sycom: <b>${it.sla_percent}%</b> consumido (${getItemSlaRemaining(it) || ('Vence: ' + formatDate(it.due_at))})</div>
-        ${getTeamSlaBadgeHtml(it)}
-      </td>
-    </tr>
-  `).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">Sin asuntos fuera de SLA.</td></tr>';
+      // 3. En Espera
+      const esperaList = list.filter(i => i.status === 'espera');
+      const tblEsperaTbody = document.querySelector('#tblEspera tbody');
+      if (tblEsperaTbody) {
+        tblEsperaTbody.innerHTML = esperaList.map(it => `
+          <tr class="click" onclick="openModal(${it.id})">
+            <td><span class="badge src-${it.source}">${it.source}</span> #${it.external_id}</td>
+            <td><b>${escapeHtml(it.title)}</b></td>
+            <td>${escapeHtml(it.assignee_name || 'Sin asignar')}</td>
+            <td><span class="prio prio-${it.priority}">${it.priority}</span></td>
+            <td><div style="font-weight:600;font-size:12px">${getItemAttentionTime(it)}</div></td>
+            <td class="muted">${formatDate(it.escalated_at || it.received_at || it.created_at)}</td>
+          </tr>
+        `).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:20px">Sin actividades en espera.</td></tr>';
+      }
+      const tblOverdueTbody = document.querySelector('#tblOverdue tbody');
+      if (tblOverdueTbody) {
+        tblOverdueTbody.innerHTML = tblEsperaTbody ? tblEsperaTbody.innerHTML : '';
+      }
 
       // 4. Clientes
       renderClients(list);
@@ -3851,16 +3824,15 @@
       list.forEach(it => {
         const name = it.client_name || 'Sin Especificar';
         if (!clientsMap[name]) {
-          clientsMap[name] = { total: 0, open: 0, overdue: 0, closed: 0 };
+          clientsMap[name] = { total: 0, open: 0, espera: 0, closed: 0 };
         }
         clientsMap[name].total++;
         if (it.status === 'cerrado') {
           clientsMap[name].closed++;
+        } else if (it.status === 'espera') {
+          clientsMap[name].espera++;
         } else {
           clientsMap[name].open++;
-          if (it.is_overdue || it.semaphore === 'rojo') {
-            clientsMap[name].overdue++;
-          }
         }
       });
 
@@ -3868,20 +3840,18 @@
       if (!tbody) return;
       const keys = Object.keys(clientsMap);
       if (!keys.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">Sin datos de clientes.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;padding:20px">Sin datos de clientes.</td></tr>';
         return;
       }
 
       tbody.innerHTML = keys.map(k => {
         const c = clientsMap[k];
-        const slaCompliance = c.total > 0 ? Math.round(((c.total - c.overdue) / c.total) * 100) : 100;
         return `
       <tr>
-        <td><b>${k}</b></td>
+        <td><b>${escapeHtml(k)}</b></td>
         <td><span class="badge" style="background:rgba(79,140,255,.2);color:var(--accent)">${c.open}</span></td>
-        <td><span class="badge" style="background:rgba(255,93,93,.2);color:var(--red)">${c.overdue}</span></td>
+        <td><span class="badge" style="background:rgba(245,158,11,.2);color:#f59e0b">${c.espera}</span></td>
         <td><span class="badge" style="background:rgba(46,204,113,.2);color:var(--green)">${c.closed}</span></td>
-        <td><b>${slaCompliance}%</b></td>
       </tr>
     `;
       }).join('');
@@ -3920,18 +3890,6 @@
     function handleDragOver(e) {
       e.preventDefault();
       const col = e.currentTarget;
-      const colStatus = col.getAttribute('data-col');
-
-      // Si se arrastra una tarea de ClickUp hacia la columna 'espera', no resaltar pero permitir que ondrop dispare el toast informativo
-      if (DRAGGED_ITEM_ID) {
-        const item = ALL_ITEMS.find(i => i.id === DRAGGED_ITEM_ID);
-        if (item && item.source === 'ClickUp' && colStatus === 'espera') {
-          if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-          col.classList.remove('drag-over');
-          return;
-        }
-      }
-
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
       if (!col.classList.contains('drag-over')) {
         col.classList.add('drag-over');
@@ -3964,17 +3922,6 @@
             : 'El modo actual es solo de lectura. Solo el Coordinador puede mover tareas.',
           'error',
           4000
-        );
-        return;
-      }
-
-      // Validación: ClickUp no posee estado 'En espera'
-      if (item.source === 'ClickUp' && targetStatus === 'espera') {
-        showToast(
-          'Estado no aplicable en ClickUp',
-          "El estado 'En espera' no aplica para actividades de ClickUp. Solo admite: Pendientes, En curso y Cerrados.",
-          'error',
-          4500
         );
         return;
       }
@@ -4022,42 +3969,32 @@
     function renderKanban(list) {
       const srcFilter = document.getElementById('fSrc') ? document.getElementById('fSrc').value : '';
       syncKanbanOriginUI(srcFilter);
-      const hideEspera = srcFilter === 'ClickUp';
 
-      const cols = hideEspera
-        ? [
-            { k: 'pendiente', title: 'Pendientes' },
-            { k: 'curso', title: 'En curso' },
-            { k: 'cerrado', title: 'Cerrados' }
-          ]
-        : [
-            { k: 'pendiente', title: 'Pendientes' },
-            { k: 'curso', title: 'En curso' },
-            { k: 'espera', title: 'En espera' },
-            { k: 'cerrado', title: 'Cerrados' }
-          ];
+      const cols = [
+        { k: 'pendiente', title: 'Pendientes' },
+        { k: 'curso', title: 'En curso' },
+        { k: 'espera', title: 'En espera' },
+        { k: 'cerrado', title: 'Cerrados' }
+      ];
 
       const gridEl = document.getElementById('kanbanGrid');
       if (!gridEl) return;
-      gridEl.classList.toggle('cols-3', hideEspera);
+      gridEl.classList.remove('cols-3');
 
       gridEl.innerHTML = cols.map(c => {
-        const colItems = list.filter(i => {
-          const effectiveStatus = (i.source === 'ClickUp' && i.status === 'espera') ? 'curso' : i.status;
-          return effectiveStatus === c.k;
-        });
+        const colItems = list.filter(i => i.status === c.k);
         return `
       <div class="col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
         <h4>${c.title} <span class="muted" style="margin-left:auto">${colItems.length}</span></h4>
         ${colItems.map(it => {
           const canDrag = canUserEditItem(it);
           return `
-          <div class="tcard ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-${it.id}" draggable="${canDrag ? 'true' : 'false'}" ${canDrag ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!canDrag ? 'cursor:pointer;' : ''}">
+          <div class="tcard ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-${it.id}" draggable="${canDrag ? 'true' : 'false'}" ${canDrag ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!canDrag ? 'cursor:pointer;' : ''}">
             <div class="top">
               <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
               <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
             </div>
-            <div class="title">${it.title}</div>
+            <div class="title">${escapeHtml(it.title)}</div>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:2px;flex-wrap:wrap">
               <div class="muted" style="font-size:11px">${escapeHtml(it.project_name || it.client_name || 'Interno')}</div>
               ${it.escalation_id ? `<span class="badge" style="background:rgba(79,140,255,0.12);color:var(--accent);border:1px solid rgba(79,140,255,0.25);font-size:10px;padding:1px 5px;display:inline-flex;align-items:center;gap:3px" title="Vinculado a Escalamiento #${it.escalation_id}"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span>Escalamiento #${it.escalation_id}</span></span>` : ''}
@@ -4065,19 +4002,18 @@
             <div style="font-size:11px;font-weight:600;margin-top:4px;display:flex;align-items:center;justify-content:space-between;color:var(--text)">
               <div style="display:flex;align-items:center;gap:4px;overflow:hidden">
                 <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.6;flex-shrink:0"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.assignee_name || 'Sin asignar'}</span>
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(it.assignee_name || 'Sin asignar')}</span>
               </div>
               ${(!it.assignee_name || it.assignee_name.toLowerCase().includes('sin asignar')) && isCoordinator() ? `
                 <button type="button" class="badge" onclick="event.stopPropagation();openModal(${it.id})" style="background:rgba(243,156,18,.15);color:#f39c12;border:1px solid rgba(243,156,18,.35);padding:1px 6px;font-size:10px;font-weight:700;border-radius:4px;cursor:pointer;flex-shrink:0;transition:all .15s" title="Asignar especialista">+ Asignar</button>
               ` : ''}
             </div>
             <div style="font-size:11px;font-weight:600;color:var(--accent);margin-top:4px;display:flex;justify-content:space-between;align-items:center">
-              <span>${getItemTimeLabel(it)}</span>
-              <span class="${it.is_overdue ? 'txt-red' : 'muted'}">SLA Sycom: ${it.sla_percent}%</span>
+              <span>${getItemAttentionTime(it)}</span>
+              <span class="muted" style="font-size:10px">Recibido: ${formatDate(it.received_at || it.created_at, true)}</span>
             </div>
             <div style="font-size:10px;color:var(--muted);margin-top:2px;display:flex;justify-content:space-between;align-items:center">
-              <span>Vence Sycom: ${formatDate(it.due_at, true)}</span>
-              <span class="${it.team_is_overdue ? 'txt-red' : ''}">SLA Equipo: ${it.team_sla_percent !== undefined ? it.team_sla_percent : it.sla_percent}%</span>
+              <span>Escalado: ${formatDate(it.escalated_at || it.received_at || it.created_at, true)}</span>
             </div>
           </div>
         `;
@@ -4292,10 +4228,10 @@
     function onCreateEscalationChange(escId) {
       const recInput = document.getElementById('createReceivedAt');
       const escInput = document.getElementById('createEscalatedAt');
-      const escHelp = document.getElementById('createEscalationSlaHint');
+      const escHelp = document.getElementById('createEscalationHint');
       if (!escId) {
         if (escHelp) escHelp.style.display = 'none';
-        updateCreateSlaSuggestion();
+        updateCreateChronologicalSuggestion();
         return;
       }
       const doc = (ESCALATIONS_LIST || []).find(e => Number(e.id) === Number(escId));
@@ -4306,52 +4242,34 @@
         if (escInput && escLocal) escInput.value = escLocal;
         if (escHelp) {
           escHelp.style.display = 'block';
-          escHelp.innerHTML = `<span style="color:#34d399;font-weight:600">Fechas de SLA heredadas del Escalamiento #${doc.id}</span> (Recibido Sycom: <b>${escapeHtml(doc.received_at_caracas || doc.created_at_caracas || '')}</b> · Escalado Infra: <b>${escapeHtml(doc.escalated_at_caracas || doc.created_at_caracas || '')}</b>)`;
+          escHelp.innerHTML = `<span style="color:#34d399;font-weight:600">Fechas cronológicas heredadas del Escalamiento #${doc.id}</span> (Recibido Sycom: <b>${escapeHtml(doc.received_at_caracas || doc.created_at_caracas || '')}</b> · Escalado Infra: <b>${escapeHtml(doc.escalated_at_caracas || doc.created_at_caracas || '')}</b>)`;
         }
       }
-      updateCreateSlaSuggestion();
+      updateCreateChronologicalSuggestion();
     }
 
-    function updateCreateSlaSuggestion() {
-      const prioSelect = document.getElementById('createPriority');
+    function updateCreateChronologicalSuggestion() {
       const escInput = document.getElementById('createEscalatedAt');
       const recInput = document.getElementById('createReceivedAt');
-      const badge = document.getElementById('createSlaBadgePreview');
-      if (!prioSelect) return;
-      const prio = prioSelect.value;
-      const hoursMap = { 'Crítica': 4, 'Alta': 24, 'Media': 72, 'Baja': 120 };
-      const h = hoursMap[prio] || 72;
-
-      let sycomBase = new Date();
-      if (recInput && recInput.value) {
-        const parsed = new Date(recInput.value);
-        if (!isNaN(parsed.getTime())) sycomBase = parsed;
-      }
-      let teamBase = new Date(sycomBase.getTime());
-      if (escInput && escInput.value) {
-        const parsed = new Date(escInput.value);
-        if (!isNaN(parsed.getTime())) teamBase = parsed;
-      }
-
-      const sycomTarget = new Date(sycomBase.getTime() + h * 3600 * 1000);
-      const teamTarget = new Date(teamBase.getTime() + h * 3600 * 1000);
+      const badge = document.getElementById('createChronologicalBadgePreview');
       if (badge) {
-        const pad = n => String(n).padStart(2, '0');
-        const fmt = d => `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        const recStr = (recInput && recInput.value) ? recInput.value.replace('T', ' ') : 'Pendiente';
+        const escStr = (escInput && escInput.value) ? escInput.value.replace('T', ' ') : 'Pendiente';
         badge.innerHTML = `
           <div style="display:flex;flex-wrap:wrap;gap:8px">
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(79,140,255,0.12);color:var(--accent);padding:6px 10px;border-radius:6px;font-size:11.5px;font-weight:600;border:1px solid rgba(79,140,255,0.25)">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span>SLA Sycom (Empresa): <b style="color:#ffffff">+${h}h</b> · Vence: <b style="color:#ffffff">${fmt(sycomTarget)}</b></span>
+              <span>Recibido Sycom: <b style="color:#ffffff">${escapeHtml(recStr)}</b></span>
             </div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,0.12);color:#34d399;padding:6px 10px;border-radius:6px;font-size:11.5px;font-weight:600;border:1px solid rgba(16,185,129,0.25)">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span>SLA Equipo (Infra & BD): <b style="color:#ffffff">+${h}h</b> · Vence: <b style="color:#ffffff">${fmt(teamTarget)}</b></span>
+              <span>Escalado Infra &amp; BD: <b style="color:#ffffff">${escapeHtml(escStr)}</b></span>
             </div>
           </div>
         `;
       }
     }
+    window.updateCreateChronologicalSuggestion = updateCreateChronologicalSuggestion;
 
     function renderCreateAssigneeChips() {
       const container = document.getElementById('createSelectedAssigneeChips');
@@ -4650,28 +4568,28 @@
         <textarea id="createDesc" class="form-input" rows="3" placeholder="Detalles técnicos, comandos, alcance o requerimientos específicos..."></textarea>
       </div>
 
-      <!-- 5. Doble SLA: Fechas (Sycom y Equipo) -->
+      <!-- 5. Fechas Cronológicas (Sycom e Infra & BD) -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" for="createReceivedAt">Recibimiento en Sycom (SLA Empresa):</label>
-          <input type="datetime-local" id="createReceivedAt" class="form-input" onchange="updateCreateSlaSuggestion()" style="cursor:pointer">
+          <label class="form-label" for="createReceivedAt">Fecha de Llegada a Sycom:</label>
+          <input type="datetime-local" id="createReceivedAt" class="form-input" onchange="updateCreateChronologicalSuggestion()" style="cursor:pointer">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" for="createEscalatedAt">Escalada al Equipo de Infra & BD (SLA Equipo):</label>
-          <input type="datetime-local" id="createEscalatedAt" class="form-input" onchange="updateCreateSlaSuggestion()" style="cursor:pointer">
+          <label class="form-label" for="createEscalatedAt">Fecha de Llegada a Infra & BD:</label>
+          <input type="datetime-local" id="createEscalatedAt" class="form-input" onchange="updateCreateChronologicalSuggestion()" style="cursor:pointer">
         </div>
       </div>
 
       <!-- 6. Prioridad -->
       <div class="form-group" style="margin-bottom:14px">
         <label class="form-label" for="createPriority">Prioridad:</label>
-        <select id="createPriority" class="form-input" onchange="updateCreateSlaSuggestion()" style="cursor:pointer">
-          <option value="Media" selected>Media (SLA Equipo: 72h)</option>
-          <option value="Baja">Baja (SLA Equipo: 120h)</option>
-          <option value="Alta">Alta (SLA Equipo: 24h)</option>
-          <option value="Crítica">Crítica (SLA Equipo: 4h)</option>
+        <select id="createPriority" class="form-input" onchange="updateCreateChronologicalSuggestion()" style="cursor:pointer">
+          <option value="Media" selected>Media</option>
+          <option value="Baja">Baja</option>
+          <option value="Alta">Alta</option>
+          <option value="Crítica">Crítica</option>
         </select>
-        <div id="createSlaBadgePreview" style="margin-top:6px"></div>
+        <div id="createChronologicalBadgePreview" style="margin-top:6px"></div>
       </div>
 
       <!-- 7. Responsable(s) con Buscador corporativo -->
@@ -4699,12 +4617,12 @@
 
       <!-- 8. Vincular a Escalamiento -->
       <div class="form-group">
-        <label class="form-label" for="createEscalationId">Vincular a Escalamiento: <span class="muted" style="font-weight:400;text-transform:none">(Opcional - hereda fechas de SLA)</span></label>
+        <label class="form-label" for="createEscalationId">Vincular a Escalamiento: <span class="muted" style="font-weight:400;text-transform:none">(Opcional - hereda fechas cronológicas)</span></label>
         <select id="createEscalationId" class="form-input" onchange="onCreateEscalationChange(this.value)" style="cursor:pointer">
           <option value="">-- Sin escalamiento vinculado --</option>
           ${ESCALATIONS_LIST.map(esc => `<option value="${esc.id}">${formatEscalationOption(esc)}</option>`).join('')}
         </select>
-        <div id="createEscalationSlaHint" style="display:none;font-size:11px;margin-top:5px;padding:6px 10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:6px"></div>
+        <div id="createEscalationHint" style="display:none;font-size:11px;margin-top:5px;padding:6px 10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:6px"></div>
         <small class="muted" style="font-size:11px;margin-top:3px;display:block">Al seleccionar un escalamiento, las fechas de Recibimiento en Sycom y Escalada al Equipo se heredan automáticamente del escalamiento.</small>
       </div>
 
@@ -4726,13 +4644,18 @@
       const esc = document.getElementById('createEscalatedAt');
       if (rec) rec.value = nowLocal;
       if (esc) esc.value = nowLocal;
-      updateCreateSlaSuggestion();
+      updateCreateChronologicalSuggestion();
       document.getElementById('modalBg').classList.add('show');
       setTimeout(() => {
         const titleInput = document.getElementById('createTitle');
         if (titleInput) titleInput.focus();
       }, 100);
     }
+
+    function showItemDetailModal(id) {
+      return openModal(id);
+    }
+    window.showItemDetailModal = showItemDetailModal;
 
     async function openModal(id) {
       if (IS_DRAGGING) return;
@@ -4765,9 +4688,9 @@
       document.getElementById('modalContent').innerHTML = `
     ${roleBanner}
     <div style="margin-bottom:10px">
-      <span class="badge src-${it.source}">${it.source}</span> #${it.external_id} · <span class="sem ${it.semaphore}"></span>
+      <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
     </div>
-    <h2 style="font-size:18px;line-height:1.3;margin-bottom:8px">${it.title}</h2>
+    <h2 style="font-size:18px;line-height:1.3;margin-bottom:8px">${escapeHtml(it.title)}</h2>
     <dl>
       <dt>Estado:</dt>
       <dd>
@@ -4778,7 +4701,7 @@
             <select onchange="changeStatusFromModal(${it.id}, this.value)" style="background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:11.5px;outline:none;cursor:pointer">
               <option value="pendiente" ${it.status === 'pendiente' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: Pendiente ${it.source === 'ClickUp' ? '(TO DO)' : '(Nuevo)'}</option>
               <option value="curso" ${it.status === 'curso' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: En curso ${it.source === 'ClickUp' ? '(IN PROGRESS)' : '(Asignado)'}</option>
-              ${it.source === 'GLPI' ? `<option value="espera" ${it.status === 'espera' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: En espera (4 - En espera)</option>` : ''}
+              <option value="espera" ${it.status === 'espera' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: En espera ${it.source === 'ClickUp' ? '(EN ESPERA)' : '(4 - En espera)'}</option>
               <option value="cerrado" ${it.status === 'cerrado' ? 'selected' : ''} style="background:#141c2b;color:#fff">Mover a: Cerrado ${it.source === 'ClickUp' ? '(COMPLETE)' : '(Resuelto)'}</option>
             </select>
           </div>` : ''}
@@ -4849,21 +4772,9 @@
       <dt>Prioridad:</dt><dd><span class="prio prio-${it.priority}">${it.priority}</span></dd>
       <dt>${it.source === 'ClickUp' ? 'Proyecto ClickUp' : 'Entidad / Cliente GLPI'}:</dt><dd><b>${escapeHtml(it.project_name || it.client_name || 'Interno')}</b></dd>
       <dt>Creado el:</dt><dd>${formatDate(it.created_at, true)}</dd>
-      ${it.received_at ? `<dt>Recibido en Sycom (SLA Empresa):</dt><dd><b>${formatDate(it.received_at, true)}</b></dd>` : ''}
-      ${it.escalated_at ? `<dt>Escalado a Infra (SLA Equipo):</dt><dd><b>${formatDate(it.escalated_at, true)}</b></dd>` : ''}
-      <dt>SLA Sycom (Empresa):</dt>
-      <dd>
-        <span class="sem ${it.semaphore}"></span> <b>${it.sla_percent}%</b> consumido (${it.semaphore.toUpperCase()})
-        · Vence: <b>${formatDate(it.company_due_at || it.due_at, true)}</b>
-        ${getItemSlaRemaining(it) ? '· <b class="' + (it.is_overdue ? 'txt-red' : '') + '">' + getItemSlaRemaining(it) + '</b>' : ''}
-      </dd>
-      <dt>SLA Equipo (Infra & BD):</dt>
-      <dd>
-        <span class="sem ${it.team_semaphore || it.semaphore}"></span> <b>${it.team_sla_percent !== undefined ? it.team_sla_percent : it.sla_percent}%</b> consumido (${(it.team_semaphore || it.semaphore).toUpperCase()})
-        · Vence: <b>${formatDate(it.team_due_at || it.due_at, true)}</b>
-        ${it.team_sla_remaining_human ? '· <b class="' + (it.team_is_overdue ? 'txt-red' : '') + '">' + it.team_sla_remaining_human + '</b>' : ''}
-      </dd>
-      <dt>Tiempo registrado (Sycom):</dt><dd><b>${getItemTimeLabel(it)}</b></dd>
+      <dt>Fecha Recibido en Sycom:</dt><dd><b>${formatDate(it.received_at || it.created_at, true)}</b></dd>
+      <dt>Fecha Escalado a Infra & BD:</dt><dd><b>${formatDate(it.escalated_at || it.received_at || it.created_at, true)}</b></dd>
+      <dt>Tiempo de Atención:</dt><dd><b>${getItemAttentionTime(it)}</b></dd>
       <dt>Escalamiento vinculado:</dt>
       <dd>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -5260,7 +5171,7 @@
           return;
         }
         await loadData();
-        showToast('Escalamiento actualizado', 'El vínculo con el escalamiento y sus fechas de SLA se actualizaron correctamente.', 'info', 3000);
+        showToast('Escalamiento actualizado', 'El vínculo con el escalamiento y sus fechas cronológicas se actualizaron correctamente.', 'info', 3000);
         openModal(itemId);
       } catch (err) {
         console.error('Error in changeItemEscalation:', err);
@@ -5379,11 +5290,12 @@
 
     function switchView(viewName) {
       if (!viewName) return;
+      if (viewName === 'atrasados' || viewName === 'espera') viewName = 'en_espera';
       const targetView = document.getElementById(`v-${viewName}`);
       if (!targetView) return;
       document.querySelectorAll('.nav').forEach(x => x.classList.remove('active'));
       document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
-      const targetNav = document.querySelector(`.nav[data-view="${viewName}"]`);
+      const targetNav = document.querySelector(`.nav[data-view="${viewName}"]`) || document.querySelector(`.nav[data-view="en_espera"]`);
       if (targetNav) targetNav.classList.add('active');
       targetView.classList.add('active');
       const label = targetNav ? (targetNav.querySelector('.label')?.textContent || targetNav.textContent.trim()) : viewName;
@@ -5745,7 +5657,7 @@
       if (s.type === 'resumen') {
         const active = visibleTvItems.filter(i => i.status !== 'cerrado');
         const criticos = active.filter(i => i.priority === 'Crítica').length;
-        const atrasados = active.filter(i => i.is_overdue || i.semaphore === 'rojo').length;
+        const enEspera = active.filter(i => i.status === 'espera').length;
         const enCurso = active.filter(i => i.status === 'curso').length;
         const pendientes = active.filter(i => i.status === 'pendiente').length;
 
@@ -5759,9 +5671,9 @@
           <span class="muted" style="font-size:12px;text-transform:uppercase">En Atención</span>
           <div class="num">${enCurso}</div>
         </div>
-        <div class="tv-stat-box" style="border-left:4px solid var(--red)">
-          <span class="muted" style="font-size:12px;text-transform:uppercase">Atrasadas / Fuera SLA</span>
-          <div class="num" style="color:var(--red)">${atrasados}</div>
+        <div class="tv-stat-box" style="border-left:4px solid var(--purple)">
+          <span class="muted" style="font-size:12px;text-transform:uppercase">En Espera</span>
+          <div class="num" style="color:var(--purple)">${enEspera}</div>
         </div>
         <div class="tv-stat-box" style="border-left:4px solid var(--yellow)">
           <span class="muted" style="font-size:12px;text-transform:uppercase">Casos Críticos</span>
@@ -5771,16 +5683,16 @@
       <h3 style="margin-bottom:12px;font-size:16px">Casos Prioritarios y Actividades en Atención</h3>
       <div class="tv-card-grid">
         ${active.slice(0, 6).map(it => `
-          <div class="tv-item-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}">
+          <div class="tv-item-card ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}">
             <div style="display:flex;align-items:center;gap:8px;font-size:12px">
               <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
               <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
             </div>
-            <div style="font-size:15px;font-weight:700">${it.title}</div>
-            <div class="muted" style="font-size:12px">Cliente: ${it.client_name} · Responsable: <b>${it.assignee_name || 'Sin asignar'}</b></div>
+            <div style="font-size:15px;font-weight:700">${escapeHtml(it.title)}</div>
+            <div class="muted" style="font-size:12px">Cliente: ${escapeHtml(it.client_name || it.project_name || 'Interno')} · Responsable: <b>${escapeHtml(it.assignee_name || 'Sin asignar')}</b></div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;font-size:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px">
-              <span style="font-weight:600;color:var(--accent)">${getItemTimeLabel(it)}</span>
-              <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? '· ' + getItemSlaRemaining(it) : ''}</span>
+              <span style="font-weight:600;color:var(--accent)">${getItemAttentionTime(it)}</span>
+              <span class="muted">Recibido: ${formatDate(it.received_at || it.created_at, true)}</span>
             </div>
           </div>
         `).join('') || '<div class="muted" style="padding:40px;text-align:center">No hay tickets activos en este momento.</div>'}
@@ -5788,20 +5700,13 @@
     `;
       } else if (s.type === 'kanban') {
         const srcFilter = document.getElementById('fSrc') ? document.getElementById('fSrc').value : '';
-        const hideEspera = srcFilter === 'ClickUp';
         const tvKanbanItems = srcFilter ? visibleTvItems.filter(i => i.source === srcFilter) : visibleTvItems;
-        const cols = hideEspera
-          ? [
-              { k: 'pendiente', title: 'Pendientes', color: '#4f8cff' },
-              { k: 'curso', title: 'En curso', color: '#22c3d6' },
-              { k: 'cerrado', title: 'Cerrados', color: '#2ecc71' }
-            ]
-          : [
-              { k: 'pendiente', title: 'Pendientes', color: '#4f8cff' },
-              { k: 'curso', title: 'En curso', color: '#22c3d6' },
-              { k: 'espera', title: 'En espera', color: '#f39c12' },
-              { k: 'cerrado', title: 'Cerrados', color: '#2ecc71' }
-            ];
+        const cols = [
+          { k: 'pendiente', title: 'Pendientes', color: '#4f8cff' },
+          { k: 'curso', title: 'En curso', color: '#22c3d6' },
+          { k: 'espera', title: 'En espera', color: '#f39c12' },
+          { k: 'cerrado', title: 'Cerrados', color: '#2ecc71' }
+        ];
 
         container.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 16px;backdrop-filter:blur(14px);flex-wrap:wrap;gap:10px">
@@ -5821,12 +5726,9 @@
         </div>
         `}
       </div>
-      <div class="tv-kanban-grid ${hideEspera ? 'cols-3' : ''}">
+      <div class="tv-kanban-grid">
         ${cols.map(c => {
-          const colItems = tvKanbanItems.filter(i => {
-            const effectiveStatus = (i.source === 'ClickUp' && i.status === 'espera') ? 'curso' : i.status;
-            return effectiveStatus === c.k;
-          });
+          const colItems = tvKanbanItems.filter(i => i.status === c.k);
           return `
             <div class="tv-kanban-col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
               <div class="tv-kanban-col-header" style="border-top:3px solid ${c.color}">
@@ -5848,19 +5750,19 @@
                 ${colItems.map(it => {
             const canDrag = canUserEditItem(it);
             return `
-                  <div class="tv-kanban-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-tv-${it.id}" draggable="${canDrag ? 'true' : 'false'}" ${canDrag ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!canDrag ? 'cursor:pointer;' : ''}">
+                  <div class="tv-kanban-card ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-tv-${it.id}" draggable="${canDrag ? 'true' : 'false'}" ${canDrag ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!canDrag ? 'cursor:pointer;' : ''}">
                     <div style="display:flex;align-items:center;gap:6px;font-size:11px">
                       <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
                       <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
                     </div>
-                    <div style="font-size:13.5px;font-weight:700;line-height:1.3;margin:6px 0 4px 0">${it.title}</div>
+                    <div style="font-size:13.5px;font-weight:700;line-height:1.3;margin:6px 0 4px 0">${escapeHtml(it.title)}</div>
                     <div class="muted" style="font-size:11px;display:flex;align-items:center;justify-content:space-between">
-                      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%">${it.client_name}</span>
-                      <span style="font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%">${it.assignee_name || '<em style="color:#f39c12">Sin asignar</em>'}</span>
+                      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%">${escapeHtml(it.client_name || 'Interno')}</span>
+                      <span style="font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%">${escapeHtml(it.assignee_name || 'Sin asignar')}</span>
                     </div>
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;border-top:1px solid rgba(255,255,255,.06);padding-top:6px;font-size:11px">
-                      <span style="font-weight:600;color:var(--accent)">${getItemTimeLabel(it)}</span>
-                      <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? '· ' + getItemSlaRemaining(it) : ''}</span>
+                      <span style="font-weight:600;color:var(--accent)">${getItemAttentionTime(it)}</span>
+                      <span class="muted">Recibido: ${formatDate(it.received_at || it.created_at, true)}</span>
                     </div>
                   </div>
                 `;
@@ -5896,11 +5798,11 @@
                 <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
                 <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
               </div>
-              <div style="font-size:15px;font-weight:700">${it.title}</div>
-              <div class="muted" style="font-size:12px">Cliente: ${it.client_name}</div>
+              <div style="font-size:15px;font-weight:700">${escapeHtml(it.title)}</div>
+              <div class="muted" style="font-size:12px">Cliente: ${escapeHtml(it.client_name || 'Interno')}</div>
               <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;display:flex;flex-direction:column;gap:8px">
                 <div style="display:flex;align-items:center;justify-content:space-between">
-                  <span style="font-size:12px;font-weight:600;color:#f39c12">${getItemTimeLabel(it)}</span>
+                  <span style="font-size:12px;font-weight:600;color:#f39c12">${getItemAttentionTime(it)}</span>
                   <a href="${it.url}" target="_blank" class="tv-action-btn" style="padding:4px 10px;font-size:11px" title="Abrir en plataforma nativa">
                     <span>Abrir</span>
                     <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -5934,8 +5836,8 @@
         const spec = s.spec;
         const items = ALL_ITEMS.filter(it => it.status !== 'cerrado' && it.assignee_name && it.assignee_name.toLowerCase().includes(spec.key));
         const enCurso = items.filter(i => i.status === 'curso').length;
+        const enEspera = items.filter(i => i.status === 'espera').length;
         const pendientes = items.filter(i => i.status === 'pendiente').length;
-        const vencidos = items.filter(i => i.is_overdue || i.semaphore === 'rojo').length;
 
         container.innerHTML = `
       <div class="tv-stat-row">
@@ -5947,13 +5849,13 @@
           <span class="muted" style="font-size:12px;text-transform:uppercase">En Curso</span>
           <div class="num">${enCurso}</div>
         </div>
+        <div class="tv-stat-box" style="border-left:4px solid var(--purple)">
+          <span class="muted" style="font-size:12px;text-transform:uppercase">En Espera</span>
+          <div class="num" style="color:var(--purple)">${enEspera}</div>
+        </div>
         <div class="tv-stat-box" style="border-left:4px solid var(--yellow)">
           <span class="muted" style="font-size:12px;text-transform:uppercase">Pendientes</span>
-          <div class="num">${pendientes}</div>
-        </div>
-        <div class="tv-stat-box" style="border-left:4px solid var(--red)">
-          <span class="muted" style="font-size:12px;text-transform:uppercase">Fuera de SLA</span>
-          <div class="num" style="color:var(--red)">${vencidos}</div>
+          <div class="num" style="color:var(--yellow)">${pendientes}</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
@@ -5969,21 +5871,20 @@
       ` : `
         <div class="tv-card-grid">
           ${items.map(it => `
-            <div class="tv-item-card ${it.semaphore}">
+            <div class="tv-item-card">
               <div style="display:flex;align-items:center;gap:8px;font-size:12px">
                 <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
                 <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
               </div>
-              <div style="font-size:15px;font-weight:700">${it.title}</div>
-              <div class="muted" style="font-size:12px">Cliente: ${it.client_name} · Estado: <b>${it.status_origin || it.status}</b></div>
+              <div style="font-size:15px;font-weight:700">${escapeHtml(it.title)}</div>
+              <div class="muted" style="font-size:12px">Cliente: ${escapeHtml(it.client_name || 'Interno')} · Estado: <b>${escapeHtml(it.status_origin || it.status)}</b></div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;font-size:12px;gap:6px;flex-wrap:wrap">
-                <span style="font-weight:600;color:var(--accent)">${getItemTimeLabel(it)}</span>
-                <span class="${it.is_overdue ? 'txt-red' : 'muted'}">${it.sla_percent}% SLA ${getItemSlaRemaining(it) ? '· ' + getItemSlaRemaining(it) : ''}</span>
+                <span style="font-weight:600;color:var(--accent)">${getItemAttentionTime(it)}</span>
+                <span class="muted">Recibido: ${formatDate(it.received_at || it.created_at, true)}</span>
                 <div style="display:inline-flex;align-items:center;gap:6px">
                   ${isCoordinator() ? `
                   <button type="button" onclick="openModal(${it.id})" class="tv-action-btn" style="cursor:pointer;padding:4px 8px;font-size:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)" title="Reasignar o sumar especialistas">
                     <span>Reasignar</span>
-                  </button>
                   </button>` : ''}
                   <a href="${it.url}" target="_blank" class="tv-action-btn" style="padding:4px 8px;font-size:11px">
                     <span>Abrir</span>
@@ -6533,23 +6434,17 @@
 
         const data = await res.json();
         const k = data.kpis || {};
-        const slaVal = Number(k.cumplimiento_general) || 0;
-        const slaColor = (slaVal >= 90) ? '#10b981' : ((slaVal >= 75) ? '#f59e0b' : '#ef4444');
 
         let specRows = '';
         if (data.por_especialista && data.por_especialista.length > 0) {
           specRows = data.por_especialista.map(s => {
-            const p = Number(s.cumplimiento_pct) || 0;
-            const barC = (p >= 90) ? '#10b981' : ((p >= 75) ? '#f59e0b' : '#ef4444');
             return `
               <tr style="border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px">
                 <td style="padding:7px 8px"><strong>${escapeHtml(s.name)}</strong></td>
                 <td style="padding:7px 8px;text-align:center">${s.total}</td>
                 <td style="padding:7px 8px;text-align:center;color:#10b981;font-weight:600">${s.cerrados}</td>
                 <td style="padding:7px 8px;text-align:center;color:#0ea5e9;font-weight:600">${s.en_curso}</td>
-                <td style="padding:7px 8px;text-align:center">
-                  <span style="color:${barC};font-weight:700">${p.toFixed(1)}%</span>
-                </td>
+                <td style="padding:7px 8px;text-align:center;color:#f59e0b;font-weight:600">${s.en_espera || 0}</td>
                 <td style="padding:7px 8px;text-align:center;color:var(--muted)">${escapeHtml(s.avg_time_str)}</td>
               </tr>
             `;
@@ -6573,7 +6468,7 @@
             <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
               <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Cerrados</div>
               <div style="font-size:22px;font-weight:800;color:#10b981;margin-top:2px">${k.total_cerrados || 0}</div>
-              <div class="muted" style="font-size:10px;margin-top:2px">${k.total_dentro_sla || 0} a tiempo</div>
+              <div class="muted" style="font-size:10px;margin-top:2px">${k.total_cerrados || 0} resueltas</div>
             </div>
             <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
               <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Escalamientos</div>
@@ -6581,9 +6476,9 @@
               <div class="muted" style="font-size:10px;margin-top:2px">En el filtro actual</div>
             </div>
             <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
-              <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">SLA Sycom</div>
-              <div style="font-size:22px;font-weight:800;color:${slaColor};margin-top:2px">${slaVal.toFixed(1)}%</div>
-              <div class="muted" style="font-size:10px;margin-top:2px">SLA Equipo: ${(Number(k.cumplimiento_equipo) || 100).toFixed(0)}%</div>
+              <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">En Espera</div>
+              <div style="font-size:22px;font-weight:800;color:#f59e0b;margin-top:2px">${k.total_en_espera || 0}</div>
+              <div class="muted" style="font-size:10px;margin-top:2px">${k.total_pendientes || 0} pendientes</div>
             </div>
             <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center">
               <div class="muted" style="font-size:11px;text-transform:uppercase;font-weight:600">Resolución Prom.</div>
@@ -6597,7 +6492,7 @@
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;overflow:hidden">
               <div style="padding:8px 12px;background:rgba(255,255,255,0.04);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between">
                 <span>Rendimiento por Especialista</span>
-                <span>SLA %</span>
+                <span>Tiempos Operativos</span>
               </div>
               <div style="max-height:140px;overflow-y:auto">
                 <table style="width:100%;border-collapse:collapse">
@@ -6607,7 +6502,7 @@
                       <th style="padding:6px 8px">Total</th>
                       <th style="padding:6px 8px">Cerradas</th>
                       <th style="padding:6px 8px">En curso</th>
-                      <th style="padding:6px 8px">SLA %</th>
+                      <th style="padding:6px 8px">En espera</th>
                       <th style="padding:6px 8px">T. Promedio</th>
                     </tr>
                   </thead>
@@ -6818,8 +6713,6 @@
       }
 
       tbody.innerHTML = list.map(r => {
-        const sla = Number(r.sla_percent) || 0;
-        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 75) ? '#f59e0b' : '#ef4444');
         const folio = `REP-${String(r.id).padStart(4, '0')}`;
 
         return `
@@ -6837,11 +6730,10 @@
             </td>
             <td style="text-align:center">
               <span style="font-weight:700;font-size:13px">${r.total_items}</span>
-              <small class="muted"> (${r.total_closed} cerrados)</small>
             </td>
             <td style="text-align:center">
-              <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-weight:700">
-                ${sla.toFixed(1)}%
+              <span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);font-weight:700">
+                ${r.total_closed || 0} resueltas
               </span>
             </td>
             <td style="text-align:center;color:var(--muted)">
@@ -7209,7 +7101,7 @@
     function renderAnalyticsDashboard(data) {
       if (!data) return;
       renderAnalyticsKpis(data.kpis || {}, data.por_origen || {});
-      renderSlaDonutChart(data.kpis || {});
+      renderStatusDonutChart(data.kpis || {});
       renderSpecialistsChart(data.por_especialista || []);
       renderCategoryChart(data.por_categoria || [], data.items || []);
       renderIbpChart(data.por_ibp || [], data.items || []);
@@ -7223,10 +7115,6 @@
       const kpiGrid = document.getElementById('analyticsKpiGrid');
       if (!kpiGrid) return;
 
-      const slaVal = Number(kpis.cumplimiento_general != null ? kpis.cumplimiento_general : 100);
-      const slaColor = (slaVal >= 90) ? '#10b981' : ((slaVal >= 80) ? '#f59e0b' : '#ef4444');
-      const slaBadgeText = (slaVal >= 90) ? 'Excelente · Meta 90%' : ((slaVal >= 80) ? 'Aceptable' : 'En Riesgo');
-
       const totalItems = kpis.total_items || 0;
       const totalClosed = kpis.total_cerrados || 0;
       const closePct = totalItems > 0 ? ((totalClosed / totalItems) * 100).toFixed(1) : '100.0';
@@ -7236,25 +7124,25 @@
       const cuCount = porOrigen.ClickUp || 0;
 
       kpiGrid.innerHTML = `
-        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px;border-left:4px solid ${slaColor}">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Cumplimiento SLA</span>
-            <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:10px;font-weight:700">${slaBadgeText}</span>
-          </div>
-          <div style="font-size:26px;font-weight:800;color:${slaColor};line-height:1.1">${slaVal.toFixed(1)}%</div>
-          <small class="muted" style="font-size:11px;margin-top:5px;display:block">
-            ${kpis.total_dentro_sla || 0} dentro de SLA · ${kpis.total_fuera_sla || 0} fuera de SLA
-          </small>
-        </div>
-
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px;border-left:4px solid var(--accent)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Total Gestionadas</span>
-            <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:10px;font-weight:700">${closePct}% Cerradas</span>
+            <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Total Actividades</span>
+            <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:10px;font-weight:700">Período</span>
           </div>
           <div style="font-size:26px;font-weight:800;color:var(--text);line-height:1.1">${totalItems}</div>
           <small class="muted" style="font-size:11px;margin-top:5px;display:block">
-            ${totalClosed} resueltas · ${activeItems} en proceso
+            Volumen gestionado en el período
+          </small>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px;border-left:4px solid #10b981">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Cerradas / Resueltas</span>
+            <span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:10px;font-weight:700">${closePct}% Cerradas</span>
+          </div>
+          <div style="font-size:26px;font-weight:800;color:#10b981;line-height:1.1">${totalClosed}</div>
+          <small class="muted" style="font-size:11px;margin-top:5px;display:block">
+            ${activeItems} en proceso (en curso / espera / pendientes)
           </small>
         </div>
 
@@ -7285,29 +7173,25 @@
       `;
     }
 
-    function renderSlaDonutChart(kpis) {
-      const container = document.getElementById('chartSlaDonutContainer');
-      const badgePct = document.getElementById('lblSlaBadgePct');
+    function renderStatusDonutChart(kpis) {
+      const container = document.getElementById('chartStatusDonutContainer');
+      const badgePct = document.getElementById('lblStatusBadgePct');
       if (!container) return;
 
-      const slaVal = Number(kpis.cumplimiento_general != null ? kpis.cumplimiento_general : 100);
-      const slaColor = (slaVal >= 90) ? '#10b981' : ((slaVal >= 80) ? '#f59e0b' : '#ef4444');
+      // Conteo de Estados mutuamente excluyentes (Cerradas, En Curso, En Espera, Pendientes)
+      const cerradosOk = kpis.total_cerrados || 0;
+      const enCursoOk = kpis.total_en_curso || 0;
+      const pendientesOk = kpis.total_pendientes || 0;
+      const esperaOk = kpis.total_en_espera || 0;
+      const total = cerradosOk + enCursoOk + pendientesOk + esperaOk;
+      const closePct = total > 0 ? ((cerradosOk / total) * 100).toFixed(0) : '0';
 
       if (badgePct) {
-        badgePct.textContent = `${slaVal.toFixed(1)}% SLA`;
-        badgePct.style.background = `${slaColor}22`;
-        badgePct.style.color = slaColor;
-        badgePct.style.border = `1px solid ${slaColor}44`;
+        badgePct.textContent = `${cerradosOk} Cerradas (${closePct}%)`;
+        badgePct.style.background = 'rgba(16,185,129,0.15)';
+        badgePct.style.color = '#10b981';
+        badgePct.style.border = '1px solid rgba(16,185,129,0.3)';
       }
-
-      // Conteo de Estados mutuamente excluyentes (Cerradas, En Curso, Pendientes, En Espera y Fuera de SLA)
-      const cerradosOk = kpis.total_cerrados_ok != null ? kpis.total_cerrados_ok : (kpis.total_cerrados || 0);
-      const enCursoOk = kpis.total_en_curso_ok != null ? kpis.total_en_curso_ok : (kpis.total_en_curso || 0);
-      const pendientesOk = kpis.total_pendientes_ok != null ? kpis.total_pendientes_ok : (kpis.total_pendientes || 0);
-      const esperaOk = kpis.total_en_espera_ok != null ? kpis.total_en_espera_ok : (kpis.total_en_espera || 0);
-      const fueraSla = kpis.total_fuera_sla || 0;
-      
-      const total = cerradosOk + enCursoOk + pendientesOk + esperaOk + fueraSla;
 
       if (total === 0) {
         container.innerHTML = `
@@ -7326,11 +7210,10 @@
       const r = 95;
 
       const segments = [
-        { label: 'Cerradas / Resueltas', count: cerradosOk, color: '#10b981', desc: 'Finalizadas dentro de SLA' },
-        { label: 'En Curso / Atención', count: enCursoOk, color: '#3b82f6', desc: 'Activas dentro de plazo' },
-        { label: 'Pendientes / Por Iniciar', count: pendientesOk, color: '#06b6d4', desc: 'En cola dentro de plazo' },
-        { label: 'En Espera', count: esperaOk, color: '#f59e0b', desc: 'Pausadas por tercero' },
-        { label: 'Fuera de SLA / Atrasadas', count: fueraSla, color: '#ef4444', desc: 'Excedieron el tiempo límite' }
+        { label: 'Cerradas / Resueltas', count: cerradosOk, color: '#10b981', desc: 'Actividades finalizadas' },
+        { label: 'En Curso / Atención', count: enCursoOk, color: '#3b82f6', desc: 'En atención técnica' },
+        { label: 'En Espera', count: esperaOk, color: '#f59e0b', desc: 'En espera de respuesta o terceros' },
+        { label: 'Pendientes / Por Iniciar', count: pendientesOk, color: '#06b6d4', desc: 'En cola de atención' }
       ].filter(s => s.count > 0);
 
       let pieSvg = '';
@@ -7376,11 +7259,10 @@
       }
 
       const allItems = [
-        { label: 'Cerradas / Resueltas', count: cerradosOk, color: '#10b981', desc: 'Finalizadas dentro de SLA' },
-        { label: 'En Curso / Atención', count: enCursoOk, color: '#3b82f6', desc: 'Activas dentro de plazo' },
-        { label: 'Pendientes / Por Iniciar', count: pendientesOk, color: '#06b6d4', desc: 'En cola dentro de plazo' },
-        { label: 'En Espera', count: esperaOk, color: '#f59e0b', desc: 'Pausadas por cliente/proveedor' },
-        { label: 'Fuera de SLA / Atrasadas', count: fueraSla, color: '#ef4444', desc: 'Excedieron el tiempo límite' }
+        { label: 'Cerradas / Resueltas', count: cerradosOk, color: '#10b981', desc: 'Actividades finalizadas' },
+        { label: 'En Curso / Atención', count: enCursoOk, color: '#3b82f6', desc: 'En atención técnica' },
+        { label: 'En Espera', count: esperaOk, color: '#f59e0b', desc: 'En espera de respuesta o terceros' },
+        { label: 'Pendientes / Por Iniciar', count: pendientesOk, color: '#06b6d4', desc: 'En cola de atención' }
       ];
 
       const legendsHtml = allItems.map(item => {
@@ -7416,12 +7298,13 @@
             ${legendsHtml}
             <div style="padding:9px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:space-between;margin-top:2px">
               <span class="muted" style="font-size:11.5px">Total evaluadas en este período:</span>
-              <strong style="color:var(--text);font-size:13px">${total} actividades (${kpis.total_dentro_sla != null ? kpis.total_dentro_sla : (total - fueraSla)} dentro de SLA)</strong>
+              <strong style="color:var(--text);font-size:13px">${total} actividades registradas</strong>
             </div>
           </div>
         </div>
       `;
     }
+    window.renderStatusDonutChart = renderStatusDonutChart;
 
     function renderSpecialistsChart(list) {
       const container = document.getElementById('chartSpecialistsContainer');
@@ -7445,7 +7328,8 @@
         const barH = s.total > 0 ? Math.max(Math.round((s.total / maxTotal) * MAX_BAR_H), 16) : 4;
         const closedH = s.total > 0 ? Math.round((s.cerrados / s.total) * barH) : 0;
         const activeH = s.total > 0 ? Math.round((s.en_curso / s.total) * barH) : 0;
-        const overdueH = s.total > 0 ? Math.max(barH - closedH - activeH, (s.fuera_sla > 0 ? 4 : 0)) : 0;
+        const esperaH = s.total > 0 ? Math.round(((s.en_espera || 0) / s.total) * barH) : 0;
+        const pendH = s.total > 0 ? Math.max(barH - closedH - activeH - esperaH, 0) : 0;
 
         return `
           <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:55px;max-width:92px">
@@ -7456,19 +7340,18 @@
 
             <!-- Barra vertical -->
             <div style="width:30px;height:${barH}px;background:${s.total > 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)'};border-radius:5px 5px 0 0;overflow:hidden;display:flex;flex-direction:column-reverse;box-shadow:0 2px 8px rgba(0,0,0,0.3)"
-              title="${escapeHtml(s.name)}: ${s.total} asignadas (${s.cerrados} cerradas, ${s.en_curso} en curso, ${s.fuera_sla} fuera SLA)">
+              title="${escapeHtml(s.name)}: ${s.total} asignadas (${s.cerrados} cerradas, ${s.en_curso} en curso, ${s.en_espera || 0} en espera, ${s.pendientes || 0} pendientes)">
               <div style="height:${closedH}px;background:#10b981;width:100%" title="${s.cerrados} cerradas"></div>
-              <div style="height:${activeH}px;background:#4f8cff;width:100%" title="${s.en_curso} en curso"></div>
-              <div style="height:${overdueH}px;background:#ef4444;width:100%" title="${s.fuera_sla} atrasadas"></div>
+              <div style="height:${activeH}px;background:#3b82f6;width:100%" title="${s.en_curso} en curso"></div>
+              <div style="height:${esperaH}px;background:#f59e0b;width:100%" title="${s.en_espera || 0} en espera"></div>
+              <div style="height:${pendH}px;background:#06b6d4;width:100%" title="${s.pendientes || 0} pendientes"></div>
             </div>
           </div>
         `;
       }).join('');
 
-      // 2. Eje X independiente (Nombres, roles y porcentaje de SLA alineados bajo la línea base)
+      // 2. Eje X independiente (Nombres, roles y tiempo promedio bajo la línea base)
       const barsAxisHtml = list.map(s => {
-        const sla = Number(s.cumplimiento_pct) || 0;
-        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
         const isCoord = (s.role || '').toLowerCase().includes('coordinador');
         const isBolsa = (s.name || '').toLowerCase().includes('sin asignar');
 
@@ -7478,6 +7361,7 @@
                      : `<span class="badge notranslate" translate="no" style="background:rgba(167,139,250,0.15);color:#a78bfa;font-size:9px;padding:2px 5px">Especialista</span>`);
 
         const shortName = isBolsa ? 'Sin asignar' : s.name.split(' ')[0];
+        const avgTime = s.avg_time_str || '—';
 
         return `
           <div style="flex:1;min-width:55px;max-width:92px;text-align:center">
@@ -7485,18 +7369,17 @@
               ${escapeHtml(shortName)}
             </strong>
             <div style="margin-top:3px">${roleBadge}</div>
-            <div style="font-size:10px;font-weight:700;color:${s.total > 0 ? slaColor : '#94a3b8'};margin-top:3px">${s.total > 0 ? `${sla.toFixed(0)}% SLA` : '— SLA'}</div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;margin-top:3px">T. Prom: ${escapeHtml(avgTime)}</div>
           </div>
         `;
       }).join('');
 
       // 3. Resumen numérico inferior por especialista
       const detailsHtml = list.map(s => {
-        const sla = Number(s.cumplimiento_pct) || 0;
-        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
         const isUnassigned = (s.name || '').toLowerCase().includes('sin asignar');
         const displayName = isUnassigned ? 'Sin asignar' : escapeHtml(s.name);
         const displayRole = (isUnassigned || !s.role || s.role.toLowerCase().includes('sin asignar') || s.role.toLowerCase().includes('bolsa')) ? '' : `(${escapeHtml(s.role)})`;
+        const avgTime = s.avg_time_str ? `T. Prom: ${escapeHtml(s.avg_time_str)}` : '';
 
         return `
           <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(255,255,255,0.02);border-radius:6px;border:1px solid rgba(255,255,255,0.04);font-size:11px">
@@ -7505,8 +7388,8 @@
               ${displayRole ? `<span class="muted">${displayRole}</span>` : ''}
             </div>
             <div style="display:flex;align-items:center;gap:10px">
-              <span><strong>${s.total}</strong> casos (<span style="color:#10b981">${s.cerrados} c.</span> / <span style="color:#4f8cff">${s.en_curso} act.</span>${s.fuera_sla > 0 ? ` / <span style="color:#ef4444">${s.fuera_sla} atr.</span>` : ''})</span>
-              ${rptSlaBadge(s.cumplimiento_pct, s.total > 0)}
+              <span><strong>${s.total}</strong> casos (<span style="color:#10b981">${s.cerrados} c.</span> / <span style="color:#3b82f6">${s.en_curso} act.</span>${s.en_espera ? ` / <span style="color:#f59e0b">${s.en_espera} esp.</span>` : ''})</span>
+              ${avgTime ? `<span class="badge" style="background:rgba(255,255,255,0.06);color:var(--text);font-size:10px;padding:2px 6px">${avgTime}</span>` : ''}
             </div>
           </div>
         `;
@@ -7532,10 +7415,13 @@
               <span style="width:10px;height:10px;border-radius:2px;background:#10b981;display:inline-block"></span> Cerradas
             </span>
             <span style="display:flex;align-items:center;gap:5px;color:var(--text)">
-              <span style="width:10px;height:10px;border-radius:2px;background:#4f8cff;display:inline-block"></span> En Curso
+              <span style="width:10px;height:10px;border-radius:2px;background:#3b82f6;display:inline-block"></span> En Curso
             </span>
             <span style="display:flex;align-items:center;gap:5px;color:var(--text)">
-              <span style="width:10px;height:10px;border-radius:2px;background:#ef4444;display:inline-block"></span> Fuera de SLA
+              <span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;display:inline-block"></span> En Espera
+            </span>
+            <span style="display:flex;align-items:center;gap:5px;color:var(--text)">
+              <span style="width:10px;height:10px;border-radius:2px;background:#06b6d4;display:inline-block"></span> Pendientes
             </span>
           </div>
 
@@ -7628,9 +7514,8 @@
       const maxTotal = Math.max(...topClients.map(c => c.total), 1);
 
       container.innerHTML = topClients.map((c, idx) => {
-        const sla = Number(c.cumplimiento_pct) || 0;
-        const slaColor = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
         const barPct = (c.total / maxTotal) * 100;
+        const avgTime = c.avg_time_str ? `T. Prom: ${escapeHtml(c.avg_time_str)}` : `${c.cerrados || 0} resueltas`;
 
         return `
           <div style="background:rgba(255,255,255,0.02);padding:7px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.05)">
@@ -7640,8 +7525,8 @@
               </span>
               <div style="display:flex;align-items:center;gap:6px">
                 <span style="font-weight:700;color:var(--text)">${c.total}</span>
-                <span class="badge" style="background:${slaColor}22;color:${slaColor};border:1px solid ${slaColor}44;font-size:10px;padding:2px 5px">
-                  ${sla.toFixed(0)}%
+                <span class="badge" style="background:rgba(79,140,255,0.15);color:var(--accent);font-size:10px;padding:2px 5px">
+                  ${avgTime}
                 </span>
               </div>
             </div>
@@ -7669,24 +7554,15 @@
     };
     // Segmentos mutuamente excluyentes de las barras apiladas
     const RPT_SEGMENTS = [
-      { key: 'ok_closed', label: 'Resueltas en SLA', short: 'resueltas', one: 'resuelta', color: '#10b981' },
-      { key: 'ok_active', label: 'En curso en SLA', short: 'en curso', one: 'en curso', color: '#3b82f6' },
-      { key: 'overdue', label: 'Fuera de SLA', short: 'fuera SLA', one: 'fuera SLA', color: '#ef4444' },
+      { key: 'cerrados', label: 'Cerradas', short: 'cerradas', one: 'cerrada', color: '#10b981' },
+      { key: 'en_curso', label: 'En curso', short: 'en curso', one: 'en curso', color: '#3b82f6' },
+      { key: 'en_espera', label: 'En espera', short: 'en espera', one: 'en espera', color: '#f59e0b' },
+      { key: 'pendientes', label: 'Pendientes', short: 'pendientes', one: 'pendiente', color: '#06b6d4' },
       { key: 'esc_only', label: 'Escalamiento sin actividad', short: 'esc. sin act.', one: 'esc. sin act.', color: '#a78bfa' }
     ];
 
     function rptIsOverdue(it) {
-      return !!(it && (it.is_overdue || it.semaphore === 'rojo'));
-    }
-
-    // Etiqueta SLA con semáforo; gris "—" cuando no hay actividades medibles
-    function rptSlaBadge(pct, measurable) {
-      if (!measurable) {
-        return `<span class="badge" title="Sin actividades medibles en este período" style="background:rgba(148,163,184,0.12);color:#94a3b8;border:1px solid rgba(148,163,184,0.25);font-size:10px;padding:2px 6px;font-weight:700;white-space:nowrap">— SLA</span>`;
-      }
-      const sla = Number(pct) || 0;
-      const c = (sla >= 90) ? '#10b981' : ((sla >= 80) ? '#f59e0b' : '#ef4444');
-      return `<span class="badge" style="background:${c}22;color:${c};border:1px solid ${c}44;font-size:10px;padding:2px 6px;font-weight:700;white-space:nowrap">${sla.toFixed(0)}% SLA</span>`;
+      return false;
     }
 
     // Agrupa los items del período por campo ('ibp' | 'category') en segmentos de estado
@@ -7694,10 +7570,11 @@
       const map = {};
       (items || []).forEach(it => {
         const k = it[field] || (field === 'ibp' ? RPT_GENERAL_IBP : 'Infraestructura');
-        const b = map[k] || (map[k] = { ok_closed: 0, ok_active: 0, overdue: 0 });
-        if (rptIsOverdue(it)) b.overdue++;
-        else if (it.status === 'cerrado') b.ok_closed++;
-        else b.ok_active++;
+        const b = map[k] || (map[k] = { cerrados: 0, en_curso: 0, en_espera: 0, pendientes: 0 });
+        if (it.status === 'cerrado') b.cerrados++;
+        else if (it.status === 'curso') b.en_curso++;
+        else if (it.status === 'espera') b.en_espera++;
+        else b.pendientes++;
       });
       return map;
     }
@@ -7706,11 +7583,13 @@
     function rptRowSegments(row, breakdown) {
       const totalItems = row.total_items || 0;
       let b = breakdown || null;
-      if (!b || (b.ok_closed + b.ok_active + b.overdue) !== totalItems) {
-        // Respaldo con los campos agregados del backend
-        const overdue = Math.min(row.fuera_sla || 0, totalItems);
-        const closed = Math.min(row.cerrados || 0, totalItems - overdue);
-        b = { ok_closed: closed, ok_active: Math.max(totalItems - overdue - closed, 0), overdue };
+      if (!b) {
+        b = {
+          cerrados: row.cerrados || 0,
+          en_curso: row.en_curso || 0,
+          en_espera: row.en_espera || 0,
+          pendientes: row.pendientes || 0
+        };
       }
       return { ...b, esc_only: Math.max((row.total || 0) - totalItems, 0) };
     }
@@ -7740,7 +7619,7 @@
 
     // Fila de barra apilada clicable (filtra el tablero por esa IBP o categoría)
     function rptBarRowHtml(opts) {
-      const { label, labelColor, dotColor, segs, total, maxTotal, sumTotal, slaPct, measurable, drillAttr, drillValue, active, muted } = opts;
+      const { label, labelColor, dotColor, segs, total, maxTotal, sumTotal, avgTime, drillAttr, drillValue, active, muted } = opts;
       const widthPct = total > 0 ? Math.max((total / maxTotal) * 100, 4) : 0;
       const share = sumTotal > 0 ? ((total / sumTotal) * 100).toFixed(0) : '0';
       return `
@@ -7755,7 +7634,7 @@
             </span>
             <div style="display:flex;align-items:center;gap:8px;font-size:11px;flex-shrink:0">
               <span style="color:var(--text)"><strong style="font-size:13px">${total}</strong> <span class="muted">(${share}%)</span></span>
-              ${rptSlaBadge(slaPct, measurable)}
+              ${avgTime ? `<span class="badge" style="background:rgba(255,255,255,0.06);color:var(--text);font-size:10px;padding:2px 6px">T. Prom: ${escapeHtml(avgTime)}</span>` : ''}
             </div>
           </div>
           ${rptStackedBarHtml(segs, total, widthPct)}
@@ -7827,8 +7706,7 @@
         total: c.total || 0,
         maxTotal,
         sumTotal,
-        slaPct: c.cumplimiento_pct,
-        measurable: (c.total_items || 0) > 0,
+        avgTime: c.avg_time_str,
         drillAttr: 'data-drill-cat',
         drillValue: c.category,
         active: currentCat === c.category
@@ -7881,8 +7759,7 @@
         total: item.total || 0,
         maxTotal,
         sumTotal,
-        slaPct: item.cumplimiento_pct,
-        measurable: (item.total_items || 0) > 0,
+        avgTime: item.avg_time_str,
         drillAttr: 'data-drill-ibp',
         drillValue: item.ibp,
         active: currentIbp === item.ibp,
@@ -7928,20 +7805,19 @@
       const cells = {};
       const rowTotals = {};
       const colTotals = {};
-      const add = (ibp, cat, kind, overdue) => {
+      const add = (ibp, cat, kind) => {
         const key = `${ibp}\u0000${cat}`;
-        const c = cells[key] || (cells[key] = { total: 0, items: 0, esc: 0, overdue: 0 });
+        const c = cells[key] || (cells[key] = { total: 0, items: 0, esc: 0 });
         c.total++;
         if (kind === 'item') c.items++; else c.esc++;
-        if (overdue) c.overdue++;
         rowTotals[ibp] = (rowTotals[ibp] || 0) + 1;
         colTotals[cat] = (colTotals[cat] || 0) + 1;
       };
-      items.forEach(it => add(it.ibp || RPT_GENERAL_IBP, it.category || 'Infraestructura', 'item', rptIsOverdue(it)));
+      items.forEach(it => add(it.ibp || RPT_GENERAL_IBP, it.category || 'Infraestructura', 'item'));
       // Escalamientos sin actividad vinculada (evita doble conteo)
       escs.forEach(e => {
         if (linkedEscIds.has(e.id)) return;
-        add((e.ibp || RPT_GENERAL_IBP).trim(), (e.category || 'Infraestructura').trim(), 'esc', false);
+        add((e.ibp || RPT_GENERAL_IBP).trim(), (e.category || 'Infraestructura').trim(), 'esc');
       });
 
       const rows = Object.keys(rowTotals).sort((a, b) => {
@@ -7984,17 +7860,14 @@
           const alpha = 0.14 + 0.66 * (c.total / maxCell);
           const strong = alpha > 0.45;
           const isActive = curIbp === ibp && curCat === cat;
-          const ring = c.overdue > 0
-            ? 'box-shadow:inset 0 0 0 2px #ef4444;'
-            : (isActive ? 'box-shadow:inset 0 0 0 2px #ffffff;' : '');
-          const tip = `${ibp} · ${cat}: ${c.total} caso${c.total === 1 ? '' : 's'} (${c.items} act. / ${c.esc} esc. sin act.)${c.overdue ? ` · ${c.overdue} fuera de SLA` : ''}`;
+          const ring = isActive ? 'box-shadow:inset 0 0 0 2px #ffffff;' : '';
+          const tip = `${ibp} · ${cat}: ${c.total} caso${c.total === 1 ? '' : 's'} (${c.items} act. / ${c.esc} esc. sin act.)`;
           return `
             <td data-drill-ibp="${escapeHtml(ibp)}" data-drill-cat="${escapeHtml(cat)}"
               onclick="applyAnalyticsDrilldown(this.dataset.drillIbp, this.dataset.drillCat)" title="${escapeHtml(tip)}"
               style="cursor:pointer;text-align:center;padding:0;height:34px;min-width:62px;border-radius:6px;background:rgba(56,189,248,${alpha.toFixed(2)});${ring}color:${strong ? '#ffffff' : 'var(--text)'};font-size:12.5px;font-weight:800;position:relative;transition:transform .12s"
               onmouseover="this.style.transform='scale(1.06)'" onmouseout="this.style.transform='none'">
               ${c.total}
-              ${c.overdue ? `<span style="position:absolute;top:2px;right:4px;font-size:9px;font-weight:800;color:#fecaca">${c.overdue}!</span>` : ''}
             </td>`;
         }).join('');
 
@@ -8034,10 +7907,6 @@
             Menos
             <span style="width:90px;height:8px;border-radius:4px;background:linear-gradient(90deg, rgba(56,189,248,0.14), rgba(56,189,248,0.80))"></span>
             Más casos
-          </span>
-          <span style="display:inline-flex;align-items:center;gap:6px">
-            <span style="width:14px;height:12px;border-radius:3px;box-shadow:inset 0 0 0 2px #ef4444"></span>
-            Con casos fuera de SLA (n! = cantidad)
           </span>
           <span>Clic en IBP, categoría o celda para filtrar · clic de nuevo para quitar</span>
         </div>`;
@@ -8566,21 +8435,21 @@
             <small class="muted" style="font-size:11px;margin-top:3px;display:block">Pega la URL del documento compartido en Google Drive / Docs</small>
           </div>
 
-          <!-- 4.5. Fechas de SLA del Escalamiento (Sycom y Equipo) -->
+          <!-- 4.5. Fechas Cronológicas del Escalamiento (Sycom e Infra & BD) -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
             <div>
               <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)" for="escalationReceivedAtInput">
-                Recibimiento en Sycom (SLA Empresa) <span style="color:var(--red)">*</span>
+                Fecha de Llegada a Sycom <span style="color:var(--red)">*</span>
               </label>
               <input type="datetime-local" id="escalationReceivedAtInput" class="form-input" value="${recAtVal}" style="width:100%;font-size:12px;cursor:pointer" required>
-              <small class="muted" style="font-size:10.5px;margin-top:3px;display:block">Inicio del SLA principal (Empresa / Sycom)</small>
+              <small class="muted" style="font-size:10.5px;margin-top:3px;display:block">Fecha y hora de recepción en la organización</small>
             </div>
             <div>
               <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--text)" for="escalationEscalatedAtInput">
-                Escalada a Infra & BD (SLA Equipo) <span style="color:var(--red)">*</span>
+                Fecha de Escalada a Infra & BD <span style="color:var(--red)">*</span>
               </label>
               <input type="datetime-local" id="escalationEscalatedAtInput" class="form-input" value="${escAtVal}" style="width:100%;font-size:12px;cursor:pointer" required>
-              <small class="muted" style="font-size:10.5px;margin-top:3px;display:block">Inicio del SLA interno del equipo técnico</small>
+              <small class="muted" style="font-size:10.5px;margin-top:3px;display:block">Fecha y hora de escalamiento al equipo de Infra & BD</small>
             </div>
           </div>
 

@@ -10,8 +10,9 @@ STATUS_MAP_CLICKUP = {
     "in progress": "curso",
     "en curso": "curso",
     "doing": "curso",
-    "waiting": "curso",
-    "en espera": "curso",
+    "waiting": "espera",
+    "en espera": "espera",
+    "espera": "espera",
     "blocked": "curso",
     "bloqueado": "curso",
     "complete": "cerrado",
@@ -120,9 +121,7 @@ class ClickUpClient:
             if not has_due_time or (due_at.date() == created_at.date() and due_at < created_at):
                 due_at = due_at.replace(hour=23, minute=59, second=59)
         else:
-            # Si no tiene due_date, calculamos SLA por prioridad
-            sla_hours = {"Crítica": 4, "Alta": 24, "Media": 72, "Baja": 120}.get(prio_unif, 72)
-            due_at = created_at + datetime.timedelta(hours=sla_hours)
+            due_at = None
 
         # Responsables normalizados a nombres canónicos de la Agenda
         assignees = raw.get("assignees", [])
@@ -205,15 +204,12 @@ class ClickUpClient:
     def update_task_status(self, task_id: str, new_status: str) -> bool:
         """
         Actualiza el estado de la tarea en ClickUp.
-        ClickUp solo cuenta con: 'to do' (pendiente), 'in progress' (curso) y 'complete' (cerrado).
-        'espera' no existe en ClickUp.
+        Soporta: 'pendiente' ('to do'), 'curso' ('in progress'), 'espera' ('en espera') y 'cerrado' ('complete').
         """
-        if new_status == "espera":
-            return False
-
         status_map = {
             "pendiente": "to do",
             "curso": "in progress",
+            "espera": "en espera",
             "cerrado": "complete"
         }
         target = status_map.get(new_status, new_status)
@@ -227,6 +223,8 @@ class ClickUpClient:
                 res = requests.put(url, headers=self.get_headers(), json={"status": "open"}, timeout=10)
             elif target == "complete":
                 res = requests.put(url, headers=self.get_headers(), json={"status": "closed"}, timeout=10)
+            elif target == "en espera":
+                res = requests.put(url, headers=self.get_headers(), json={"status": "waiting"}, timeout=10)
             return res.status_code == 200
         except Exception as e:
             print(f"[ClickUpClient] Error actualizando estado de tarea {task_id} a {new_status}: {e}")

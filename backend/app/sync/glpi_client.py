@@ -12,6 +12,7 @@ STATUS_MAP = {
     6: ("cerrado", "6 - Cerrado")
 }
 
+# Mapeo de prioridades GLPI
 PRIORITY_MAP = {
     1: "Baja",
     2: "Baja",
@@ -19,14 +20,6 @@ PRIORITY_MAP = {
     4: "Alta",
     5: "Crítica",
     6: "Crítica"
-}
-
-# Horas de SLA por defecto si GLPI no tiene time_to_resolve configurado
-DEFAULT_SLA_HOURS = {
-    "Crítica": 4,
-    "Alta": 24,
-    "Media": 72,
-    "Baja": 120
 }
 
 DEFAULT_ENTITIES_MAP = {
@@ -238,13 +231,15 @@ class GLPIClient:
         closed_str = raw_ticket.get("closedate") or raw_ticket.get("solvedate")
         closed_at = datetime.datetime.fromisoformat(closed_str) if closed_str else None
 
-        # Vencimiento / SLA
+        # Vencimiento / Fecha límite nativa
         ttr_str = raw_ticket.get("time_to_resolve")
         if ttr_str:
-            due_at = datetime.datetime.fromisoformat(ttr_str)
+            try:
+                due_at = datetime.datetime.fromisoformat(ttr_str)
+            except Exception:
+                due_at = None
         else:
-            sla_hours = DEFAULT_SLA_HOURS.get(prio_unif, 72)
-            due_at = created_at + datetime.timedelta(hours=sla_hours)
+            due_at = None
 
         # Construir enlace directo
         base_host = self.base_url.replace("/apirest.php", "")

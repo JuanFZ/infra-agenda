@@ -446,9 +446,12 @@ function simulateDeepLink(opts) {
     kanbanSubText: { textContent: '' },
     kpisContainer: { innerHTML: '' },
     navOver: { textContent: '' },
+    navEspera: { textContent: '' },
     kanbanGrid: {
       innerHTML: '',
       classList: {
+        add: (c) => kanbanGridClasses.add(c),
+        remove: (c) => kanbanGridClasses.delete(c),
         toggle: (c, force) => { if (force) kanbanGridClasses.add(c); else kanbanGridClasses.delete(c); },
         has: (c) => kanbanGridClasses.has(c)
       }
@@ -457,10 +460,10 @@ function simulateDeepLink(opts) {
 
   const kanbanToasts = [];
   const kanbanItems = [
-    { id: 1, source: 'ClickUp', external_id: 'cu-1', title: 'Tarea ClickUp 1', status: 'pendiente', priority: 'Alta', semaphore: 'verde', sla_percent: 20 },
-    { id: 2, source: 'ClickUp', external_id: 'cu-2', title: 'Tarea ClickUp 2', status: 'curso', priority: 'Media', semaphore: 'verde', sla_percent: 40 },
-    { id: 3, source: 'GLPI', external_id: '236', title: 'Ticket GLPI 236', status: 'espera', priority: 'Alta', semaphore: 'amarillo', sla_percent: 75, client_name: 'SYCOM' },
-    { id: 4, source: 'GLPI', external_id: '237', title: 'Ticket GLPI 237', status: 'cerrado', priority: 'Baja', semaphore: 'verde', sla_percent: 10, client_name: 'Microfilms Center' }
+    { id: 1, source: 'ClickUp', external_id: 'cu-1', title: 'Tarea ClickUp 1', status: 'pendiente', priority: 'Alta' },
+    { id: 2, source: 'ClickUp', external_id: 'cu-2', title: 'Tarea ClickUp 2', status: 'curso', priority: 'Media' },
+    { id: 3, source: 'GLPI', external_id: '236', title: 'Ticket GLPI 236', status: 'espera', priority: 'Alta', client_name: 'SYCOM' },
+    { id: 4, source: 'GLPI', external_id: '237', title: 'Ticket GLPI 237', status: 'cerrado', priority: 'Baja', client_name: 'Microfilms Center' }
   ];
 
   const kanbanRunner = new Function(
@@ -476,11 +479,13 @@ function simulateDeepLink(opts) {
     function isCoordinator() { return true; }
     function isSpecialist() { return false; }
     function getItemTimeLabel() { return '10m'; }
+    function getItemAttentionTime() { return '10m'; }
     function formatDate(d) { return d || '—'; }
     function getAuthHeaders() { return {}; }
+    function loadData() { return Promise.resolve(); }
     function renderAll() {
       syncKanbanOriginUI();
-      renderKPIs({ pendientes: 1, en_curso: 1, en_espera: 1, atrasados: 0, cumplimiento_sla: 100, total_registrados: 4 });
+      renderKPIs({ pendientes: 1, en_curso: 1, en_espera: 1, cerrados: 1, total_registrados: 4, total_actividades: 4 });
       const src = document.getElementById('fSrc').value;
       const filtered = src ? ALL_ITEMS.filter(i => i.source === src) : ALL_ITEMS;
       renderKanban(filtered);
@@ -511,21 +516,22 @@ function simulateDeepLink(opts) {
     kanbanItems
   );
 
-  // 5A: Switch origin to 'ClickUp' -> hides 'espera' column (3 columns), adds .cols-3, hides 'espera' KPI, resets ACTIVE_KPI_FILTER from 'espera'
+  // 5A: Switch origin to 'ClickUp' -> renders all 4 columns including 'espera', no .cols-3, renders 'espera' KPI
   kanbanRunner.setOriginFilter('ClickUp');
   assert.strictEqual(mockKanbanEls.fSrc.value, 'ClickUp', '#fSrc should be updated to ClickUp');
-  assert.strictEqual(kanbanRunner.getActiveKpi(), null, 'ACTIVE_KPI_FILTER should reset when switching to ClickUp if it was espera');
   assert.strictEqual(pillButtons[1].classList.has('active'), true, 'ClickUp pill should be active');
   assert.strictEqual(pillButtons[0].classList.has('active'), false, 'Todos pill should not be active');
   assert(mockKanbanEls.kanbanOriginBadge.textContent.includes('ClickUp'), 'Badge should show ClickUp origin');
-  assert.strictEqual(kanbanGridClasses.has('cols-3'), true, '#kanbanGrid should have cols-3 class for ClickUp');
-  assert(!mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="espera"'), 'Kanban must NOT render En espera column for ClickUp');
+  assert.strictEqual(kanbanGridClasses.has('cols-3'), false, '#kanbanGrid must NOT have cols-3 class for ClickUp');
+  assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="espera"'), 'Kanban must ALWAYS render En espera column for ClickUp');
   assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="pendiente"'), 'Kanban must render Pendientes column');
   assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="curso"'), 'Kanban must render En curso column');
   assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="cerrado"'), 'Kanban must render Cerrados column');
-  assert(!mockKanbanEls.kpisContainer.innerHTML.includes('data-kpi="espera"'), 'KPIs must NOT render En Espera card for ClickUp');
+  assert(mockKanbanEls.kpisContainer.innerHTML.includes('data-kpi="espera"'), 'KPIs must render En Espera card for ClickUp');
+  assert(!mockKanbanEls.kpisContainer.innerHTML.includes('Cumplimiento SLA'), 'KPIs must not have SLA compliance card');
+  assert(!mockKanbanEls.kpisContainer.innerHTML.includes('data-kpi="atrasados"'), 'KPIs must not have Atrasadas card');
 
-  // 5B: Switch origin to 'GLPI' -> shows all 4 columns including 'espera' and removes .cols-3
+  // 5B: Switch origin to 'GLPI' -> shows all 4 columns including 'espera' and renders 'espera' KPI
   kanbanRunner.setOriginFilter('GLPI');
   assert.strictEqual(mockKanbanEls.fSrc.value, 'GLPI');
   assert.strictEqual(pillButtons[2].classList.has('active'), true, 'GLPI pill should be active');
@@ -533,26 +539,26 @@ function simulateDeepLink(opts) {
   assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="espera"'), 'Kanban must render En espera column for GLPI');
   assert(mockKanbanEls.kpisContainer.innerHTML.includes('data-kpi="espera"'), 'KPIs must render En Espera card for GLPI');
 
-  // 5C: Switch origin to '' (Todos) and test dragging a ClickUp item onto 'espera' column -> blocked with toast
+  // 5C: Switch origin to '' (Todos) and test dragging a ClickUp item onto 'espera' column -> successfully moves to 'espera'
   kanbanRunner.setOriginFilter('');
   assert.strictEqual(mockKanbanEls.fSrc.value, '');
   assert(mockKanbanEls.kanbanGrid.innerHTML.includes('data-col="espera"'), 'Kanban must render 4 columns for Todos');
 
+  global.fetch = async (url, opts) => ({ ok: true, json: async () => ({ id: 1, status: 'espera' }) });
+  global.alert = () => {};
   kanbanRunner.setDraggedId(1); // Item 1 is ClickUp
   await kanbanRunner.onDrop({
     preventDefault: () => {},
     currentTarget: { classList: { remove: () => {} } },
     dataTransfer: { getData: () => '1' }
   }, 'espera');
-  assert.strictEqual(kanbanItems[0].status, 'pendiente', 'ClickUp item status must remain unchanged when dropped on espera');
-  assert.strictEqual(kanbanToasts.length, 1, 'Toast should be shown when dropping ClickUp item on espera');
-  assert(kanbanToasts[0].message.includes('En espera'), 'Toast message should explain En espera does not apply to ClickUp');
+  assert.strictEqual(kanbanItems[0].status, 'espera', 'ClickUp item status must be updated to espera when dropped on espera');
+  assert(kanbanToasts.some(t => t.title.includes('Estado sincronizado')), 'Toast should confirm ClickUp moved to En espera');
 
   // 5D: Verify dropping a ClickUp item onto 'curso' while filtered by ClickUp preserves ClickUp filter (does not leak GLPI cards)
   kanbanRunner.setOriginFilter('ClickUp');
   kanbanRunner.setDraggedId(1);
   global.fetch = async () => ({ ok: false, json: async () => ({ detail: 'Simulated error' }) });
-  global.alert = () => {};
   await kanbanRunner.onDrop({
     preventDefault: () => {},
     currentTarget: { classList: { remove: () => {} } },
@@ -561,12 +567,38 @@ function simulateDeepLink(opts) {
   assert(!mockKanbanEls.kanbanGrid.innerHTML.includes('Ticket GLPI 236'), 'GLPI items must not leak into ClickUp-filtered Kanban after drop/rollback');
   assert(!mockKanbanEls.kanbanGrid.innerHTML.includes('Ticket GLPI 237'), 'GLPI items must not leak into ClickUp-filtered Kanban after drop/rollback');
 
-  // 5E: Verify openModal template omits 'espera' option for ClickUp and includes it only for GLPI
+  // 5E: Verify openModal template contains 'espera' option for all items (ClickUp and GLPI)
   assert(
-    content.includes("${it.source === 'GLPI' ? `<option value=\"espera\""),
-    'openModal must only render the espera status option when it.source === GLPI'
+    content.includes('<option value="espera"'),
+    'openModal must render the espera status option'
   );
 
-  console.log('✓ Test 5: Kanban Origin selector, 3-column ClickUp layout (En Espera hidden), and drag-and-drop toast protection verified');
+  console.log('✓ Test 5: Kanban 4-column layout for ClickUp/GLPI, full espera drag-and-drop, and clean KPIs verified');
+
+  // Test 6: Verify showItemDetailModal and clean chronological fields in modal
+  assert(content.includes('function showItemDetailModal('), 'showItemDetailModal must be defined');
+  assert(content.includes('window.showItemDetailModal = showItemDetailModal;'), 'showItemDetailModal must be exposed on window');
+  assert(content.includes('Fecha Recibido en Sycom:'), 'Modal must contain Fecha Recibido en Sycom');
+  assert(content.includes('Fecha Escalado a Infra & BD:'), 'Modal must contain Fecha Escalado a Infra & BD');
+  assert(content.includes('Tiempo de Atención:'), 'Modal must contain Tiempo de Atención');
+  console.log('✓ Test 6: showItemDetailModal and clean chronological labels verified');
+
+  // Test 7: Zero emoji check
+  const emojiPattern = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2702}-\u{27B0}\u{24C2}-\u{1F251}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}]/u;
+  assert(!emojiPattern.test(content), 'index.html must contain 0 emojis');
+  console.log('✓ Test 7: Strict 0 emojis constraint verified');
+
+  // Test 8: Zero SLA traces in DOM and JS logic
+  const lines = content.split('\n');
+  const slaMatches = [];
+  lines.forEach((line, idx) => {
+    const l = line.toLowerCase();
+    if (l.includes('sla') && !l.includes('translate') && !l.includes('transform') && !l.includes('slash')) {
+      slaMatches.push(`Line ${idx + 1}: ${line.trim()}`);
+    }
+  });
+  assert.strictEqual(slaMatches.length, 0, `Expected 0 SLA occurrences in index.html, found:\n${slaMatches.join('\n')}`);
+  console.log('✓ Test 8: Complete removal of SLA metrics, badges, and containers verified');
+
   console.log('ALL FRONTEND TESTS PASSED SUCCESSFULLY!');
 })();

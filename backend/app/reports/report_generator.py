@@ -237,35 +237,6 @@ def get_report_data(
     pendientes = [it for it in items if it.status == "pendiente"]
     en_espera = [it for it in items if it.status == "espera"]
 
-    # Cálculo de SLA Sycom (General) y SLA Equipo (Infra)
-    dentro_sla = [it for it in items if not (it.is_overdue or it.semaphore == "rojo")]
-    fuera_sla = [it for it in items if it.is_overdue or it.semaphore == "rojo"]
-
-    dentro_team_sla = [it for it in items if not (getattr(it, "team_is_overdue", False) or getattr(it, "team_semaphore", "verde") == "rojo")]
-    fuera_team_sla = [it for it in items if getattr(it, "team_is_overdue", False) or getattr(it, "team_semaphore", "verde") == "rojo"]
-
-    cerrados_ok = [it for it in cerrados if not (it.is_overdue or it.semaphore == "rojo")]
-    cerrados_fuera = [it for it in cerrados if (it.is_overdue or it.semaphore == "rojo")]
-    en_curso_ok = [it for it in en_curso if not (it.is_overdue or it.semaphore == "rojo")]
-    en_curso_fuera = [it for it in en_curso if (it.is_overdue or it.semaphore == "rojo")]
-    pendientes_ok = [it for it in pendientes if not (it.is_overdue or it.semaphore == "rojo")]
-    pendientes_fuera = [it for it in pendientes if (it.is_overdue or it.semaphore == "rojo")]
-    en_espera_ok = [it for it in en_espera if not (it.is_overdue or it.semaphore == "rojo")]
-    en_espera_fuera = [it for it in en_espera if (it.is_overdue or it.semaphore == "rojo")]
-
-    cumplimiento_general = 100.0
-    if cerrados:
-        cumplimiento_general = round((len(cerrados_ok) / len(cerrados)) * 100.0, 1)
-    elif total_items > 0:
-        cumplimiento_general = round((len(dentro_sla) / total_items) * 100.0, 1)
-
-    cumplimiento_equipo = 100.0
-    if cerrados:
-        cerrados_team_ok = [it for it in cerrados if not (getattr(it, "team_is_overdue", False) or getattr(it, "team_semaphore", "verde") == "rojo")]
-        cumplimiento_equipo = round((len(cerrados_team_ok) / len(cerrados)) * 100.0, 1)
-    elif total_items > 0:
-        cumplimiento_equipo = round((len(dentro_team_sla) / total_items) * 100.0, 1)
-
     # Tiempo promedio de resolución de cerrados
     total_dur_cerrados = sum(it.elapsed_seconds for it in cerrados)
     avg_resolution_seconds = (total_dur_cerrados / len(cerrados)) if cerrados else 0.0
@@ -304,15 +275,6 @@ def get_report_data(
         s_curso = [it for it in matched if it.status == "curso"]
         s_pendientes = [it for it in matched if it.status == "pendiente"]
         s_espera = [it for it in matched if it.status == "espera"]
-        s_fuera_sla = [it for it in matched if it.is_overdue or it.semaphore == "rojo"]
-
-        s_cumplimiento = 100.0
-        if s_cerrados:
-            s_ok = [it for it in s_cerrados if not (it.is_overdue or it.semaphore == "rojo")]
-            s_cumplimiento = round((len(s_ok) / len(s_cerrados)) * 100.0, 1)
-        elif s_total > 0:
-            s_ok = [it for it in matched if not (it.is_overdue or it.semaphore == "rojo")]
-            s_cumplimiento = round((len(s_ok) / s_total) * 100.0, 1)
 
         s_dur_total = sum(it.elapsed_seconds for it in s_cerrados)
         s_avg_dur = (s_dur_total / len(s_cerrados)) if s_cerrados else 0.0
@@ -325,8 +287,6 @@ def get_report_data(
             "en_curso": len(s_curso),
             "pendientes": len(s_pendientes),
             "en_espera": len(s_espera),
-            "fuera_sla": len(s_fuera_sla),
-            "cumplimiento_pct": s_cumplimiento,
             "avg_time_str": format_duration_seconds(s_avg_dur)
         })
 
@@ -341,16 +301,13 @@ def get_report_data(
         c_cerrados = [it for it in c_items if it.status == "cerrado"]
         c_activos = [it for it in c_items if it.status != "cerrado"]
         c_criticos = [it for it in c_items if it.priority == "Crítica"]
-        c_ok = [it for it in c_items if not (it.is_overdue or it.semaphore == "rojo")]
-        c_sla = round((len(c_ok) / len(c_items)) * 100.0, 1) if c_items else 100.0
         por_cliente.append({
             "client_name": c_name,
             "client_type": c_items[0].client_type if c_items else "Interno",
             "total": len(c_items),
             "cerrados": len(c_cerrados),
             "activos": len(c_activos),
-            "criticos": len(c_criticos),
-            "cumplimiento_pct": c_sla
+            "criticos": len(c_criticos)
         })
 
     # Desglose por Categoría Técnica (incluyendo las 7 categorías oficiales + adicionales activas)
@@ -374,22 +331,20 @@ def get_report_data(
         unlinked_escs = [e for e in c_escs if e.id not in linked_esc_ids]
         total_vol = len(c_its) + len(unlinked_escs)
         c_cerr = [it for it in c_its if it.status == "cerrado"]
+        c_curso = [it for it in c_its if it.status == "curso"]
+        c_espera = [it for it in c_its if it.status == "espera"]
+        c_pend = [it for it in c_its if it.status == "pendiente"]
         c_act = [it for it in c_its if it.status != "cerrado"]
-        c_fuera = [it for it in c_its if it.is_overdue or it.semaphore == "rojo"]
-        c_ok = [it for it in c_its if not (it.is_overdue or it.semaphore == "rojo")]
-        c_team_ok = [it for it in c_its if not (getattr(it, "team_is_overdue", False) or getattr(it, "team_semaphore", "verde") == "rojo")]
-        c_sla = round((len(c_ok) / len(c_its)) * 100.0, 1) if c_its else 100.0
-        c_team_sla = round((len(c_team_ok) / len(c_its)) * 100.0, 1) if c_its else 100.0
         por_categoria.append({
             "category": c_lbl,
             "total": total_vol,
             "total_items": len(c_its),
             "total_escalamientos": len(c_escs),
             "cerrados": len(c_cerr),
+            "en_curso": len(c_curso),
+            "en_espera": len(c_espera),
+            "pendientes": len(c_pend),
             "activos": len(c_act) + len(unlinked_escs),
-            "fuera_sla": len(c_fuera),
-            "cumplimiento_pct": c_sla,
-            "team_cumplimiento_pct": c_team_sla,
         })
     por_categoria.sort(key=lambda x: (x["total"], x["total_escalamientos"]), reverse=True)
 
@@ -415,22 +370,20 @@ def get_report_data(
         unlinked_escs = [e for e in i_escs if e.id not in linked_esc_ids]
         total_vol = len(i_its) + len(unlinked_escs)
         i_cerr = [it for it in i_its if it.status == "cerrado"]
+        i_curso = [it for it in i_its if it.status == "curso"]
+        i_espera = [it for it in i_its if it.status == "espera"]
+        i_pend = [it for it in i_its if it.status == "pendiente"]
         i_act = [it for it in i_its if it.status != "cerrado"]
-        i_fuera = [it for it in i_its if it.is_overdue or it.semaphore == "rojo"]
-        i_ok = [it for it in i_its if not (it.is_overdue or it.semaphore == "rojo")]
-        i_team_ok = [it for it in i_its if not (getattr(it, "team_is_overdue", False) or getattr(it, "team_semaphore", "verde") == "rojo")]
-        i_sla = round((len(i_ok) / len(i_its)) * 100.0, 1) if i_its else 100.0
-        i_team_sla = round((len(i_team_ok) / len(i_its)) * 100.0, 1) if i_its else 100.0
         por_ibp.append({
             "ibp": i_lbl,
             "total": total_vol,
             "total_items": len(i_its),
             "total_escalamientos": len(i_escs),
             "cerrados": len(i_cerr),
+            "en_curso": len(i_curso),
+            "en_espera": len(i_espera),
+            "pendientes": len(i_pend),
             "activos": len(i_act) + len(unlinked_escs),
-            "fuera_sla": len(i_fuera),
-            "cumplimiento_pct": i_sla,
-            "team_cumplimiento_pct": i_team_sla,
         })
     por_ibp.sort(key=lambda x: (0 if x["ibp"] != "General / Interno" else 1, -x["total"], -x["total_escalamientos"]))
 
@@ -453,8 +406,7 @@ def get_report_data(
     # Detalle de Items
     items_detail = []
     for it in items:
-        ref_time = it.closed_at if it.status == "cerrado" and it.closed_at else datetime.datetime.utcnow()
-        dur_str = format_duration_seconds((ref_time - it.created_at).total_seconds()) if it.created_at else "0m"
+        dur_str = it.duration_human
 
         items_detail.append({
             "id": it.id,
@@ -471,17 +423,13 @@ def get_report_data(
             "priority": it.priority or "Media",
             "status": it.status or "pendiente",
             "status_origin": it.status_origin or it.status or "",
-            "sla_percent": it.sla_percent,
-            "semaphore": it.semaphore,
-            "is_overdue": it.is_overdue,
-            "team_sla_percent": getattr(it, "team_sla_percent", it.sla_percent),
-            "team_semaphore": getattr(it, "team_semaphore", it.semaphore),
-            "team_is_overdue": getattr(it, "team_is_overdue", it.is_overdue),
             "duration_str": dur_str,
+            "attention_time_str": it.time_attention_label,
+            "received_at_str": format_caracas_time(it.received_at or it.created_at) if (it.received_at or it.created_at) else "—",
+            "escalated_at_str": format_caracas_time(it.escalated_at or it.received_at or it.created_at) if (it.escalated_at or it.received_at or it.created_at) else "—",
             "created_at_str": format_caracas_time(it.created_at) if it.created_at else "—",
             "assigned_at_str": format_caracas_time(it.assigned_at) if it.assigned_at else "—",
             "closed_at_str": format_caracas_time(it.closed_at) if it.closed_at else "—",
-            "due_at_str": format_caracas_time(it.due_at) if it.due_at else "—",
         })
 
     # Determinación de etiquetas de fechas
@@ -507,18 +455,9 @@ def get_report_data(
             "total_items": total_items,
             "total_escalamientos": len(escalations),
             "total_cerrados": len(cerrados),
-            "total_cerrados_ok": len(cerrados_ok),
-            "total_cerrados_fuera": len(cerrados_fuera),
             "total_en_curso": len(en_curso),
-            "total_en_curso_ok": len(en_curso_ok),
             "total_pendientes": len(pendientes),
-            "total_pendientes_ok": len(pendientes_ok),
             "total_en_espera": len(en_espera),
-            "total_en_espera_ok": len(en_espera_ok),
-            "total_dentro_sla": len(dentro_sla),
-            "total_fuera_sla": len(fuera_sla),
-            "cumplimiento_general": cumplimiento_general,
-            "cumplimiento_equipo": cumplimiento_equipo,
             "avg_resolution_str": format_duration_seconds(avg_resolution_seconds)
         },
         "por_origen": por_origen,
@@ -585,7 +524,7 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
     ws_resumen["A1"].alignment = align_center
 
     ws_resumen.merge_cells("A2:G2")
-    ws_resumen["A2"] = f"INFORME EJECUTIVO DE GESTIÓN OPERATIVA Y CUMPLIMIENTO DE SLA · {data['period_label'].upper()}"
+    ws_resumen["A2"] = f"INFORME EJECUTIVO DE GESTIÓN OPERATIVA · {data['period_label'].upper()}"
     ws_resumen["A2"].font = font_subtitle
     ws_resumen["A2"].fill = fill_subheader
     ws_resumen["A2"].alignment = align_center
@@ -596,12 +535,12 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
     # Tarjetas KPI Principales (Fila 6 y 7)
     kpis = data["kpis"]
     kpi_cards = [
-        ("A", "B", "TOTAL ASUNTOS", str(kpis["total_items"]), "1B365D"),
-        ("C", "C", "CERRADOS", str(kpis["total_cerrados"]), "15803D"),
-        ("D", "D", "EN ATENCIÓN", str(kpis["total_en_curso"]), "0891B2"),
-        ("E", "E", "PENDIENTES", str(kpis["total_pendientes"]), "2563EB"),
-        ("F", "F", "EN ESPERA", str(kpis["total_en_espera"]), "D97706"),
-        ("G", "G", "CUMPLIMIENTO SLA", f"{kpis['cumplimiento_general']}%", "15803D" if kpis['cumplimiento_general'] >= 90 else "D97706")
+        ("A", "A", "TOTAL ASUNTOS", str(kpis["total_items"]), "1B365D"),
+        ("B", "B", "CERRADOS", str(kpis["total_cerrados"]), "15803D"),
+        ("C", "C", "EN ATENCIÓN", str(kpis["total_en_curso"]), "0891B2"),
+        ("D", "D", "PENDIENTES", str(kpis["total_pendientes"]), "2563EB"),
+        ("E", "E", "EN ESPERA", str(kpis["total_en_espera"]), "D97706"),
+        ("F", "G", "ESCALAMIENTOS", str(kpis.get("total_escalamientos", 0)), "2563EB")
     ]
 
     for col_start, col_end, lbl, val, color_hex in kpi_cards:
@@ -657,12 +596,12 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
     ws_resumen.cell(row=row_cur, column=1, value="2. DISTRIBUCIÓN POR NIVEL DE PRIORIDAD").font = font_section
     row_cur += 1
 
-    headers_prio = ["Nivel de Prioridad", "Cantidad de Casos", "% del Total", "Plazo de Atención SLA"]
-    prio_slas = {
-        "Crítica": "Inmediato (< 8h)",
-        "Alta": "Prioritario (24h)",
-        "Media": "Estándar (48h)",
-        "Baja": "Planificado (72h)"
+    headers_prio = ["Nivel de Prioridad", "Cantidad de Casos", "% del Total", "Nivel de Atención"]
+    prio_levels = {
+        "Crítica": "Inmediato (Crítica)",
+        "Alta": "Prioritario (Alta)",
+        "Media": "Estándar (Media)",
+        "Baja": "Planificado (Baja)"
     }
     for col_idx, h in enumerate(headers_prio, start=1):
         cell = ws_resumen.cell(row=row_cur, column=col_idx, value=h)
@@ -677,7 +616,7 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
         ws_resumen.cell(row=row_cur, column=1, value=prio).alignment = align_left
         ws_resumen.cell(row=row_cur, column=2, value=cnt).alignment = align_center
         ws_resumen.cell(row=row_cur, column=3, value=f"{pct:.1f}%").alignment = align_center
-        ws_resumen.cell(row=row_cur, column=4, value=prio_slas.get(prio, "—")).alignment = align_center
+        ws_resumen.cell(row=row_cur, column=4, value=prio_levels.get(prio, "—")).alignment = align_center
         for c in range(1, 5):
             ws_resumen.cell(row=row_cur, column=c).border = border_cell
             ws_resumen.cell(row=row_cur, column=c).font = font_body
@@ -695,22 +634,21 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
     ws_spec = wb.create_sheet(title="Por Especialista")
     ws_spec.views.sheetView[0].showGridLines = True
 
-    ws_spec.merge_cells("A1:I1")
+    ws_spec.merge_cells("A1:H1")
     ws_spec["A1"] = "RENDIMIENTO Y CARGA DE TRABAJO POR ESPECIALISTA"
     ws_spec["A1"].font = font_title
     ws_spec["A1"].fill = fill_header
     ws_spec["A1"].alignment = align_center
 
-    ws_spec.merge_cells("A2:I2")
-    ws_spec["A2"] = f"Auditoría Individual de Productividad, Cumplimiento de SLA y Casos Atendidos · {data['period_label']}"
+    ws_spec.merge_cells("A2:H2")
+    ws_spec["A2"] = f"Auditoría Individual de Productividad y Casos Atendidos · {data['period_label']}"
     ws_spec["A2"].font = font_subtitle
     ws_spec["A2"].fill = fill_subheader
     ws_spec["A2"].alignment = align_center
 
     headers_spec = [
         "Especialista", "Rol Operativo", "Total Asignadas", 
-        "Cerradas", "En Atención", "Pendientes", 
-        "Fuera de SLA", "% Cumplimiento SLA", "Tiempo Promedio"
+        "Cerradas", "En Atención", "En Espera", "Pendientes", "Tiempo Promedio"
     ]
     for col_idx, h in enumerate(headers_spec, start=1):
         cell = ws_spec.cell(row=4, column=col_idx, value=h)
@@ -726,23 +664,14 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
         ws_spec.cell(row=r_idx, column=3, value=s["total"]).alignment = align_center
         ws_spec.cell(row=r_idx, column=4, value=s["cerrados"]).alignment = align_center
         ws_spec.cell(row=r_idx, column=5, value=s["en_curso"]).alignment = align_center
-        ws_spec.cell(row=r_idx, column=6, value=s["pendientes"]).alignment = align_center
-        ws_spec.cell(row=r_idx, column=7, value=s["fuera_sla"]).alignment = align_center
-        
-        c_sla = ws_spec.cell(row=r_idx, column=8, value=f"{s['cumplimiento_pct']:.1f}%")
-        c_sla.alignment = align_center
-        if s["cumplimiento_pct"] >= 90:
-            c_sla.font = Font(name="Calibri", size=10, bold=True, color="15803D")
-        else:
-            c_sla.font = Font(name="Calibri", size=10, bold=True, color="D97706")
+        ws_spec.cell(row=r_idx, column=6, value=s.get("en_espera", 0)).alignment = align_center
+        ws_spec.cell(row=r_idx, column=7, value=s["pendientes"]).alignment = align_center
+        ws_spec.cell(row=r_idx, column=8, value=s["avg_time_str"]).alignment = align_center
 
-        ws_spec.cell(row=r_idx, column=9, value=s["avg_time_str"]).alignment = align_center
-
-        for c in range(1, 10):
+        for c in range(1, 9):
             cell = ws_spec.cell(row=r_idx, column=c)
             cell.border = border_cell
-            if c != 8:
-                cell.font = font_body
+            cell.font = font_body
             if row_fill.fill_type:
                 cell.fill = row_fill
 
@@ -757,13 +686,13 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
     ws_client = wb.create_sheet(title="Por Cliente")
     ws_client.views.sheetView[0].showGridLines = True
 
-    ws_client.merge_cells("A1:G1")
-    ws_client["A1"] = "VOLUMEN DE SERVICIOS Y NIVELES DE SLA POR CLIENTE / ENTIDAD"
+    ws_client.merge_cells("A1:F1")
+    ws_client["A1"] = "VOLUMEN DE SERVICIOS POR CLIENTE / ENTIDAD"
     ws_client["A1"].font = font_title
     ws_client["A1"].fill = fill_header
     ws_client["A1"].alignment = align_center
 
-    ws_client.merge_cells("A2:G2")
+    ws_client.merge_cells("A2:F2")
     ws_client["A2"] = f"Consolidación por Cliente / Espacio Operativo · {data['period_label']}"
     ws_client["A2"].font = font_subtitle
     ws_client["A2"].fill = fill_subheader
@@ -771,7 +700,7 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
 
     headers_client = [
         "Cliente / Espacio", "Tipo de Entidad", "Total Requerimientos",
-        "Resueltos", "En Atención Activa", "Casos Críticos", "% Cumplimiento SLA"
+        "Resueltos", "En Atención Activa", "Casos Críticos"
     ]
     for col_idx, h in enumerate(headers_client, start=1):
         cell = ws_client.cell(row=4, column=col_idx, value=h)
@@ -788,19 +717,11 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
         ws_client.cell(row=r_idx, column=4, value=c["cerrados"]).alignment = align_center
         ws_client.cell(row=r_idx, column=5, value=c["activos"]).alignment = align_center
         ws_client.cell(row=r_idx, column=6, value=c["criticos"]).alignment = align_center
-        
-        c_sla = ws_client.cell(row=r_idx, column=7, value=f"{c['cumplimiento_pct']:.1f}%")
-        c_sla.alignment = align_center
-        if c["cumplimiento_pct"] >= 90:
-            c_sla.font = Font(name="Calibri", size=10, bold=True, color="15803D")
-        else:
-            c_sla.font = Font(name="Calibri", size=10, bold=True, color="D97706")
 
-        for col_i in range(1, 8):
+        for col_i in range(1, 7):
             cell = ws_client.cell(row=r_idx, column=col_i)
             cell.border = border_cell
-            if col_i != 7:
-                cell.font = font_body
+            cell.font = font_body
             if row_fill.fill_type:
                 cell.fill = row_fill
 
@@ -824,8 +745,8 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
     headers_detail = [
         "# ID", "Origen", "ID Externo", "Asunto / Título del Requerimiento",
         "Cliente / Entidad", "Responsable(s)", "Prioridad", "Estado Actual",
-        "Duración Real", "SLA %", "Fecha Creación", "Fecha Asignación", 
-        "Fecha Cierre", "Enlace Nativo"
+        "Tiempo de Atención", "Fecha Recibido Sycom", "Fecha Escalado Infra",
+        "Fecha Asignación", "Fecha Cierre", "Enlace Nativo"
     ]
     for col_idx, h in enumerate(headers_detail, start=1):
         cell = ws_items.cell(row=3, column=col_idx, value=h)
@@ -848,18 +769,9 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
         c_prio.alignment = align_center
 
         ws_items.cell(row=r_idx, column=8, value=it["status_origin"] or it["status"]).alignment = align_center
-        ws_items.cell(row=r_idx, column=9, value=it["duration_str"]).alignment = align_center
-        
-        c_sla = ws_items.cell(row=r_idx, column=10, value=f"{it['sla_percent']:.1f}%")
-        c_sla.alignment = align_center
-        if it["semaphore"] == "rojo":
-            c_sla.font = Font(name="Calibri", size=10, bold=True, color="DC2626")
-        elif it["semaphore"] == "amarillo":
-            c_sla.font = Font(name="Calibri", size=10, bold=True, color="D97706")
-        else:
-            c_sla.font = Font(name="Calibri", size=10, bold=True, color="15803D")
-
-        ws_items.cell(row=r_idx, column=11, value=it["created_at_str"]).alignment = align_center
+        ws_items.cell(row=r_idx, column=9, value=it.get("attention_time_str") or it["duration_str"]).alignment = align_center
+        ws_items.cell(row=r_idx, column=10, value=it["received_at_str"]).alignment = align_center
+        ws_items.cell(row=r_idx, column=11, value=it["escalated_at_str"]).alignment = align_center
         ws_items.cell(row=r_idx, column=12, value=it["assigned_at_str"]).alignment = align_center
         ws_items.cell(row=r_idx, column=13, value=it["closed_at_str"]).alignment = align_center
         
@@ -872,13 +784,13 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
         for col_i in range(1, 15):
             cell = ws_items.cell(row=r_idx, column=col_i)
             cell.border = border_cell
-            if col_i not in (10, 14):
+            if col_i != 14:
                 cell.font = font_body
             if row_fill.fill_type:
                 cell.fill = row_fill
 
     # Anchos para Hoja Detalle
-    widths = {1: 8, 2: 11, 3: 13, 4: 42, 5: 24, 6: 28, 7: 12, 8: 16, 9: 14, 10: 12, 11: 19, 12: 19, 13: 19, 14: 30}
+    widths = {1: 8, 2: 11, 3: 13, 4: 42, 5: 24, 6: 28, 7: 12, 8: 16, 9: 18, 10: 19, 11: 19, 12: 19, 13: 19, 14: 30}
     for col_idx, w in widths.items():
         col_letter = get_column_letter(col_idx)
         ws_items.column_dimensions[col_letter].width = w
@@ -898,7 +810,7 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
     ws_ibp["A3"] = "1. MÉTRICAS POR IBP (BANCO PARTICIPANTE)"
     ws_ibp["A3"].font = font_section
 
-    headers_ibp = ["IBP / Entidad Bancaria", "Volumen Total", "Actividades", "Escalamientos", "Cerrados", "SLA Sycom %", "SLA Equipo %"]
+    headers_ibp = ["IBP / Entidad Bancaria", "Volumen Total", "Actividades", "Escalamientos", "Cerrados", "En Curso", "En Espera"]
     for col_idx, h in enumerate(headers_ibp, start=1):
         cell = ws_ibp.cell(row=4, column=col_idx, value=h)
         cell.font = font_header
@@ -913,8 +825,8 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
         ws_ibp.cell(row=row_cursor, column=3, value=ibp_row["total_items"]).alignment = align_center
         ws_ibp.cell(row=row_cursor, column=4, value=ibp_row["total_escalamientos"]).alignment = align_center
         ws_ibp.cell(row=row_cursor, column=5, value=ibp_row["cerrados"]).alignment = align_center
-        ws_ibp.cell(row=row_cursor, column=6, value=f"{ibp_row['cumplimiento_pct']:.1f}%").alignment = align_center
-        ws_ibp.cell(row=row_cursor, column=7, value=f"{ibp_row['team_cumplimiento_pct']:.1f}%").alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=6, value=ibp_row.get("en_curso", 0)).alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=7, value=ibp_row.get("en_espera", 0)).alignment = align_center
         for c_i in range(1, 8):
             c_cell = ws_ibp.cell(row=row_cursor, column=c_i)
             c_cell.font = font_body
@@ -925,7 +837,7 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
     ws_ibp.cell(row=row_cursor, column=1, value="2. MÉTRICAS POR CATEGORÍA TÉCNICA").font = font_section
     row_cursor += 1
 
-    headers_cat = ["Categoría Técnica", "Volumen Total", "Actividades", "Escalamientos", "Cerrados", "SLA Sycom %", "SLA Equipo %"]
+    headers_cat = ["Categoría Técnica", "Volumen Total", "Actividades", "Escalamientos", "Cerrados", "En Curso", "En Espera"]
     for col_idx, h in enumerate(headers_cat, start=1):
         cell = ws_ibp.cell(row=row_cursor, column=col_idx, value=h)
         cell.font = font_header
@@ -940,8 +852,8 @@ def generate_excel_report(data: Dict[str, Any]) -> io.BytesIO:
         ws_ibp.cell(row=row_cursor, column=3, value=cat_row["total_items"]).alignment = align_center
         ws_ibp.cell(row=row_cursor, column=4, value=cat_row["total_escalamientos"]).alignment = align_center
         ws_ibp.cell(row=row_cursor, column=5, value=cat_row["cerrados"]).alignment = align_center
-        ws_ibp.cell(row=row_cursor, column=6, value=f"{cat_row['cumplimiento_pct']:.1f}%").alignment = align_center
-        ws_ibp.cell(row=row_cursor, column=7, value=f"{cat_row['team_cumplimiento_pct']:.1f}%").alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=6, value=cat_row.get("en_curso", 0)).alignment = align_center
+        ws_ibp.cell(row=row_cursor, column=7, value=cat_row.get("en_espera", 0)).alignment = align_center
         for c_i in range(1, 8):
             c_cell = ws_ibp.cell(row=row_cursor, column=c_i)
             c_cell.font = font_body
@@ -964,9 +876,6 @@ def _build_svg_donut_chart(kpis: Dict[str, Any]) -> str:
     en_curso = kpis.get("total_en_curso", 0)
     pendientes = kpis.get("total_pendientes", 0)
     en_espera = kpis.get("total_en_espera", 0)
-    fuera_sla = kpis.get("total_fuera_sla", 0)
-    sla_pct = kpis.get("cumplimiento_general", 100.0)
-    team_sla_pct = kpis.get("cumplimiento_equipo", 100.0)
 
     r = 46
     c_len = 2 * math.pi * r
@@ -1014,15 +923,14 @@ def _build_svg_donut_chart(kpis: Dict[str, Any]) -> str:
                 {circles_svg}
             </svg>
             <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
-                <span style="font-size:15px;font-weight:800;color:#0f172a;line-height:1">{sla_pct:.1f}%</span>
-                <span style="font-size:8px;font-weight:700;color:#64748b;text-transform:uppercase;margin-top:2px">SLA Sycom</span>
-                <span style="font-size:9px;font-weight:700;color:#0ea5e9;margin-top:1px">{team_sla_pct:.0f}% Eq.</span>
+                <span style="font-size:18px;font-weight:800;color:#0f172a;line-height:1">{total}</span>
+                <span style="font-size:8.5px;font-weight:700;color:#64748b;text-transform:uppercase;margin-top:2px">Actividades</span>
             </div>
         </div>
         <div style="flex:1">
             {legend_rows}
             <div style="font-size:9.5px;color:#475569;margin-top:4px;text-align:right">
-                Fuera de SLA: <strong style="color:{'#ef4444' if fuera_sla > 0 else '#10b981'}">{fuera_sla}</strong> de <strong>{total}</strong>
+                Total Operativo: <strong>{total}</strong>
             </div>
         </div>
     </div>
@@ -1030,7 +938,7 @@ def _build_svg_donut_chart(kpis: Dict[str, Any]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Helpers del PDF: barras apiladas por estado, SLA "—" sin datos y matriz IBP × Categoría
+# Helpers del PDF: barras apiladas por estado y matriz IBP × Categoría
 # ---------------------------------------------------------------------------
 GENERAL_IBP_LABEL = "General / Interno"
 
@@ -1047,48 +955,40 @@ PDF_CAT_COLORS = {
 
 # (clave, etiqueta, plural, singular, color) — segmentos mutuamente excluyentes
 PDF_SEGMENTS = [
-    ("ok_closed", "Resueltas en SLA", "resueltas", "resuelta", "#10b981"),
-    ("ok_active", "En curso en SLA", "en curso", "en curso", "#0ea5e9"),
-    ("overdue", "Fuera de SLA", "fuera SLA", "fuera SLA", "#ef4444"),
+    ("cerrados", "Cerradas", "cerradas", "cerrada", "#10b981"),
+    ("en_curso", "En Curso", "en curso", "en curso", "#0ea5e9"),
+    ("en_espera", "En Espera", "en espera", "en espera", "#f59e0b"),
+    ("pendientes", "Pendientes", "pendientes", "pendiente", "#2563eb"),
     ("esc_only", "Escalamiento sin actividad", "esc. sin act.", "esc. sin act.", "#8b5cf6"),
 ]
 
 
-def _sla_color(pct: float) -> str:
-    return "#10b981" if pct >= 90 else ("#f59e0b" if pct >= 80 else "#ef4444")
-
-
-def _item_is_overdue(it: Dict[str, Any]) -> bool:
-    return bool(it.get("is_overdue") or it.get("semaphore") == "rojo")
-
-
-def _pdf_sla_html(pct: float, measurable: bool) -> str:
-    if not measurable:
-        return '<strong style="color:#94a3b8" title="Sin actividades medibles">— SLA</strong>'
-    return f'<strong style="color:{_sla_color(pct)}">{pct:.0f}% SLA</strong>'
-
-
 def _pdf_breakdown(items: List[Dict[str, Any]], field: str, default: str) -> Dict[str, Dict[str, int]]:
-    """Agrupa los items del período por IBP o categoría en segmentos de estado."""
+    """Agrupa los items del período por IBP o categoría en segmentos de estado operativos."""
     out: Dict[str, Dict[str, int]] = {}
     for it in items:
         key = it.get(field) or default
-        b = out.setdefault(key, {"ok_closed": 0, "ok_active": 0, "overdue": 0})
-        if _item_is_overdue(it):
-            b["overdue"] += 1
-        elif it.get("status") == "cerrado":
-            b["ok_closed"] += 1
+        b = out.setdefault(key, {"cerrados": 0, "en_curso": 0, "en_espera": 0, "pendientes": 0})
+        st = it.get("status")
+        if st == "cerrado":
+            b["cerrados"] += 1
+        elif st == "espera":
+            b["en_espera"] += 1
+        elif st == "curso":
+            b["en_curso"] += 1
         else:
-            b["ok_active"] += 1
+            b["pendientes"] += 1
     return out
 
 
 def _pdf_row_segments(row: Dict[str, Any], b: Optional[Dict[str, int]]) -> Dict[str, int]:
     total_items = row.get("total_items", 0) or 0
     if not b or sum(b.values()) != total_items:
-        overdue = min(row.get("fuera_sla", 0) or 0, total_items)
-        closed = min(row.get("cerrados", 0) or 0, total_items - overdue)
-        b = {"ok_closed": closed, "ok_active": max(total_items - overdue - closed, 0), "overdue": overdue}
+        cerrados = row.get("cerrados", 0) or 0
+        en_curso = row.get("en_curso", 0) or 0
+        en_espera = row.get("en_espera", 0) or 0
+        pendientes = max(total_items - cerrados - en_curso - en_espera, 0)
+        b = {"cerrados": cerrados, "en_curso": en_curso, "en_espera": en_espera, "pendientes": pendientes}
     return {**b, "esc_only": max((row.get("total", 0) or 0) - total_items, 0)}
 
 
@@ -1102,7 +1002,7 @@ def _pdf_segments_legend() -> str:
 
 
 def _pdf_bar_row(label: str, label_color: str, dot_color: Optional[str], segs: Dict[str, int],
-                 total: int, max_total: int, sum_total: int, sla_pct: float, measurable: bool) -> str:
+                 total: int, max_total: int, sum_total: int) -> str:
     width = max((total / max_total) * 100.0, 4.0) if total > 0 and max_total > 0 else 0.0
     share = (total / sum_total) * 100.0 if sum_total > 0 else 0.0
     parts = "".join(
@@ -1119,7 +1019,7 @@ def _pdf_bar_row(label: str, label_color: str, dot_color: Optional[str], segs: D
         <div style="margin-bottom:7px">
             <div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;margin-bottom:2px">
                 <span style="font-weight:700;color:{label_color};display:flex;align-items:center;gap:5px">{dot}{html_escape(label)}</span>
-                <span style="font-size:10px;color:#334155"><strong>{total}</strong> ({share:.0f}%) · {_pdf_sla_html(sla_pct, measurable)}</span>
+                <span style="font-size:10px;color:#334155"><strong>{total}</strong> ({share:.0f}%)</span>
             </div>
             <div style="background:#e2e8f0;height:7px;border-radius:4px;overflow:hidden">
                 <div style="width:{width:.1f}%;height:100%;display:flex">{parts}</div>
@@ -1135,31 +1035,28 @@ def _pdf_ibp_category_matrix(data: Dict[str, Any]) -> str:
     escs = data.get("escalations", []) or []
     linked_ids = {it.get("escalation_id") for it in items if it.get("escalation_id")}
 
-    cells: Dict[tuple, Dict[str, int]] = {}
+    cells: Dict[tuple, int] = {}
     row_tot: Dict[str, int] = {}
     col_tot: Dict[str, int] = {}
 
-    def _add(ibp: str, cat: str, overdue: bool) -> None:
-        c = cells.setdefault((ibp, cat), {"total": 0, "overdue": 0})
-        c["total"] += 1
-        if overdue:
-            c["overdue"] += 1
+    def _add(ibp: str, cat: str) -> None:
+        cells[(ibp, cat)] = cells.get((ibp, cat), 0) + 1
         row_tot[ibp] = row_tot.get(ibp, 0) + 1
         col_tot[cat] = col_tot.get(cat, 0) + 1
 
     for it in items:
-        _add(it.get("ibp") or GENERAL_IBP_LABEL, it.get("category") or "Infraestructura", _item_is_overdue(it))
+        _add(it.get("ibp") or GENERAL_IBP_LABEL, it.get("category") or "Infraestructura")
     for e in escs:
         if e.get("id") in linked_ids:
             continue
-        _add((e.get("ibp") or GENERAL_IBP_LABEL).strip(), (e.get("category") or "Infraestructura").strip(), False)
+        _add((e.get("ibp") or GENERAL_IBP_LABEL).strip(), (e.get("category") or "Infraestructura").strip())
 
     if not row_tot:
         return '<div style="padding:12px;text-align:center;color:#64748b;font-size:11px">Sin casos para cruzar en este período.</div>'
 
     rows = sorted(row_tot.keys(), key=lambda r: (r == GENERAL_IBP_LABEL, -row_tot[r], r))
     cols = sorted(col_tot.keys(), key=lambda c: (-col_tot[c], c))
-    max_cell = max(c["total"] for c in cells.values()) or 1
+    max_cell = max(cells.values()) if cells else 1
     grand = sum(row_tot.values())
 
     head = "".join(
@@ -1172,17 +1069,14 @@ def _pdf_ibp_category_matrix(data: Dict[str, Any]) -> str:
     for r in rows:
         tds = ""
         for c in cols:
-            cell = cells.get((r, c))
-            if not cell:
+            cnt = cells.get((r, c), 0)
+            if not cnt:
                 tds += '<td style="text-align:center;color:#cbd5e1;background:#ffffff">·</td>'
                 continue
-            alpha = 0.12 + 0.68 * (cell["total"] / max_cell)
+            alpha = 0.12 + 0.68 * (cnt / max_cell)
             strong = alpha > 0.45
-            ring = "box-shadow:inset 0 0 0 2px #ef4444;" if cell["overdue"] else ""
-            flag = (f' <span style="font-size:8px;color:{"#fecaca" if strong else "#ef4444"}">({cell["overdue"]}!)</span>'
-                    if cell["overdue"] else "")
             tds += (f'<td style="text-align:center;font-weight:800;background:rgba(37,99,235,{alpha:.2f});'
-                    f'color:{"#ffffff" if strong else "#0f172a"};{ring}">{cell["total"]}{flag}</td>')
+                    f'color:{"#ffffff" if strong else "#0f172a"}">{cnt}</td>')
         name_color = "#64748b" if r == GENERAL_IBP_LABEL else "#1b365d"
         body += (f'<tr><td style="font-weight:700;white-space:nowrap;color:{name_color};background:#ffffff">{html_escape(r)}</td>'
                  f'{tds}<td style="text-align:center;font-weight:800;background:#f1f5f9">{row_tot[r]}</td></tr>')
@@ -1199,7 +1093,6 @@ def _pdf_ibp_category_matrix(data: Dict[str, Any]) -> str:
             <span>Intensidad = volumen de casos
                 <span style="display:inline-block;width:70px;height:7px;border-radius:4px;vertical-align:middle;margin-left:4px;background:linear-gradient(90deg, rgba(37,99,235,0.12), rgba(37,99,235,0.80))"></span>
             </span>
-            <span><span style="display:inline-block;width:12px;height:9px;border-radius:2px;vertical-align:middle;box-shadow:inset 0 0 0 2px #ef4444"></span> Con casos fuera de SLA (n! = cantidad)</span>
         </div>
     """
 
@@ -1225,7 +1118,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
         scope_title_parts.append(f"ESPECIALISTA: {spec_filter_lbl}")
     dynamic_report_heading = " · ".join(scope_title_parts) if scope_title_parts else "MESA DE CONTROL INTEGRADA (GLOBAL)"
 
-    # 1. Gráfico Donut de Estados y SLA
+    # 1. Gráfico Donut de Distribución de Estados Operativos
     donut_svg_html = _build_svg_donut_chart(kpis)
 
     # 2. Gráfico de Barras por Especialista (compacto para el PDF)
@@ -1234,7 +1127,6 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
     spec_chart_bars = ""
     for s in spec_list:
         pct_w = (s["total"] / max_spec_total) * 100.0 if max_spec_total > 0 else 0.0
-        sla_v = s["cumplimiento_pct"]
         short_name = "Sin asignar" if "sin asignar" in s["name"].lower() else s["name"]
         spec_chart_bars += f"""
         <div style="margin-bottom:7px">
@@ -1242,8 +1134,8 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 <span style="font-weight:700;color:#1e293b">{short_name}</span>
                 <span>
                     <strong>{s['total']}</strong> casos
-                    (<span style="color:#10b981">{s['cerrados']} c.</span> / <span style="color:#0ea5e9">{s['en_curso']} act.</span>)
-                    · {_pdf_sla_html(sla_v, s['total'] > 0)}
+                    (<span style="color:#10b981">{s['cerrados']} c.</span> / <span style="color:#0ea5e9">{s['en_curso']} act.</span> / <span style="color:#f59e0b">{s.get('en_espera', 0)} esp.</span>)
+                    · <span style="color:#64748b">{s['avg_time_str']}</span>
                 </span>
             </div>
             <div style="background:#e2e8f0;height:7px;border-radius:4px;overflow:hidden">
@@ -1275,8 +1167,6 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 total=c["total"],
                 max_total=max_cat_total,
                 sum_total=sum_cat_total,
-                sla_pct=c["cumplimiento_pct"],
-                measurable=(c.get("total_items") or 0) > 0,
             )
     else:
         cat_chart_html = '<div style="padding:12px;text-align:center;color:#64748b;font-size:10.5px">Ninguna categoría registra actividad en este período.</div>'
@@ -1289,10 +1179,6 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
         )
 
     for c in cat_list:
-        has_items = (c.get("total_items") or 0) > 0
-        sla_col = _sla_color(c["cumplimiento_pct"]) if has_items else "#94a3b8"
-        sla_cell = f"{c['cumplimiento_pct']:.1f}%" if has_items else "—"
-        team_cell = f"{c['team_cumplimiento_pct']:.1f}%" if has_items else "—"
         cat_table_rows += f"""
         <tr>
             <td><strong>{c['category']}</strong></td>
@@ -1300,9 +1186,8 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             <td style="text-align:center">{c['total_items']}</td>
             <td style="text-align:center;color:#2563eb;font-weight:600">{c['total_escalamientos']}</td>
             <td style="text-align:center;color:#10b981">{c['cerrados']}</td>
-            <td style="text-align:center;color:{'#ef4444' if c['fuera_sla'] > 0 else '#64748b'}">{c['fuera_sla']}</td>
-            <td style="text-align:center;font-weight:700;color:{sla_col}">{sla_cell}</td>
-            <td style="text-align:center;font-weight:700;color:{'#0ea5e9' if has_items else '#94a3b8'}">{team_cell}</td>
+            <td style="text-align:center;color:#0ea5e9">{c.get('en_curso', 0)}</td>
+            <td style="text-align:center;color:#f59e0b">{c.get('en_espera', 0)}</td>
         </tr>
         """
 
@@ -1328,8 +1213,6 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 total=ibp_item["total"],
                 max_total=max_ibp_total,
                 sum_total=sum_ibp_total,
-                sla_pct=ibp_item["cumplimiento_pct"],
-                measurable=(ibp_item.get("total_items") or 0) > 0,
             )
         if ibp_general:
             segs = _pdf_row_segments(ibp_general, ibp_breakdown.get(ibp_general["ibp"]))
@@ -1345,14 +1228,8 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 total=ibp_general["total"],
                 max_total=max_ibp_total,
                 sum_total=sum_ibp_total,
-                sla_pct=ibp_general["cumplimiento_pct"],
-                measurable=(ibp_general.get("total_items") or 0) > 0,
             )
         for ibp_item in ibp_list:
-            has_items = (ibp_item.get("total_items") or 0) > 0
-            sla_col = _sla_color(ibp_item["cumplimiento_pct"]) if has_items else "#94a3b8"
-            sla_cell = f"{ibp_item['cumplimiento_pct']:.1f}%" if has_items else "—"
-            team_cell = f"{ibp_item['team_cumplimiento_pct']:.1f}%" if has_items else "—"
             ibp_table_rows += f"""
             <tr>
                 <td><strong>{ibp_item['ibp']}</strong></td>
@@ -1360,14 +1237,13 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 <td style="text-align:center">{ibp_item['total_items']}</td>
                 <td style="text-align:center;color:#2563eb;font-weight:600">{ibp_item['total_escalamientos']}</td>
                 <td style="text-align:center;color:#10b981">{ibp_item['cerrados']}</td>
-                <td style="text-align:center;color:{'#ef4444' if ibp_item['fuera_sla'] > 0 else '#64748b'}">{ibp_item['fuera_sla']}</td>
-                <td style="text-align:center;font-weight:700;color:{sla_col}">{sla_cell}</td>
-                <td style="text-align:center;font-weight:700;color:{'#0ea5e9' if has_items else '#94a3b8'}">{team_cell}</td>
+                <td style="text-align:center;color:#0ea5e9">{ibp_item.get('en_curso', 0)}</td>
+                <td style="text-align:center;color:#f59e0b">{ibp_item.get('en_espera', 0)}</td>
             </tr>
             """
     else:
         ibp_chart_html = '<div style="padding:14px;text-align:center;color:#64748b;font-size:11px">Sin registros de IBP en este filtro.</div>'
-        ibp_table_rows = '<tr><td colspan="8" style="text-align:center;color:#64748b">Sin registros de IBP en este filtro.</td></tr>'
+        ibp_table_rows = '<tr><td colspan="7" style="text-align:center;color:#64748b">Sin registros de IBP en este filtro.</td></tr>'
 
     matrix_html = _pdf_ibp_category_matrix(data)
 
@@ -1398,28 +1274,17 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
     # Tablas de Especialistas, Clientes y Escalamientos
     spec_rows = ""
     for s in data["por_especialista"]:
-        pct = s["cumplimiento_pct"]
-        has_spec_items = (s.get("total") or 0) > 0
-        bar_color = _sla_color(pct) if has_spec_items else "#94a3b8"
-        sla_block = (
-            f'<div style="font-weight:700;color:{bar_color}">{pct:.1f}%</div>'
-            f'<div style="background:#e2e8f0;border-radius:4px;height:5px;width:100%;margin-top:3px;overflow:hidden">'
-            f'<div style="background:{bar_color};height:100%;width:{min(100, pct)}%"></div></div>'
-            if has_spec_items
-            else '<div style="font-weight:700;color:#94a3b8">—</div>'
-        )
         spec_rows += f"""
         <tr>
             <td>
                 <strong>{s['name']}</strong><br>
                 <small style="color:#64748b">{s['role']}</small>
             </td>
-            <td style="text-align:center">{s['total']}</td>
+            <td style="text-align:center;font-weight:700">{s['total']}</td>
             <td style="text-align:center;color:#10b981;font-weight:600">{s['cerrados']}</td>
             <td style="text-align:center;color:#0ea5e9;font-weight:600">{s['en_curso']}</td>
+            <td style="text-align:center;color:#f59e0b;font-weight:600">{s.get('en_espera', 0)}</td>
             <td style="text-align:center">{s['pendientes']}</td>
-            <td style="text-align:center;color:{'#ef4444' if s['fuera_sla'] > 0 else '#64748b'}">{s['fuera_sla']}</td>
-            <td style="text-align:center">{sla_block}</td>
             <td style="text-align:center">{s['avg_time_str']}</td>
         </tr>
         """
@@ -1430,11 +1295,10 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
         <tr>
             <td><strong>{c['client_name']}</strong></td>
             <td style="text-align:center">{c['client_type']}</td>
-            <td style="text-align:center">{c['total']}</td>
+            <td style="text-align:center;font-weight:700">{c['total']}</td>
             <td style="text-align:center;color:#10b981">{c['cerrados']}</td>
             <td style="text-align:center;color:#0ea5e9">{c['activos']}</td>
             <td style="text-align:center;color:{'#ef4444' if c['criticos'] > 0 else '#64748b'}">{c['criticos']}</td>
-            <td style="text-align:center;font-weight:600;color:{'#10b981' if c['cumplimiento_pct'] >= 90 else '#f59e0b'}">{c['cumplimiento_pct']:.1f}%</td>
         </tr>
         """
 
@@ -1702,7 +1566,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 </div>
             </div>
             <div style="text-align:right">
-                <div style="font-size:10px;color:#64748b">INFORME EJECUTIVO DE GESTIÓN Y SLA</div>
+                <div style="font-size:10px;color:#64748b">INFORME EJECUTIVO DE GESTIÓN OPERATIVA</div>
                 <div style="font-weight:700;font-size:11.5px;color:#1b365d;margin-top:2px">{dynamic_report_heading}</div>
                 <div style="font-size:9.5px;color:#94a3b8;margin-top:4px">Emisión: {data['generated_at']}</div>
             </div>
@@ -1721,44 +1585,44 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 <div class="kpi-lbl">En Atención</div>
                 <div class="kpi-val" style="color:#0ea5e9">{kpis['total_en_curso']}</div>
             </div>
+            <div class="kpi-card yellow">
+                <div class="kpi-lbl">En Espera</div>
+                <div class="kpi-val" style="color:#f59e0b">{kpis.get('total_en_espera', 0)}</div>
+            </div>
+            <div class="kpi-card blue">
+                <div class="kpi-lbl">Pendientes</div>
+                <div class="kpi-val" style="color:#2563eb">{kpis['total_pendientes']}</div>
+            </div>
             <div class="kpi-card blue">
                 <div class="kpi-lbl">Escalamientos</div>
-                <div class="kpi-val" style="color:#2563eb">{kpis.get('total_escalamientos', 0)}</div>
-            </div>
-            <div class="kpi-card green">
-                <div class="kpi-lbl">SLA Sycom (Emp.)</div>
-                <div class="kpi-val" style="color:{'#10b981' if kpis['cumplimiento_general'] >= 90 else '#f59e0b'}">{kpis['cumplimiento_general']}%</div>
-            </div>
-            <div class="kpi-card cyan">
-                <div class="kpi-lbl">SLA Equipo (Infra)</div>
-                <div class="kpi-val" style="color:{'#10b981' if kpis.get('cumplimiento_equipo', 100.0) >= 90 else '#0ea5e9'}">{kpis.get('cumplimiento_equipo', 100.0)}%</div>
+                <div class="kpi-val" style="color:#1b365d">{kpis.get('total_escalamientos', 0)}</div>
             </div>
         </div>
 
         <div style="font-size:11px;color:#475569;margin-bottom:14px;background:#f1f5f9;padding:7px 12px;border-radius:6px;display:flex;justify-content:space-between">
             <span><strong>Tiempo Promedio de Resolución:</strong> {kpis['avg_resolution_str']}</span>
-            <span><strong>Dentro de SLA:</strong> {kpis['total_dentro_sla']} · <strong>Fuera de SLA:</strong> {kpis['total_fuera_sla']} · <strong>Pendientes:</strong> {kpis['total_pendientes']}</span>
+            <span><strong>Total Gestionadas:</strong> {kpis['total_items']} · <strong>Cerradas:</strong> {kpis['total_cerrados']} · <strong>En Espera:</strong> {kpis.get('total_en_espera', 0)}</span>
         </div>
 
         <div class="section-title">1. Panel Gráfico de Indicadores Clave (KPIs, IBP y Categorías)</div>
         <div class="charts-grid">
             <div class="chart-box">
-                <div class="chart-box-title">Distribución de Estados y Cumplimiento SLA</div>
+                <div class="chart-box-title">Distribución de Estados Operativos</div>
                 {donut_svg_html}
             </div>
             <div class="chart-box">
-                <div class="chart-box-title">Carga Operativa y SLA por Especialista</div>
+                <div class="chart-box-title">Carga Operativa y Rendimiento por Especialista</div>
                 {spec_chart_bars}
             </div>
         </div>
 
         <div class="charts-grid">
             <div class="chart-box">
-                <div class="chart-box-title">Gráfico por Categoría Técnica (Volumen &amp; SLA)</div>
+                <div class="chart-box-title">Gráfico por Categoría Técnica (Volumen Operativo)</div>
                 {cat_chart_html}
             </div>
             <div class="chart-box">
-                <div class="chart-box-title">Gráfico por IBP / Banco Participante (Volumen &amp; SLA)</div>
+                <div class="chart-box-title">Gráfico por IBP / Banco Participante (Volumen Operativo)</div>
                 {ibp_chart_html}
                 <div style="margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9">
                     <div style="font-size:10px;font-weight:700;color:#1b365d;margin-bottom:4px">ORIGEN Y PRIORIDAD OPERATIVA</div>
@@ -1785,9 +1649,8 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                     <th style="text-align:center">Actividades</th>
                     <th style="text-align:center">Escalamientos</th>
                     <th style="text-align:center">Cerrados</th>
-                    <th style="text-align:center">Fuera SLA</th>
-                    <th style="text-align:center">SLA Sycom %</th>
-                    <th style="text-align:center">SLA Equipo %</th>
+                    <th style="text-align:center">En Curso</th>
+                    <th style="text-align:center">En Espera</th>
                 </tr>
             </thead>
             <tbody>
@@ -1804,9 +1667,8 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                     <th style="text-align:center">Actividades</th>
                     <th style="text-align:center">Escalamientos</th>
                     <th style="text-align:center">Cerrados</th>
-                    <th style="text-align:center">Fuera SLA</th>
-                    <th style="text-align:center">SLA Sycom %</th>
-                    <th style="text-align:center">SLA Equipo %</th>
+                    <th style="text-align:center">En Curso</th>
+                    <th style="text-align:center">En Espera</th>
                 </tr>
             </thead>
             <tbody>
@@ -1822,9 +1684,8 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                     <th style="text-align:center">Asignadas</th>
                     <th style="text-align:center">Cerradas</th>
                     <th style="text-align:center">En Curso</th>
+                    <th style="text-align:center">En Espera</th>
                     <th style="text-align:center">Pendientes</th>
-                    <th style="text-align:center">Fuera SLA</th>
-                    <th style="text-align:center">SLA %</th>
                     <th style="text-align:center">T. Promedio</th>
                 </tr>
             </thead>
@@ -1850,7 +1711,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
             </tbody>
         </table>
 
-        <div class="section-title">6. Volumen de Actividad y Cumplimiento por Cliente / Entidad</div>
+        <div class="section-title">6. Volumen de Actividad por Cliente / Entidad</div>
         <table>
             <thead>
                 <tr>
@@ -1860,7 +1721,6 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                     <th style="text-align:center">Resueltos</th>
                     <th style="text-align:center">Activos</th>
                     <th style="text-align:center">Críticos</th>
-                    <th style="text-align:center">Cumplimiento SLA</th>
                 </tr>
             </thead>
             <tbody>
@@ -1878,7 +1738,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
 
         <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:9.5px;color:#94a3b8">
             <span>Soluciones SYCOM · Gestión de Infraestructura y Base de Datos</span>
-            <span>Documento Confidencial · Cumplimiento de SLA</span>
+            <span>Documento Confidencial · Gestión Operativa</span>
         </div>
     </div>
 </body>
