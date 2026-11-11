@@ -7093,8 +7093,12 @@
         return `
           <form class="formProfilePassword" onsubmit="handleSaveProfilePassword(event, ${isModal})" style="display:flex;flex-direction:column;gap:14px">
             <div style="background:rgba(79,140,255,0.06);border:1px solid rgba(79,140,255,0.18);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--text)">
-              <strong style="color:var(--accent);display:block;margin-bottom:3px">Seguridad de la Cuenta</strong>
-              Ingresa tu contraseña actual y define una nueva clave de acceso de al menos 4 caracteres.
+              <strong style="color:var(--accent);display:block;margin-bottom:3px">Estándares de Seguridad de la Contraseña</strong>
+              Ingresa tu contraseña actual y define una nueva clave que cumpla:
+              <ul style="margin:5px 0 0 16px;padding:0;font-size:11.5px;color:var(--muted);line-height:1.5">
+                <li>Longitud: mínimo 6 y máximo 15 caracteres.</li>
+                <li>Al menos un carácter especial (ej: $, &, ., *, @, #, !, ?, _, -).</li>
+              </ul>
             </div>
 
             <div>
@@ -7110,7 +7114,7 @@
             <div>
               <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Nueva Contraseña</label>
               <div style="position:relative">
-                <input type="password" name="new_password" class="form-input" required minlength="4" placeholder="Mínimo 4 caracteres" style="padding-right:42px">
+                <input type="password" name="new_password" class="form-input" required minlength="6" maxlength="15" placeholder="6 a 15 caracteres con caracter especial ($&.*)" style="padding-right:42px">
                 <button type="button" onclick="togglePassInputSibling(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:6px">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
@@ -7120,7 +7124,7 @@
             <div>
               <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Confirmar Nueva Contraseña</label>
               <div style="position:relative">
-                <input type="password" name="confirm_password" class="form-input" required minlength="4" placeholder="Repite la nueva contraseña" style="padding-right:42px">
+                <input type="password" name="confirm_password" class="form-input" required minlength="6" maxlength="15" placeholder="Repite la nueva contraseña" style="padding-right:42px">
                 <button type="button" onclick="togglePassInputSibling(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:6px">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
@@ -7321,8 +7325,17 @@
         showScopedProfileAlert(form, 'profile-pass-alert', 'Las nuevas contraseñas no coinciden.', 'error');
         return;
       }
-      if (newPass.length < 4) {
-        showScopedProfileAlert(form, 'profile-pass-alert', 'La nueva contraseña debe tener al menos 4 caracteres.', 'error');
+      if (newPass.length < 6) {
+        showScopedProfileAlert(form, 'profile-pass-alert', 'La nueva contraseña debe tener como mínimo 6 caracteres.', 'error');
+        return;
+      }
+      if (newPass.length > 15) {
+        showScopedProfileAlert(form, 'profile-pass-alert', 'La nueva contraseña no debe exceder los 15 caracteres.', 'error');
+        return;
+      }
+      const specialCharRegex = /[\$\&\.\*\@\#\%\^\!\?\_\-\+\=\(\)\[\]\{\}\<\>\,\:\;\|\\\/]/;
+      if (!specialCharRegex.test(newPass)) {
+        showScopedProfileAlert(form, 'profile-pass-alert', 'La nueva contraseña debe contener al menos un caracter especial ($&.*).', 'error');
         return;
       }
 

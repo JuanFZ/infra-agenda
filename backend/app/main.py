@@ -994,10 +994,18 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
     if not verify_password(req.old_password, user.password_hash):
         raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta.")
-    if len(req.new_password) < 4:
-        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 4 caracteres.")
     
-    user.password_hash = hash_password(req.new_password)
+    new_pw = req.new_password
+    if len(new_pw) < 6:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 6 caracteres.")
+    if len(new_pw) > 15:
+        raise HTTPException(status_code=400, detail="La nueva contraseña no debe exceder los 15 caracteres.")
+    
+    special_chars = set("$&.*@#%!_?+-=()[]{}<>,:;|/\\^~`")
+    if not any(c in special_chars for c in new_pw):
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe contener al menos un caracter especial ($&.*).")
+    
+    user.password_hash = hash_password(new_pw)
     db.commit()
     return {"status": "ok", "message": "Contraseña actualizada con éxito"}
 

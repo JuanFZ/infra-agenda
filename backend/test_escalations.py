@@ -1481,11 +1481,39 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertEqual(updated["phone"], "+58 414 9998877")
         self.assertEqual(updated["avatar_data"], "data:image/jpeg;base64,samplephoto")
 
-        # 3. POST /api/auth/change-password
+        # 3. POST /api/auth/change-password con validaciones de seguridad (6-15 caracteres y caracter especial)
+        # 3a. Fallo si longitud menor a 6
+        too_short_res = self.client.post("/api/auth/change-password", json={
+            "username": "j.fernandez",
+            "old_password": "clave123",
+            "new_password": "ab$1"
+        })
+        self.assertEqual(too_short_res.status_code, 400)
+        self.assertIn("al menos 6", too_short_res.json()["detail"])
+
+        # 3b. Fallo si longitud mayor a 15
+        too_long_res = self.client.post("/api/auth/change-password", json={
+            "username": "j.fernandez",
+            "old_password": "clave123",
+            "new_password": "Password123456$Extra"
+        })
+        self.assertEqual(too_long_res.status_code, 400)
+        self.assertIn("15 caracteres", too_long_res.json()["detail"])
+
+        # 3c. Fallo si no tiene caracter especial ($&.*)
+        no_special_res = self.client.post("/api/auth/change-password", json={
+            "username": "j.fernandez",
+            "old_password": "clave123",
+            "new_password": "ClaveSegura123"
+        })
+        self.assertEqual(no_special_res.status_code, 400)
+        self.assertIn("caracter especial", no_special_res.json()["detail"])
+
+        # 3d. Éxito si cumple los estándares (6-15 caracteres con $, &, ., *)
         pw_res = self.client.post("/api/auth/change-password", json={
             "username": "j.fernandez",
             "old_password": "clave123",
-            "new_password": "nuevaClave456"
+            "new_password": "Nueva.Clave$1"
         })
         self.assertEqual(pw_res.status_code, 200)
         self.assertEqual(pw_res.json()["status"], "ok")
