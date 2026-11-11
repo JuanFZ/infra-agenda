@@ -688,7 +688,8 @@ def serialize_item(item: Item) -> dict:
     if item.status == "cerrado":
         ref_dt = item.closed_at or item.updated_at
         if ref_dt:
-            is_recent_closed = bool(ref_dt >= get_yesterday_start())
+            diff_secs = (datetime.datetime.utcnow() - ref_dt).total_seconds()
+            is_recent_closed = bool(0 <= diff_secs <= 24 * 3600)
 
     return {
         "id": item.id,

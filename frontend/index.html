@@ -3678,15 +3678,15 @@
 
     function isItemRecentClosed(i) {
       if (!i) return false;
-      if (typeof i.is_recent_closed === 'boolean') {
-        return i.is_recent_closed;
-      }
       const dateStr = i.closed_at || i.updated_at;
-      if (!dateStr) return false;
-      const d = parseUtcDate(dateStr);
-      if (!d) return false;
-      const diff = Date.now() - d.getTime();
-      return diff >= 0 && diff <= 24 * 60 * 60 * 1000;
+      if (dateStr) {
+        const d = parseUtcDate(dateStr);
+        if (d) {
+          const diff = Date.now() - d.getTime();
+          return diff >= 0 && diff <= 24 * 60 * 60 * 1000;
+        }
+      }
+      return typeof i.is_recent_closed === 'boolean' ? i.is_recent_closed : false;
     }
 
     function showToast(title, message = '', type = 'success', duration = 4500) {

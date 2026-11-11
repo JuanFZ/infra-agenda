@@ -205,3 +205,4 @@ if __name__ == "__main__":
 
     ok = migrate(sqlite_db, pg_conn_str, force=args.force)
     sys.exit(0 if ok else 1)
+

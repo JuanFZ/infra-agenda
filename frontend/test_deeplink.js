@@ -415,6 +415,7 @@ function simulateDeepLink(opts) {
   const handleDragOverFn = (content.match(/function handleDragOver\(e\)[\s\S]*?\n    \}/) || [])[0];
   const handleDropFn = (content.match(/async function handleDrop\(e, targetStatus\)[\s\S]*?\n    \}/) || [])[0];
   const renderKanbanFn = (content.match(/function renderKanban\(list\)[\s\S]*?\n    \}/) || [])[0];
+  const parseUtcFn = (content.match(/function parseUtcDate\(dateStr\)[\s\S]*?\n    \}/) || [])[0];
   const isItemRecentClosedFn = (content.match(/function isItemRecentClosed\(i\)[\s\S]*?\n    \}/) || [])[0];
 
   assert(setOriginFn, 'setOriginFilter function not found');
@@ -422,6 +423,7 @@ function simulateDeepLink(opts) {
   assert(renderKpisFn, 'renderKPIs function not found');
   assert(handleDropFn, 'handleDrop function not found');
   assert(renderKanbanFn, 'renderKanban function not found');
+  assert(parseUtcFn, 'parseUtcDate function not found');
   assert(isItemRecentClosedFn, 'isItemRecentClosed function not found');
 
   const pillButtons = ['', 'ClickUp', 'GLPI'].map(origin => {
@@ -498,6 +500,7 @@ function simulateDeepLink(opts) {
     ${handleDragOverFn}
     ${handleDropFn}
     const onDrop = handleDrop;
+    ${parseUtcFn}
     ${isItemRecentClosedFn}
     ${renderKanbanFn}
     return {
@@ -508,6 +511,7 @@ function simulateDeepLink(opts) {
       handleDragOver,
       handleDrop,
       onDrop,
+      isItemRecentClosed,
       getActiveKpi: () => ACTIVE_KPI_FILTER,
       setDraggedId: (id) => { DRAGGED_ITEM_ID = id; }
     };
@@ -590,6 +594,16 @@ function simulateDeepLink(opts) {
   const tvKanbanCodeMatch = content.match(/else if \(s\.type === 'kanban'\)[\s\S]*?tv-kanban-cards/);
   assert(tvKanbanCodeMatch, 'TV mode kanban slide block must exist');
   assert(tvKanbanCodeMatch[0].includes('isItemRecentClosed'), 'TV mode kanban must apply isItemRecentClosed filter to closed items');
+
+  // 5G: Verify exact rolling 24h calculation for isItemRecentClosed
+  const nowTs = Date.now();
+  const item23h = { status: 'cerrado', closed_at: new Date(nowTs - 23 * 3600 * 1000).toISOString() };
+  const item24h1m = { status: 'cerrado', closed_at: new Date(nowTs - (24 * 3600 + 60) * 1000).toISOString() };
+  const item25h = { status: 'cerrado', closed_at: new Date(nowTs - 25 * 3600 * 1000).toISOString() };
+
+  assert.strictEqual(kanbanRunner.isItemRecentClosed(item23h), true, 'Item closed 23h ago must be recent closed');
+  assert.strictEqual(kanbanRunner.isItemRecentClosed(item24h1m), false, 'Item closed 24h 1m ago must NOT be recent closed');
+  assert.strictEqual(kanbanRunner.isItemRecentClosed(item25h), false, 'Item closed 25h ago must NOT be recent closed');
 
   console.log('✓ Test 5: Kanban 4-column layout for ClickUp/GLPI, full espera drag-and-drop, and clean KPIs verified');
 
