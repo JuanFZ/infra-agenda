@@ -3976,10 +3976,22 @@
       gridEl.classList.remove('cols-3');
 
       gridEl.innerHTML = cols.map(c => {
-        const colItems = list.filter(i => i.status === c.k);
+        let colItems = list.filter(i => i.status === c.k);
+        if (c.k === 'cerrado') {
+          // Filtro visual de las últimas 24 horas para mantener limpio el flujo de trabajo del Kanban
+          const nowMs = Date.now();
+          const oneDayMs = 24 * 60 * 60 * 1000;
+          colItems = colItems.filter(i => {
+            const dateStr = i.closed_at || i.updated_at || i.created_at;
+            if (!dateStr) return true;
+            const itemMs = new Date(dateStr).getTime();
+            if (isNaN(itemMs)) return true;
+            return (nowMs - itemMs) <= oneDayMs;
+          });
+        }
         return `
       <div class="col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
-        <h4>${c.title} <span class="muted" style="margin-left:auto">${colItems.length}</span></h4>
+        <h4>${c.title} <span class="muted" style="margin-left:auto" ${c.k === 'cerrado' ? 'title="Mostrando actividades cerradas en las últimas 24 horas"' : ''}>${colItems.length}</span></h4>
         ${colItems.map(it => {
           const canDrag = canUserEditItem(it);
           return `

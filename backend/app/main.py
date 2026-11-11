@@ -666,25 +666,9 @@ def get_items(
     if prio and isinstance(prio, str):
         query = query.filter(Item.priority == prio)
     
-    # Política de cerrados: solo mostrar activos o cerrados desde el día de ayer en adelante
-    yesterday_start = get_yesterday_start()
-    if not status or not isinstance(status, str):
-        query = query.filter(
-            or_(
-                Item.status != "cerrado",
-                Item.closed_at >= yesterday_start,
-                and_(Item.closed_at == None, Item.updated_at >= yesterday_start)
-            )
-        )
-    elif status == "cerrado":
-        query = query.filter(
-            Item.status == "cerrado",
-            or_(
-                Item.closed_at >= yesterday_start,
-                and_(Item.closed_at == None, Item.updated_at >= yesterday_start)
-            )
-        )
-    else:
+    # Desacoplado: el Resumen conserva todo el histórico de actividades cerradas.
+    # El filtro de 24 horas solo aplica visualmente a la columna 'Cerrados' del Kanban en frontend.
+    if status and isinstance(status, str):
         query = query.filter(Item.status == status)
 
     if q and isinstance(q, str):
@@ -725,14 +709,7 @@ def get_item_by_id(
 
 @app.get("/api/kpis")
 def get_kpis(db: Session = Depends(get_db)):
-    yesterday_start = get_yesterday_start()
-    all_items = db.query(Item).filter(
-        or_(
-            Item.status != "cerrado",
-            Item.closed_at >= yesterday_start,
-            and_(Item.closed_at == None, Item.updated_at >= yesterday_start)
-        )
-    ).all()
+    all_items = db.query(Item).all()
     now = datetime.datetime.utcnow()
     today_start = datetime.datetime(now.year, now.month, now.day, 0, 0, 0)
     today_end = datetime.datetime(now.year, now.month, now.day, 23, 59, 59)
@@ -859,14 +836,7 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
 
 @app.get("/api/clients")
 def get_clients_summary(db: Session = Depends(get_db)):
-    yesterday_start = get_yesterday_start()
-    items = db.query(Item).filter(
-        or_(
-            Item.status != "cerrado",
-            Item.closed_at >= yesterday_start,
-            and_(Item.closed_at == None, Item.updated_at >= yesterday_start)
-        )
-    ).all()
+    items = db.query(Item).all()
     clients = {}
     for item in items:
         c_name = item.client_name or "Sin cliente"

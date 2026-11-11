@@ -392,11 +392,11 @@ class TestTelegramDeepLinks(unittest.TestCase):
         finally:
             db.close()
 
-        # Verify it is omitted from default GET /api/items
+        # Verify it IS retained in GET /api/items (desacoplado para histórico de Resumen)
         list_res = self.client.get("/api/items")
         self.assertEqual(list_res.status_code, 200)
         item_ids_in_list = [x["id"] for x in list_res.json()]
-        self.assertNotIn(item_id, item_ids_in_list)
+        self.assertIn(item_id, item_ids_in_list)
 
         # But CAN be retrieved directly via GET /api/items/{id} for deep linking
         detail_res = self.client.get(f"/api/items/{item_id}")

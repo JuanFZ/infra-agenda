@@ -13,23 +13,10 @@ def get_yesterday_start():
 
 def purge_old_closed_items(db: Session):
     """
-    Política de retención: Solo conservar tickets/tareas cerradas desde el día de ayer en adelante.
-    Cualquier asunto cerrado con fecha anterior a ayer (00:00) se elimina de la base de datos operativa.
+    Desacoplado: Las tareas cerradas se conservan permanentemente en la base de datos
+    para el historial de Resumen y Reportes. El límite de 24 horas solo aplica visualmente al Kanban.
     """
-    cutoff = get_yesterday_start()
-    purged = db.query(Item).filter(
-        Item.status == "cerrado",
-        or_(
-            and_(Item.closed_at != None, Item.closed_at < cutoff),
-            and_(Item.closed_at == None, Item.updated_at < cutoff)
-        )
-    ).all()
-    if purged:
-        count = len(purged)
-        for p in purged:
-            db.delete(p)
-        db.commit()
-        print(f"[Purge] Purgados {count} tickets/tareas cerrados anteriores a ayer ({cutoff.strftime('%Y-%m-%d')}).")
+    pass
 
 def sync_glpi(db: Session):
     client = GLPIClient()
@@ -56,16 +43,6 @@ def sync_glpi(db: Session):
 
             norm = client.normalize_ticket(raw, assignees_map, entities_map)
             ext_id = norm["external_id"]
-
-            # Política de cerrados: no guardar ni mostrar cerrados anteriores al día de ayer
-            if norm["status"] == "cerrado":
-                ref_time = norm.get("closed_at") or norm.get("updated_at")
-                if ref_time and ref_time < yesterday_start:
-                    existing_old = db.query(Item).filter(Item.source == "GLPI", Item.external_id == ext_id).first()
-                    if existing_old:
-                        db.delete(existing_old)
-                    continue
-
             active_ids.add(ext_id)
 
             # Buscar si ya existe
@@ -157,16 +134,6 @@ def sync_clickup(db: Session):
         for raw in raw_tasks:
             norm = client.normalize_task(raw)
             ext_id = norm["external_id"]
-
-            # Política de cerrados: no guardar ni mostrar cerrados anteriores al día de ayer
-            if norm["status"] == "cerrado":
-                ref_time = norm.get("closed_at") or norm.get("updated_at")
-                if ref_time and ref_time < yesterday_start:
-                    existing_old = db.query(Item).filter(Item.source == "ClickUp", Item.external_id == ext_id).first()
-                    if existing_old:
-                        db.delete(existing_old)
-                    continue
-
             active_ids.add(ext_id)
 
             item = db.query(Item).filter(
@@ -225,9 +192,10 @@ def sync_clickup(db: Session):
                 db.add(item)
             count += 1
 
-        # Eliminar tareas que hayan sido borradas en ClickUp
+        # Eliminar tareas que hayan sido borradas en ClickUp (solo si no están cerradas)
         purged = db.query(Item).filter(
             Item.source == "ClickUp",
+            Item.status != "cerrado",
             ~Item.external_id.in_(active_ids)
         ).all()
         for p in purged:
