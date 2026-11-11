@@ -2905,14 +2905,14 @@
               <option value="">Todas las IBP</option>
             </select>
             <button class="btn primary" id="btnUploadEscalationModal" onclick="openEscalationModal()"
-              style="background:linear-gradient(135deg, #4f8cff, #2563eb);color:#fff;border-color:rgba(79,140,255,.4);font-weight:700;display:inline-flex;align-items:center;gap:7px"
+              style="display:none"
               title="Registrar un nuevo escalamiento en Google Docs">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span> Registrar Escalamiento</span>
+              <span>Registrar Escalamiento</span>
             </button>
           </div>
         </div>
@@ -5362,6 +5362,35 @@
       if (arrow) arrow.innerHTML = '<polyline points="9 18 15 12 9 6"/>';
     }
 
+    let CURRENT_ACTIVE_VIEW = 'resumen';
+
+    function updateHeaderActionButton(viewName = CURRENT_ACTIVE_VIEW) {
+      CURRENT_ACTIVE_VIEW = viewName || 'resumen';
+      const btn = document.getElementById('btnNewActivityHeader');
+      if (!btn) return;
+      const canAction = isCoordinator() || isSpecialist();
+
+      if (viewName === 'escalamientos') {
+        btn.style.display = canAction ? 'inline-flex' : 'none';
+        btn.style.background = 'linear-gradient(135deg, #4f8cff, #2563eb)';
+        btn.style.borderColor = 'rgba(79,140,255,.4)';
+        btn.title = 'Registrar un nuevo escalamiento en Google Docs';
+        btn.onclick = () => openEscalationModal();
+        const textSpan = btn.querySelector('.btn-text');
+        if (textSpan) textSpan.textContent = 'Registrar Escalamiento';
+      } else if (viewName === 'reportes' || viewName === 'perfil') {
+        btn.style.display = 'none';
+      } else {
+        btn.style.display = canAction ? 'inline-flex' : 'none';
+        btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        btn.style.borderColor = 'rgba(16,185,129,.4)';
+        btn.title = 'Crear nueva actividad en ClickUp o GLPI';
+        btn.onclick = () => openCreateModal();
+        const textSpan = btn.querySelector('.btn-text');
+        if (textSpan) textSpan.textContent = 'Nueva Actividad';
+      }
+    }
+
     function switchView(viewName) {
       if (!viewName) return;
       if (viewName === 'atrasados' || viewName === 'espera') viewName = 'en_espera';
@@ -5378,6 +5407,8 @@
       if (window.innerWidth <= 768) {
         closeSidebarMobile();
       }
+
+      updateHeaderActionButton(viewName);
 
       const filtersEl = document.querySelector('.filters');
       const kpisEl = document.getElementById('kpisContainer');
@@ -6617,15 +6648,11 @@
       // 1. Sidebar user widget y avatar
       updateUserAvatarDisplay();
 
-      // 2. Botón Crear Actividad y Reportes en cabecera principal y Role Badge
-      const btnHeadCreate = document.getElementById('btnNewActivityHeader');
+      // 2. Botón de Acción en cabecera (Nueva Actividad / Registrar Escalamiento según vista)
+      updateHeaderActionButton(CURRENT_ACTIVE_VIEW);
       const btnReports = document.getElementById('btnReports');
       const sideNavReports = document.getElementById('sidebarNavReports');
       const rolePill = document.getElementById('roleBadgeHeader');
-
-      if (btnHeadCreate) {
-        btnHeadCreate.style.display = (isCoord || isSpec) ? 'inline-flex' : 'none';
-      }
       if (btnReports) {
         btnReports.style.display = isCoord ? 'inline-flex' : 'none';
       }
