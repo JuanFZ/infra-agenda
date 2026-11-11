@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from .database import engine, Base, get_db, SessionLocal
-from .models import Item, SyncLog, AlertLog, User, GeneratedReport, EscalationDocument, IBP
+from .models import Item, SyncLog, AlertLog, User, GeneratedReport, EscalationDocument, IBP, OvertimeRecord
 from .config import SYNC_INTERVAL_MINUTES
 from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
 from .sync.glpi_client import GLPIClient
@@ -285,6 +285,44 @@ def ensure_db_schema():
                     conn.execute(text(f"ALTER TABLE escalation_documents ADD COLUMN escalated_at {dt_type}"))
                 conn.execute(text("UPDATE escalation_documents SET received_at = created_at WHERE received_at IS NULL"))
                 conn.execute(text("UPDATE escalation_documents SET escalated_at = COALESCE(received_at, created_at) WHERE escalated_at IS NULL"))
+
+            # 4. overtime_records
+            if "overtime_records" in table_names:
+                ot_cols = [c["name"] for c in inspector.get_columns("overtime_records")]
+                if "specialist_name" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN specialist_name VARCHAR(150)"))
+                if "specialist_role" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN specialist_role VARCHAR(50) DEFAULT 'Especialista'"))
+                if "start_time" not in ot_cols:
+                    conn.execute(text(f"ALTER TABLE overtime_records ADD COLUMN start_time {dt_type}"))
+                if "end_time" not in ot_cols:
+                    conn.execute(text(f"ALTER TABLE overtime_records ADD COLUMN end_time {dt_type}"))
+                if "duration_minutes" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN duration_minutes INTEGER DEFAULT 0"))
+                if "duration_hours" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN duration_hours FLOAT DEFAULT 0.0"))
+                if "description" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN description TEXT"))
+                if "category" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN category VARCHAR(100) DEFAULT 'Infraestructura'"))
+                if "project_name" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN project_name VARCHAR(150)"))
+                if "item_id" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN item_id INTEGER"))
+                if "created_by" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN created_by VARCHAR(150)"))
+                if "created_by_role" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN created_by_role VARCHAR(50) DEFAULT 'Especialista'"))
+                if "status" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN status VARCHAR(50) DEFAULT 'registrado'"))
+                if "approved_by" not in ot_cols:
+                    conn.execute(text("ALTER TABLE overtime_records ADD COLUMN approved_by VARCHAR(150)"))
+                if "approved_at" not in ot_cols:
+                    conn.execute(text(f"ALTER TABLE overtime_records ADD COLUMN approved_at {dt_type}"))
+                if "created_at" not in ot_cols:
+                    conn.execute(text(f"ALTER TABLE overtime_records ADD COLUMN created_at {dt_type}"))
+                if "updated_at" not in ot_cols:
+                    conn.execute(text(f"ALTER TABLE overtime_records ADD COLUMN updated_at {dt_type}"))
 
         # Poblar catálogo oficial de las 34 IBPs (Participantes SIMF) si no existen
         seed_db = SessionLocal()
@@ -577,6 +615,25 @@ class UpdateUserProfileRequest(BaseModel):
     job_title: str | None = None
     bio: str | None = None
     avatar_data: str | None = None
+
+class CreateOvertimeRequest(BaseModel):
+    specialist_name: str | None = None
+    start_time: str
+    end_time: str
+    description: str
+    category: str | None = "Infraestructura"
+    project_name: str | None = None
+    item_id: int | None = None
+
+class UpdateOvertimeRequest(BaseModel):
+    specialist_name: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    description: str | None = None
+    category: str | None = None
+    project_name: str | None = None
+    item_id: int | None = None
+    status: str | None = None
 
 DEFAULT_USERS = [
     {"full_name": "Adonis Lozada", "username": "a.lozada", "email": "a.lozada@sycom.com.ve", "telegram_username": "@adonislozada", "role": "coordinador"},
@@ -2670,6 +2727,435 @@ def api_delete_escalation(
     db.delete(doc)
     db.commit()
     return {"status": "OK", "deleted_id": doc_id}
+
+
+# ==============================================================================
+# MODULO DE GESTION DE HORAS EXTRAS (OVERTIME RECORDS)
+# ==============================================================================
+
+def _parse_overtime_datetime(dt_str: str) -> datetime.datetime:
+    """Parsea una fecha/hora proveniente de datetime-local o ISO a datetime naive en UTC."""
+    if not dt_str:
+        raise ValueError("Fecha/hora requerida.")
+    s = dt_str.strip()
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    try:
+        dt = datetime.datetime.fromisoformat(s)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        return dt
+    except Exception:
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+            try:
+                return datetime.datetime.strptime(s, fmt)
+            except ValueError:
+                pass
+        raise HTTPException(status_code=400, detail=f"Formato de fecha u hora invalido: '{dt_str}'.")
+
+def _clean_header_user(val: str | None) -> str:
+    if not val:
+        return ""
+    try:
+        return urllib.parse.unquote(str(val)).strip()
+    except Exception:
+        return str(val).strip()
+
+def _serialize_overtime(
+    ot: OvertimeRecord,
+    req_user_name: str | None = None,
+    req_user_role: str | None = None
+) -> dict:
+    role = (req_user_role or "").strip().lower()
+    user_name = _clean_header_user(req_user_name).lower()
+    is_admin_or_coord = role in ("coordinador", "admin", "administrador")
+    is_owner = bool(user_name and (user_name in (ot.created_by or "").lower() or user_name in (ot.specialist_name or "").lower()))
+
+    can_edit = is_admin_or_coord or is_owner
+    can_delete = is_admin_or_coord or is_owner
+
+    return {
+        "id": ot.id,
+        "specialist_name": ot.specialist_name,
+        "specialist_role": ot.specialist_role or "Especialista",
+        "start_time": to_iso_z(ot.start_time),
+        "end_time": to_iso_z(ot.end_time),
+        "start_time_caracas": format_caracas_time(ot.start_time, "%d-%m-%Y %I:%M %p") if ot.start_time else None,
+        "end_time_caracas": format_caracas_time(ot.end_time, "%d-%m-%Y %I:%M %p") if ot.end_time else None,
+        "duration_minutes": ot.duration_minutes,
+        "duration_hours": ot.duration_hours,
+        "duration_human": ot.duration_human,
+        "description": ot.description,
+        "category": ot.category or "Infraestructura",
+        "project_name": ot.project_name or "General",
+        "item_id": ot.item_id,
+        "created_by": ot.created_by,
+        "created_by_role": ot.created_by_role or "Especialista",
+        "status": ot.status or "registrado",
+        "approved_by": ot.approved_by,
+        "approved_at": to_iso_z(ot.approved_at),
+        "created_at": to_iso_z(ot.created_at),
+        "updated_at": to_iso_z(ot.updated_at),
+        "can_edit": can_edit,
+        "can_delete": can_delete,
+    }
+
+
+@app.get("/api/overtimes")
+def list_overtimes(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    specialist: str | None = Query(None),
+    category: str | None = Query(None),
+    project_name: str | None = Query(None),
+    status: str | None = Query(None),
+    search: str | None = Query(None),
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name")
+):
+    """Retorna la lista de registros de horas extras con filtros opcionales."""
+    q = db.query(OvertimeRecord)
+
+    if start_date:
+        try:
+            sd = _parse_overtime_datetime(start_date)
+            q = q.filter(OvertimeRecord.start_time >= sd)
+        except Exception:
+            pass
+
+    if end_date:
+        try:
+            ed = _parse_overtime_datetime(end_date)
+            q = q.filter(OvertimeRecord.end_time <= ed)
+        except Exception:
+            pass
+
+    if specialist and specialist.strip():
+        q = q.filter(OvertimeRecord.specialist_name.ilike(f"%{specialist.strip()}%"))
+
+    if category and category.strip():
+        q = q.filter(OvertimeRecord.category == category.strip())
+
+    if project_name and project_name.strip():
+        q = q.filter(OvertimeRecord.project_name == project_name.strip())
+
+    if status and status.strip():
+        q = q.filter(OvertimeRecord.status == status.strip())
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        q = q.filter(
+            or_(
+                OvertimeRecord.description.ilike(term),
+                OvertimeRecord.specialist_name.ilike(term),
+                OvertimeRecord.project_name.ilike(term),
+                OvertimeRecord.category.ilike(term)
+            )
+        )
+
+    records = q.order_by(desc(OvertimeRecord.start_time), desc(OvertimeRecord.id)).all()
+    return [_serialize_overtime(r, x_user_name, x_user_role) for r in records]
+
+
+@app.post("/api/overtimes")
+def create_overtime(
+    req: CreateOvertimeRequest,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name")
+):
+    """Crea un nuevo registro de horas extras con cálculo de duración y control de autoría."""
+    role = (x_user_role or "").strip().lower()
+    caller_name = _clean_header_user(x_user_name)
+
+    # Validar fechas
+    start_dt = _parse_overtime_datetime(req.start_time)
+    end_dt = _parse_overtime_datetime(req.end_time)
+
+    delta_seconds = (end_dt - start_dt).total_seconds()
+    if delta_seconds <= 0:
+        raise HTTPException(status_code=400, detail="La fecha y hora de fin debe ser estrictamente posterior al inicio.")
+
+    duration_minutes = int(delta_seconds // 60)
+    duration_hours = round(duration_minutes / 60.0, 2)
+
+    # Validar descripción
+    desc = (req.description or "").strip()
+    if len(desc) < 5:
+        raise HTTPException(status_code=400, detail="La descripción de la actividad debe contener al menos 5 caracteres.")
+
+    # Resolver especialista
+    is_coord = role in ("coordinador", "admin", "administrador")
+    if is_coord and req.specialist_name and req.specialist_name.strip():
+        target_specialist = req.specialist_name.strip()
+    elif caller_name:
+        target_specialist = caller_name
+    elif req.specialist_name and req.specialist_name.strip():
+        target_specialist = req.specialist_name.strip()
+    else:
+        target_specialist = "Juan Fernández"
+
+    # Resolver rol del especialista
+    spec_user = db.query(User).filter(
+        or_(
+            User.full_name.ilike(target_specialist),
+            User.username.ilike(target_specialist)
+        )
+    ).first()
+    spec_role = (spec_user.role.title()) if spec_user and spec_user.role else ("Coordinador" if is_coord else "Especialista")
+    creator_name = caller_name or target_specialist
+    creator_role = "Coordinador" if is_coord else "Especialista"
+
+    record = OvertimeRecord(
+        specialist_name=target_specialist,
+        specialist_role=spec_role,
+        start_time=start_dt,
+        end_time=end_dt,
+        duration_minutes=duration_minutes,
+        duration_hours=duration_hours,
+        description=desc,
+        category=(req.category or "Infraestructura").strip(),
+        project_name=(req.project_name or "General").strip(),
+        item_id=req.item_id,
+        created_by=creator_name,
+        created_by_role=creator_role,
+        status="registrado"
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    return _serialize_overtime(record, x_user_name, x_user_role)
+
+
+@app.get("/api/overtimes/analytics")
+def get_overtimes_analytics(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    specialist: str | None = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Retorna métricas consolidadas y la matriz para el mapa de calor de horas extras por especialista."""
+    q = db.query(OvertimeRecord)
+
+    if start_date:
+        try:
+            sd = _parse_overtime_datetime(start_date)
+            q = q.filter(OvertimeRecord.start_time >= sd)
+        except Exception:
+            pass
+
+    if end_date:
+        try:
+            ed = _parse_overtime_datetime(end_date)
+            q = q.filter(OvertimeRecord.end_time <= ed)
+        except Exception:
+            pass
+
+    if specialist and specialist.strip():
+        q = q.filter(OvertimeRecord.specialist_name.ilike(f"%{specialist.strip()}%"))
+
+    records = q.all()
+
+    total_records = len(records)
+    total_minutes = sum(r.duration_minutes for r in records)
+    total_hours = round(total_minutes / 60.0, 2)
+
+    # 1. Agrupación por Especialista
+    by_spec = {}
+    by_cat = {}
+    by_proj = {}
+
+    for r in records:
+        s_name = r.specialist_name or "Sin Asignar"
+        if s_name not in by_spec:
+            by_spec[s_name] = {
+                "specialist_name": s_name,
+                "role": r.specialist_role or "Especialista",
+                "total_minutes": 0,
+                "total_hours": 0.0,
+                "records_count": 0
+            }
+        by_spec[s_name]["total_minutes"] += r.duration_minutes
+        by_spec[s_name]["records_count"] += 1
+
+        cat = r.category or "Infraestructura"
+        by_cat[cat] = by_cat.get(cat, 0) + r.duration_minutes
+
+        proj = r.project_name or "General"
+        by_proj[proj] = by_proj.get(proj, 0) + r.duration_minutes
+
+    spec_list = []
+    for s_name, data in by_spec.items():
+        h = round(data["total_minutes"] / 60.0, 2)
+        pct = round((data["total_minutes"] / total_minutes * 100.0), 1) if total_minutes > 0 else 0.0
+        spec_list.append({
+            "specialist_name": s_name,
+            "role": data["role"],
+            "total_minutes": data["total_minutes"],
+            "total_hours": h,
+            "records_count": data["records_count"],
+            "pct": pct
+        })
+    spec_list.sort(key=lambda x: x["total_hours"], reverse=True)
+
+    cat_list = [
+        {"category": k, "total_hours": round(v / 60.0, 2), "total_minutes": v}
+        for k, v in sorted(by_cat.items(), key=lambda item: item[1], reverse=True)
+    ]
+
+    proj_list = [
+        {"project_name": k, "total_hours": round(v / 60.0, 2), "total_minutes": v}
+        for k, v in sorted(by_proj.items(), key=lambda item: item[1], reverse=True)
+    ]
+
+    # 2. Matriz Mapa de Calor: Especialista x Categoría Técnica
+    # Filas: Especialistas, Columnas: Categorías, Valores: Horas
+    heatmap_matrix = {
+        "specialists": [s["specialist_name"] for s in spec_list],
+        "categories": [c["category"] for c in cat_list],
+        "cells": {},
+        "row_totals": {},
+        "col_totals": {},
+        "grand_total_hours": total_hours
+    }
+
+    for r in records:
+        s_name = r.specialist_name or "Sin Asignar"
+        cat = r.category or "Infraestructura"
+        key = f"{s_name}\u0000{cat}"
+        heatmap_matrix["cells"][key] = round(heatmap_matrix["cells"].get(key, 0.0) + (r.duration_minutes / 60.0), 2)
+        heatmap_matrix["row_totals"][s_name] = round(heatmap_matrix["row_totals"].get(s_name, 0.0) + (r.duration_minutes / 60.0), 2)
+        heatmap_matrix["col_totals"][cat] = round(heatmap_matrix["col_totals"].get(cat, 0.0) + (r.duration_minutes / 60.0), 2)
+
+    return {
+        "total_records": total_records,
+        "total_minutes": total_minutes,
+        "total_hours": total_hours,
+        "by_specialist": spec_list,
+        "by_category": cat_list,
+        "by_project": proj_list,
+        "heatmap_matrix": heatmap_matrix
+    }
+
+
+@app.get("/api/overtimes/{record_id}")
+def get_overtime_detail(
+    record_id: int,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name")
+):
+    record = db.query(OvertimeRecord).filter(OvertimeRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Registro de hora extra no encontrado.")
+    return _serialize_overtime(record, x_user_name, x_user_role)
+
+
+@app.put("/api/overtimes/{record_id}")
+@app.patch("/api/overtimes/{record_id}")
+def update_overtime(
+    record_id: int,
+    req: UpdateOvertimeRequest,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name")
+):
+    """Actualiza un registro de horas extras recalculando la duración si las fechas cambian."""
+    record = db.query(OvertimeRecord).filter(OvertimeRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Registro de hora extra no encontrado.")
+
+    role = (x_user_role or "").strip().lower()
+    caller_name = _clean_header_user(x_user_name).lower()
+    is_coord = role in ("coordinador", "admin", "administrador")
+    is_owner = bool(caller_name and (caller_name in (record.created_by or "").lower() or caller_name in (record.specialist_name or "").lower()))
+
+    if not is_coord and not is_owner:
+        raise HTTPException(
+            status_code=403,
+            detail="Permiso denegado: Solo el Coordinador o el autor del registro pueden modificarlo."
+        )
+
+    # Actualizar especialista solo si es coordinador
+    if req.specialist_name is not None and req.specialist_name.strip():
+        if is_coord:
+            record.specialist_name = req.specialist_name.strip()
+        elif req.specialist_name.strip().lower() != (record.specialist_name or "").lower():
+            raise HTTPException(status_code=403, detail="Un especialista no puede reasignar el registro a otro integrante.")
+
+    start_dt = record.start_time
+    end_dt = record.end_time
+
+    if req.start_time is not None:
+        start_dt = _parse_overtime_datetime(req.start_time)
+        record.start_time = start_dt
+
+    if req.end_time is not None:
+        end_dt = _parse_overtime_datetime(req.end_time)
+        record.end_time = end_dt
+
+    if req.start_time is not None or req.end_time is not None:
+        delta_seconds = (end_dt - start_dt).total_seconds()
+        if delta_seconds <= 0:
+            raise HTTPException(status_code=400, detail="La fecha y hora de fin debe ser estrictamente posterior al inicio.")
+        record.duration_minutes = int(delta_seconds // 60)
+        record.duration_hours = round(record.duration_minutes / 60.0, 2)
+
+    if req.description is not None:
+        desc = req.description.strip()
+        if len(desc) < 5:
+            raise HTTPException(status_code=400, detail="La descripción debe contener al menos 5 caracteres.")
+        record.description = desc
+
+    if req.category is not None:
+        record.category = req.category.strip()
+
+    if req.project_name is not None:
+        record.project_name = req.project_name.strip()
+
+    if req.item_id is not None:
+        record.item_id = req.item_id
+
+    if req.status is not None and is_coord:
+        record.status = req.status.strip()
+
+    record.updated_at = datetime.datetime.utcnow()
+    db.commit()
+    db.refresh(record)
+
+    return _serialize_overtime(record, x_user_name, x_user_role)
+
+
+@app.delete("/api/overtimes/{record_id}")
+def delete_overtime(
+    record_id: int,
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name")
+):
+    """Elimina un registro de horas extras con validación de permisos."""
+    record = db.query(OvertimeRecord).filter(OvertimeRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Registro de hora extra no encontrado.")
+
+    role = (x_user_role or "").strip().lower()
+    caller_name = _clean_header_user(x_user_name).lower()
+    is_coord = role in ("coordinador", "admin", "administrador")
+    is_owner = bool(caller_name and (caller_name in (record.created_by or "").lower() or caller_name in (record.specialist_name or "").lower()))
+
+    if not is_coord and not is_owner:
+        raise HTTPException(
+            status_code=403,
+            detail="Permiso denegado: Solo el Coordinador o el autor del registro pueden eliminarlo."
+        )
+
+    db.delete(record)
+    db.commit()
+    return {"status": "OK", "deleted_id": record_id}
+
+
 
 
 

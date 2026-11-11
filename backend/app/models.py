@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, Float
+from sqlalchemy import Column, Integer, String, DateTime, Text, Float, Index
 from .database import Base
 
 class Item(Base):
@@ -175,6 +175,51 @@ class IBP(Base):
     environment = Column(String(50), default="Producción")
     is_active = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class OvertimeRecord(Base):
+    __tablename__ = "overtime_records"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    specialist_name = Column(String(150), nullable=False, index=True)       # Nombre del especialista o coordinador
+    specialist_role = Column(String(50), default="Especialista")             # 'Coordinador', 'Especialista', 'Analista'
+    start_time = Column(DateTime, nullable=False, index=True)                # Fecha y hora de inicio (UTC)
+    end_time = Column(DateTime, nullable=False, index=True)                  # Fecha y hora de fin (UTC)
+    duration_minutes = Column(Integer, nullable=False, default=0)           # Duración total en minutos
+    duration_hours = Column(Float, nullable=False, default=0.0)              # Duración total en horas decimales (ej. 2.50)
+    description = Column(Text, nullable=False)                               # Detalle de la labor realizada
+    category = Column(String(100), default="Infraestructura")               # Infraestructura, PostgreSQL, Antivirus, Servidores, etc.
+    project_name = Column(String(150), nullable=True)                       # SIMF, SGLPAR, Sycom, MicroFilms Center, etc.
+    item_id = Column(Integer, nullable=True, index=True)                    # ID opcional de actividad vinculada (items.id)
+    created_by = Column(String(150), nullable=False, index=True)            # Usuario que registró
+    created_by_role = Column(String(50), default="Especialista")            # Rol de quien registró
+    status = Column(String(50), default="registrado", index=True)           # 'registrado', 'aprobado', 'rechazado'
+    approved_by = Column(String(150), nullable=True)                        # Coordinador que aprobó
+    approved_at = Column(DateTime, nullable=True)                           # Fecha de aprobación
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_overtime_spec_start", "specialist_name", "start_time"),
+        Index("ix_overtime_period", "start_time", "end_time"),
+    )
+
+    @property
+    def duration_human(self) -> str:
+        """Formatea la duración en horas y minutos legibles (ej. '2h 30m', '45m')."""
+        mins = self.duration_minutes or 0
+        if mins <= 0:
+            return "0m"
+        hours = mins // 60
+        rem_mins = mins % 60
+        days = hours // 24
+        if days > 0:
+            rem_hours = hours % 24
+            return f"{days}d {rem_hours}h {rem_mins}m" if rem_mins else f"{days}d {rem_hours}h"
+        if hours > 0:
+            return f"{hours}h {rem_mins}m" if rem_mins else f"{hours}h"
+        return f"{rem_mins}m"
+
 
 
 

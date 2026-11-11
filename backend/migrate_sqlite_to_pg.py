@@ -25,6 +25,7 @@ TABLE_ORDER = [
     "ibps",
     "escalation_documents",
     "items",
+    "overtime_records",
     "generated_reports",
     "alert_logs",
     "sync_logs",

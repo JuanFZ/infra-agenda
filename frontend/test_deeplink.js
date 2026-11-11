@@ -697,5 +697,46 @@ function simulateDeepLink(opts) {
   assert.strictEqual(timeAgoRunner.getTimeAgo(past20h), 'hace 20h 0m', '20h ago should return hace 20h 0m');
   console.log('✓ Test 10: Accurate UTC timezone parsing and getTimeAgo verified');
 
+  // Test 11: Overtime Records (Horas Extras) module and Heatmap validation
+  assert(content.includes('data-view="horas_extras"'), 'Sidebar navigation for Horas Extras missing');
+  assert(content.includes('id="v-horas_extras"'), 'View container #v-horas_extras missing');
+  assert(content.includes('id="chartOvertimeMatrix"'), 'Analytics Overtime Heatmap Card #chartOvertimeMatrix missing');
+  assert(content.includes('id="btnNewActivityHeader"'), 'Header action button #btnNewActivityHeader missing');
+  assert(content.includes('updateHeaderActionButton'), 'updateHeaderActionButton missing');
+
+  // Test calculateOvertimeDurationPreview function
+  const calcDurationMatch = content.match(/function calculateOvertimeDurationPreview\(\)[\s\S]*?\n    \}/);
+  assert(calcDurationMatch, 'calculateOvertimeDurationPreview function not found');
+
+  const calcDurationRunner = new Function(`
+    function escapeHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    const mockElements = {
+      'otStartTime': { value: '' },
+      'otEndTime': { value: '' },
+      'otDurationPreview': { innerHTML: '', textContent: '' },
+      'btnSubmitOvertime': { disabled: false }
+    };
+    const document = {
+      getElementById: (id) => mockElements[id] || { value: '', innerHTML: '', textContent: '', disabled: false }
+    };
+    ${calcDurationMatch[0]}
+    return {
+      run: (start, end) => {
+        mockElements['otStartTime'].value = start;
+        mockElements['otEndTime'].value = end;
+        calculateOvertimeDurationPreview();
+        return mockElements['otDurationPreview'].innerHTML;
+      }
+    };
+  `)();
+
+  const previewValid = calcDurationRunner.run('2026-11-11T18:00', '2026-11-11T20:30');
+  assert(previewValid.includes('2h 30m') && previewValid.includes('2.50 hrs'), 'Live preview for 18:00-20:30 should be 2h 30m (2.50 hrs)');
+
+  const previewInvalid = calcDurationRunner.run('2026-11-11T21:00', '2026-11-11T18:00');
+  assert(previewInvalid.includes('debe ser posterior'), 'Negative duration should indicate invalid range');
+
+  console.log('✓ Test 11: Overtime UI elements, live duration preview, and heatmap matrix integration verified');
+
   console.log('ALL FRONTEND TESTS PASSED SUCCESSFULLY!');
 })();

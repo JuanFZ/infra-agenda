@@ -2699,6 +2699,16 @@
       <span class="label">Escalamientos</span>
     </div>
 
+    <div class="nav" data-view="horas_extras" id="sidebarNavOvertime" title="Horas Extras">
+      <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+      <span class="label">Horas Extras</span>
+      <span class="badge" id="navOvertimeBadge" style="display:none;background:rgba(56,189,248,0.2);color:#38bdf8;font-size:10px;padding:2px 6px;border-radius:10px">0h</span>
+    </div>
+
     <div class="nav" data-view="reportes" id="sidebarNavReports" title="Reportes Ejecutivos">
       <svg class="nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
@@ -3018,6 +3028,95 @@
           </table>
         </div>
         <div id="escalationsPagination" class="pagination-container"></div>
+      </div>
+    </div>
+
+    <!-- Vista de Horas Extras -->
+    <div class="view" id="v-horas_extras">
+      <div class="card">
+        <div
+          style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">
+          <div>
+            <h3 style="margin:0;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>Gestión de Horas Extras</span>
+              <span class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:11px"
+                id="lblOvertimeCount">0 registros</span>
+              <span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:11px"
+                id="lblOvertimeTotalHours">0h acumuladas</span>
+            </h3>
+            <span class="muted" style="font-size:12px;margin-top:3px;display:block">Registro y control de jornadas extraordinarias con cálculo automático de horas trabajadas y autoría</span>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="position:relative">
+              <input type="text" id="fSearchOvertime" placeholder="Buscar por especialista, actividad, categoría..."
+                oninput="filterOvertimeTable()"
+                style="font-size:12px;padding:7px 12px 7px 30px;width:240px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none"
+                title="Filtrar por especialista, descripción, proyecto o categoría">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"
+                style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </div>
+            <select id="fSpecialistOvertime" onchange="filterOvertimeTable()"
+              style="font-size:12px;padding:7px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none;cursor:pointer"
+              title="Filtrar por especialista">
+              <option value="">Todo el Equipo</option>
+            </select>
+            <select id="fCategoryOvertime" onchange="filterOvertimeTable()"
+              style="font-size:12px;padding:7px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:8px;outline:none;cursor:pointer"
+              title="Filtrar por categoría">
+              <option value="">Todas las Categorías</option>
+              <option value="Infraestructura">Infraestructura</option>
+              <option value="PostgreSQL">PostgreSQL</option>
+              <option value="Antivirus">Antivirus</option>
+              <option value="Servidores">Servidores</option>
+              <option value="CPU">CPU</option>
+              <option value="RAM">RAM</option>
+              <option value="Disco">Disco</option>
+              <option value="Servicios">Servicios</option>
+            </select>
+            <button class="btn primary" id="btnOpenOvertimeModalHeader" onclick="openOvertimeModal()"
+              style="display:none"
+              title="Registrar una nueva hora extra">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span>Añadir Hora Extra</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table id="tblOvertime">
+            <thead>
+              <tr>
+                <th style="min-width:180px">Especialista</th>
+                <th style="min-width:210px">Horario (Inicio - Fin)</th>
+                <th style="min-width:120px">Total Horas</th>
+                <th style="min-width:280px">Descripción de la Actividad</th>
+                <th style="min-width:140px">Categoría / Proyecto</th>
+                <th style="min-width:150px">Registrado Por</th>
+                <th style="text-align:center;min-width:120px">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tblOvertimeBody">
+              <tr>
+                <td colspan="7" style="text-align:center;padding:24px" class="muted">Cargando registros de horas extras...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="overtimePagination" class="pagination-container"></div>
       </div>
     </div>
 
@@ -3351,6 +3450,23 @@
               <span class="muted" style="font-size:11px" id="lblMatrixInfo">—</span>
             </div>
             <div id="chartIbpCategoryMatrix">
+              <!-- Generado por JS -->
+            </div>
+          </div>
+
+          <!-- 2D. Matriz de Horas Extras por Especialista × Categoría Técnica (Mapa de Calor) -->
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:20px">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+              <div>
+                <h4 style="margin:0;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>Matriz de Horas Extras por Especialista (Mapa de Calor)</span>
+                </h4>
+                <span class="muted" style="font-size:11.5px">Carga y distribución de horas extras por especialista y categoría técnica en el período · Clic en una celda para ver el detalle</span>
+              </div>
+              <span class="muted" style="font-size:11px" id="lblOvertimeMatrixInfo">—</span>
+            </div>
+            <div id="chartOvertimeMatrix">
               <!-- Generado por JS -->
             </div>
           </div>
@@ -5602,6 +5718,14 @@
         btn.onclick = () => openEscalationModal();
         const textSpan = btn.querySelector('.btn-text');
         if (textSpan) textSpan.textContent = 'Registrar Escalamiento';
+      } else if (viewName === 'horas_extras') {
+        btn.style.display = canAction ? 'inline-flex' : 'none';
+        btn.style.background = 'linear-gradient(135deg, #0284c7, #0369a1)';
+        btn.style.borderColor = 'rgba(2,132,199,.4)';
+        btn.title = 'Registrar una nueva hora extra';
+        btn.onclick = () => openOvertimeModal();
+        const textSpan = btn.querySelector('.btn-text');
+        if (textSpan) textSpan.textContent = 'Añadir Hora Extra';
       } else if (viewName === 'reportes' || viewName === 'perfil') {
         btn.style.display = 'none';
       } else {
@@ -5638,7 +5762,7 @@
       const kpisEl = document.getElementById('kpisContainer');
       const subTitleEl = document.querySelector('header .sub');
 
-      if (viewName === 'reportes' || viewName === 'escalamientos' || viewName === 'perfil') {
+      if (viewName === 'reportes' || viewName === 'escalamientos' || viewName === 'horas_extras' || viewName === 'perfil') {
         if (filtersEl) filtersEl.style.display = 'none';
         if (kpisEl) kpisEl.style.display = 'none';
         if (subTitleEl) {
@@ -5648,6 +5772,8 @@
               : 'Historial y generación de informes ejecutivos consolidados';
           } else if (viewName === 'escalamientos') {
             subTitleEl.textContent = 'Base documental y enlaces directos de escalamiento (Google Docs)';
+          } else if (viewName === 'horas_extras') {
+            subTitleEl.textContent = 'Registro y control de jornadas extraordinarias con cálculo automático de horas';
           } else if (viewName === 'perfil') {
             subTitleEl.textContent = 'Gestión de perfil personal, foto de usuario y credenciales';
           }
@@ -5662,6 +5788,9 @@
         if (viewName === 'escalamientos') {
           loadIbps();
           loadEscalations();
+        }
+        if (viewName === 'horas_extras') {
+          loadOvertimes();
         }
         if (viewName === 'perfil') {
           renderUserProfileView();
@@ -8572,6 +8701,7 @@
       renderCategoryChart(data.por_categoria || [], data.items || []);
       renderIbpChart(data.por_ibp || [], data.items || []);
       renderIbpCategoryMatrix(data);
+      loadAndRenderOvertimeAnalytics();
       renderPlatformChart(data.por_origen || {});
       renderPriorityChart(data.por_prioridad || {});
       renderClientsChart(data.por_cliente || []);
@@ -10120,6 +10250,638 @@
         console.error('Error eliminando escalamiento:', err);
         alert(`No se pudo eliminar el escalamiento: ${err.message}`);
       }
+    }
+
+    // =========================================================================
+    // MODULO DE GESTION DE HORAS EXTRAS (OVERTIME RECORDS)
+    // =========================================================================
+
+    let ALL_OVERTIMES = [];
+    let CURRENT_FILTERED_OVERTIMES = [];
+    let OVERTIME_CURRENT_PAGE = 1;
+
+    async function loadOvertimes() {
+      const tbody = document.getElementById('tblOvertimeBody');
+      const countBadge = document.getElementById('lblOvertimeCount');
+      const hoursBadge = document.getElementById('lblOvertimeTotalHours');
+      const navBadge = document.getElementById('navOvertimeBadge');
+
+      try {
+        const res = await fetch(`${API_URL}/overtimes`, {
+          headers: getAuthHeaders()
+        });
+        if (!res.ok) {
+          throw new Error(`Error ${res.status}: ${res.statusText}`);
+        }
+        const list = await res.json();
+        ALL_OVERTIMES = list || [];
+
+        const totalHours = ALL_OVERTIMES.reduce((acc, r) => acc + (Number(r.duration_hours) || 0), 0);
+        const totalHoursFormatted = totalHours.toFixed(1);
+
+        if (countBadge) {
+          countBadge.textContent = `${ALL_OVERTIMES.length} registro${ALL_OVERTIMES.length === 1 ? '' : 's'}`;
+        }
+        if (hoursBadge) {
+          hoursBadge.textContent = `${totalHoursFormatted}h acumuladas`;
+        }
+        if (navBadge) {
+          if (ALL_OVERTIMES.length > 0) {
+            navBadge.style.display = 'inline-block';
+            navBadge.textContent = `${totalHoursFormatted}h`;
+          } else {
+            navBadge.style.display = 'none';
+          }
+        }
+
+        populateOvertimeSpecialistFilter();
+        filterOvertimeTable();
+      } catch (err) {
+        console.error('Error cargando horas extras:', err);
+        if (tbody) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" style="text-align:center;padding:24px;color:var(--red)">
+                Error al cargar registros de horas extras: ${escapeHtml(err.message)}
+              </td>
+            </tr>
+          `;
+        }
+      }
+    }
+
+    function populateOvertimeSpecialistFilter() {
+      const select = document.getElementById('fSpecialistOvertime');
+      if (!select) return;
+      const currentVal = select.value;
+      const specs = new Set();
+      (ALL_OVERTIMES || []).forEach(r => {
+        if (r.specialist_name) specs.add(r.specialist_name);
+      });
+      ['Adonis Lozada', 'Juan Fernández', 'Yoxaide Jiménez', 'Luis Acosta'].forEach(s => specs.add(s));
+
+      const sorted = Array.from(specs).sort((a, b) => a.localeCompare(b));
+      select.innerHTML = '<option value="">Todo el Equipo</option>' + sorted.map(s => `
+        <option value="${escapeHtml(s)}">${escapeHtml(s)}</option>
+      `).join('');
+      if (currentVal && specs.has(currentVal)) {
+        select.value = currentVal;
+      }
+    }
+
+    function filterOvertimeTable() {
+      const sInput = document.getElementById('fSearchOvertime');
+      const specSelect = document.getElementById('fSpecialistOvertime');
+      const catSelect = document.getElementById('fCategoryOvertime');
+
+      const q = normalizeSearchText(sInput ? sInput.value : '');
+      const specFilter = specSelect ? specSelect.value.trim().toLowerCase() : '';
+      const catFilter = catSelect ? catSelect.value.trim().toLowerCase() : '';
+
+      const filtered = (ALL_OVERTIMES || []).filter(r => {
+        if (specFilter && (r.specialist_name || '').toLowerCase() !== specFilter) {
+          return false;
+        }
+        if (catFilter && (r.category || '').toLowerCase() !== catFilter) {
+          return false;
+        }
+        if (q) {
+          const spec = normalizeSearchText(r.specialist_name);
+          const desc = normalizeSearchText(r.description);
+          const cat = normalizeSearchText(r.category);
+          const proj = normalizeSearchText(r.project_name);
+          const createdBy = normalizeSearchText(r.created_by);
+          return spec.includes(q) || desc.includes(q) || cat.includes(q) || proj.includes(q) || createdBy.includes(q);
+        }
+        return true;
+      });
+
+      CURRENT_FILTERED_OVERTIMES = filtered;
+      OVERTIME_CURRENT_PAGE = 1;
+      applyOvertimePagination();
+    }
+
+    function setOvertimePage(page) {
+      OVERTIME_CURRENT_PAGE = page;
+      applyOvertimePagination();
+    }
+
+    function applyOvertimePagination() {
+      const list = CURRENT_FILTERED_OVERTIMES || [];
+      const total = list.length;
+      if (!total) {
+        renderOvertimeTable([]);
+        renderPaginationControls('overtimePagination', 1, 0, PAGE_SIZE_DEFAULT, 'setOvertimePage');
+        return;
+      }
+      const totalPages = Math.ceil(total / PAGE_SIZE_DEFAULT) || 1;
+      if (OVERTIME_CURRENT_PAGE > totalPages) OVERTIME_CURRENT_PAGE = totalPages;
+      if (OVERTIME_CURRENT_PAGE < 1) OVERTIME_CURRENT_PAGE = 1;
+
+      const start = (OVERTIME_CURRENT_PAGE - 1) * PAGE_SIZE_DEFAULT;
+      const pageSlice = list.slice(start, start + PAGE_SIZE_DEFAULT);
+      renderOvertimeTable(pageSlice);
+      renderPaginationControls('overtimePagination', OVERTIME_CURRENT_PAGE, total, PAGE_SIZE_DEFAULT, 'setOvertimePage');
+    }
+
+    function renderOvertimeTable(list) {
+      const tbody = document.getElementById('tblOvertimeBody');
+      if (!tbody) return;
+
+      if (!list || !list.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">
+              <div>No se encontraron registros de horas extras con los filtros seleccionados.</div>
+              <small style="margin-top:6px;display:inline-block">Haz clic en <strong>"+ Añadir Hora Extra"</strong> para registrar una nueva jornada extraordinaria.</small>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = list.map(r => {
+        const startStr = r.start_time_caracas || r.start_time || '—';
+        const endStr = r.end_time_caracas || r.end_time || '—';
+        const durBadge = `<span class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap">${escapeHtml(r.duration_human)} (${r.duration_hours}h)</span>`;
+        const catBadge = `<span class="badge" style="background:rgba(255,255,255,0.06);color:var(--text);font-size:10.5px;padding:2px 6px">${escapeHtml(r.category || 'Infraestructura')}</span>`;
+        const projBadge = r.project_name && r.project_name !== 'General' ? `<span class="badge" style="background:rgba(79,140,255,0.12);color:var(--accent);font-size:10px;padding:2px 5px">${escapeHtml(r.project_name)}</span>` : '';
+
+        const canEdit = r.can_edit;
+        const canDelete = r.can_delete;
+
+        return `
+          <tr id="ot-row-${r.id}">
+            <td style="font-weight:700;color:var(--text)">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span>${escapeHtml(r.specialist_name)}</span>
+                <span class="badge" style="background:rgba(167,139,250,0.15);color:#a78bfa;font-size:9.5px;padding:1px 5px">${escapeHtml(r.specialist_role || 'Especialista')}</span>
+              </div>
+            </td>
+            <td>
+              <div style="font-size:11.5px;color:var(--text);white-space:nowrap">
+                <div style="color:var(--muted)">Desde: <span style="color:var(--text);font-weight:600">${escapeHtml(startStr)}</span></div>
+                <div style="color:var(--muted)">Hasta: <span style="color:var(--text);font-weight:600">${escapeHtml(endStr)}</span></div>
+              </div>
+            </td>
+            <td>${durBadge}</td>
+            <td style="max-width:320px;font-size:12px;color:var(--text);line-height:1.4">
+              ${escapeHtml(r.description)}
+            </td>
+            <td>
+              <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+                ${catBadge}
+                ${projBadge}
+              </div>
+            </td>
+            <td style="font-size:11px;color:var(--muted)">
+              <div style="font-weight:600;color:var(--text)">${escapeHtml(r.created_by)}</div>
+              <div>${r.created_at ? formatDate(r.created_at, true) : '—'}</div>
+            </td>
+            <td style="text-align:center">
+              <div style="display:inline-flex;align-items:center;gap:6px">
+                ${canEdit ? `
+                  <button type="button" class="btn" onclick="openOvertimeModal(${r.id})"
+                    style="padding:5px 8px;font-size:11px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:var(--text);border-radius:6px;cursor:pointer"
+                    title="Editar registro">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </button>
+                ` : ''}
+                ${canDelete ? `
+                  <button type="button" class="btn" onclick="deleteOvertimeRecord(${r.id})"
+                    style="padding:5px 8px;font-size:11px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);color:var(--red);border-radius:6px;cursor:pointer"
+                    title="Eliminar registro">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function calculateOvertimeDurationPreview() {
+      const startInput = document.getElementById('otStartTime');
+      const endInput = document.getElementById('otEndTime');
+      const previewBox = document.getElementById('otDurationPreview');
+      const submitBtn = document.getElementById('btnSubmitOvertime');
+      if (!previewBox || !submitBtn) return;
+
+      const startVal = startInput ? startInput.value : '';
+      const endVal = endInput ? endInput.value : '';
+
+      if (!startVal || !endVal) {
+        previewBox.innerHTML = '<span class="muted" style="font-size:12px">Selecciona fecha y hora de inicio y fin para calcular la duración automáticamente.</span>';
+        submitBtn.disabled = true;
+        return;
+      }
+
+      const startDt = new Date(startVal);
+      const endDt = new Date(endVal);
+      const diffMs = endDt.getTime() - startDt.getTime();
+
+      if (isNaN(diffMs) || diffMs <= 0) {
+        previewBox.innerHTML = '<div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:8px 12px;color:var(--red);font-size:12px;font-weight:700">La fecha y hora de fin debe ser posterior a la de inicio.</div>';
+        submitBtn.disabled = true;
+        return;
+      }
+
+      const totalMins = Math.floor(diffMs / (1000 * 60));
+      const hours = Math.floor(totalMins / 60);
+      const mins = totalMins % 60;
+      const decHours = (totalMins / 60).toFixed(2);
+      const humanStr = hours > 0 ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`) : `${mins}m`;
+
+      previewBox.innerHTML = `
+        <div style="background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);border-radius:8px;padding:8px 12px;color:#38bdf8;font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:8px">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Duración calculada: ${escapeHtml(humanStr)} (${decHours} hrs)</span>
+        </div>
+      `;
+      submitBtn.disabled = false;
+    }
+
+    function openOvertimeModal(editId = null) {
+      const isEditing = editId !== null;
+      let record = null;
+      if (isEditing) {
+        record = (ALL_OVERTIMES || []).find(r => r.id === editId);
+        if (!record) {
+          showToast('Error', 'Registro de hora extra no encontrado.', 'danger');
+          return;
+        }
+      }
+
+      const isCoord = isCoordinator();
+      const modalContent = document.getElementById('modalContent');
+      if (!modalContent) return;
+
+      const currentUserFullName = CURRENT_USER ? (CURRENT_USER.full_name || CURRENT_USER.username) : 'Especialista';
+      const specialistValue = isEditing ? (record.specialist_name || '') : currentUserFullName;
+
+      const teamMembers = ['Adonis Lozada', 'Juan Fernández', 'Yoxaide Jiménez', 'Luis Acosta'];
+      if (!teamMembers.includes(currentUserFullName)) teamMembers.push(currentUserFullName);
+
+      let specialistFieldHtml = '';
+      if (isCoord) {
+        specialistFieldHtml = `
+          <select id="otSpecialistSelect" style="width:100%;padding:9px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text);font-size:13px;outline:none">
+            ${teamMembers.map(m => `<option value="${escapeHtml(m)}" ${m === specialistValue ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}
+          </select>
+        `;
+      } else {
+        specialistFieldHtml = `
+          <input type="text" id="otSpecialistSelect" value="${escapeHtml(specialistValue)}" disabled
+            style="width:100%;padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--muted);font-size:13px;outline:none" />
+        `;
+      }
+
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const defaultStart = `${yyyy}-${mm}-${dd}T18:00`;
+      const defaultEnd = `${yyyy}-${mm}-${dd}T20:30`;
+
+      function formatForInput(isoStr, def) {
+        if (!isoStr) return def;
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return def;
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const h = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        return `${y}-${m}-${day}T${h}:${min}`;
+      }
+
+      const startVal = isEditing ? formatForInput(record.start_time, defaultStart) : defaultStart;
+      const endVal = isEditing ? formatForInput(record.end_time, defaultEnd) : defaultEnd;
+      const currentCat = isEditing ? (record.category || 'Infraestructura') : 'Infraestructura';
+      const currentProj = isEditing ? (record.project_name || 'General') : 'General';
+      const currentDesc = isEditing ? (record.description || '') : '';
+
+      modalContent.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:12px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:36px;height:36px;border-radius:10px;background:rgba(56,189,248,0.15);display:flex;align-items:center;justify-content:center;color:#38bdf8">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <div>
+              <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text)">${isEditing ? 'Editar Hora Extra' : 'Registrar Hora Extra'}</h3>
+              <span class="muted" style="font-size:11.5px">Jornada técnica extraordinaria con cálculo cronológico exacto</span>
+            </div>
+          </div>
+          <button type="button" class="btn-close" onclick="closeModal()" title="Cerrar modal">&times;</button>
+        </div>
+
+        <form id="formOvertime" onsubmit="event.preventDefault(); submitOvertimeForm(${editId});" style="display:flex;flex-direction:column;gap:14px">
+          <div>
+            <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">Especialista / Responsable</label>
+            ${specialistFieldHtml}
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">Fecha y Hora de Inicio</label>
+              <input type="datetime-local" id="otStartTime" required value="${startVal}" oninput="calculateOvertimeDurationPreview()"
+                style="width:100%;padding:9px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text);font-size:13px;outline:none" />
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">Fecha y Hora de Fin</label>
+              <input type="datetime-local" id="otEndTime" required value="${endVal}" oninput="calculateOvertimeDurationPreview()"
+                style="width:100%;padding:9px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text);font-size:13px;outline:none" />
+            </div>
+          </div>
+
+          <div id="otDurationPreview">
+            <!-- Calculado reactivamente -->
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">Categoría Técnica</label>
+              <select id="otCategorySelect" style="width:100%;padding:9px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text);font-size:13px;outline:none">
+                ${['Infraestructura', 'PostgreSQL', 'Antivirus', 'Servidores', 'CPU', 'RAM', 'Disco', 'Servicios'].map(c => `
+                  <option value="${c}" ${c === currentCat ? 'selected' : ''}>${c}</option>
+                `).join('')}
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">Proyecto / Entidad</label>
+              <input type="text" id="otProjectInput" value="${escapeHtml(currentProj)}" placeholder="ej. SIMF, SGLPAR, MicroFilms..."
+                style="width:100%;padding:9px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text);font-size:13px;outline:none" />
+            </div>
+          </div>
+
+          <div>
+            <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">Descripción de la Actividad Realizada</label>
+            <textarea id="otDescriptionInput" required rows="3" placeholder="Describe detalladamente las tareas, soporte, resolución o guardia técnica realizada..."
+              style="width:100%;padding:10px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text);font-size:12.5px;outline:none;resize:vertical">${escapeHtml(currentDesc)}</textarea>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px">
+            <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+            <button type="submit" class="btn primary" id="btnSubmitOvertime"
+              style="background:linear-gradient(135deg, #0284c7, #0369a1);color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span>${isEditing ? 'Guardar Cambios' : 'Registrar Hora Extra'}</span>
+            </button>
+          </div>
+        </form>
+      `;
+
+      document.getElementById('modalBg').classList.add('show');
+      calculateOvertimeDurationPreview();
+    }
+
+    async function submitOvertimeForm(editId = null) {
+      const isEditing = editId !== null;
+      const specInput = document.getElementById('otSpecialistSelect');
+      const startInput = document.getElementById('otStartTime');
+      const endInput = document.getElementById('otEndTime');
+      const catInput = document.getElementById('otCategorySelect');
+      const projInput = document.getElementById('otProjectInput');
+      const descInput = document.getElementById('otDescriptionInput');
+      const btn = document.getElementById('btnSubmitOvertime');
+
+      const specialist_name = specInput ? specInput.value.trim() : '';
+      const start_time = startInput ? startInput.value : '';
+      const end_time = endInput ? endInput.value : '';
+      const category = catInput ? catInput.value : 'Infraestructura';
+      const project_name = projInput ? projInput.value.trim() : 'General';
+      const description = descInput ? descInput.value.trim() : '';
+
+      if (!start_time || !end_time) {
+        alert('Debes indicar fecha y hora de inicio y fin.');
+        return;
+      }
+
+      if (new Date(end_time).getTime() <= new Date(start_time).getTime()) {
+        alert('La fecha y hora de fin debe ser estrictamente posterior al inicio.');
+        return;
+      }
+
+      if (!description || description.length < 5) {
+        alert('La descripción debe contener al menos 5 caracteres.');
+        if (descInput) descInput.focus();
+        return;
+      }
+
+      const payload = {
+        specialist_name,
+        start_time,
+        end_time,
+        category,
+        project_name: project_name || 'General',
+        description
+      };
+
+      const origBtnHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Guardando...</span>';
+      }
+
+      try {
+        const endpoint = isEditing ? `${API_URL}/overtimes/${editId}` : `${API_URL}/overtimes`;
+        const method = isEditing ? 'PUT' : 'POST';
+
+        const res = await fetch(endpoint, {
+          method,
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || `Error ${res.status}`);
+        }
+
+        closeModal();
+        await loadOvertimes();
+        showToast(
+          isEditing ? 'Hora Extra Actualizada' : 'Hora Extra Registrada',
+          `Se registraron ${data.duration_human} (${data.duration_hours}h) para ${data.specialist_name}.`,
+          'success'
+        );
+      } catch (err) {
+        console.error('Error guardando hora extra:', err);
+        alert(`No se pudo guardar la hora extra: ${err.message}`);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origBtnHtml;
+        }
+      }
+    }
+
+    async function deleteOvertimeRecord(id) {
+      const rec = (ALL_OVERTIMES || []).find(r => r.id === id);
+      const title = rec ? `${rec.duration_human} de ${rec.specialist_name}` : `#${id}`;
+      if (!confirm(`¿Estás seguro de que deseas eliminar este registro de hora extra (${title})?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/overtimes/${id}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `Error ${res.status}`);
+        }
+        await loadOvertimes();
+        showToast('Hora Extra Eliminada', `El registro (${title}) fue eliminado exitosamente.`, 'success');
+      } catch (err) {
+        console.error('Error eliminando hora extra:', err);
+        alert(`No se pudo eliminar el registro: ${err.message}`);
+      }
+    }
+
+    async function loadAndRenderOvertimeAnalytics() {
+      const container = document.getElementById('chartOvertimeMatrix');
+      const infoEl = document.getElementById('lblOvertimeMatrixInfo');
+      if (!container) return;
+
+      try {
+        const params = new URLSearchParams();
+        if (REPORT_FILTER_STATE.startDate) params.set('start_date', REPORT_FILTER_STATE.startDate);
+        if (REPORT_FILTER_STATE.endDate) params.set('end_date', REPORT_FILTER_STATE.endDate);
+        if (REPORT_FILTER_STATE.specialist) params.set('specialist', REPORT_FILTER_STATE.specialist);
+
+        const res = await fetch(`${API_URL}/overtimes/analytics?${params.toString()}`, {
+          headers: getAuthHeaders()
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderOvertimeHeatmap(data);
+      } catch (e) {
+        console.error('Error cargando analítica de horas extras:', e);
+        if (container) {
+          container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Sin datos de horas extras para el período seleccionado.</div>';
+        }
+      }
+    }
+
+    function renderOvertimeHeatmap(data) {
+      const container = document.getElementById('chartOvertimeMatrix');
+      const infoEl = document.getElementById('lblOvertimeMatrixInfo');
+      if (!container) return;
+
+      const hm = data ? data.heatmap_matrix : null;
+      if (!hm || !hm.specialists || !hm.specialists.length || !hm.categories || !hm.categories.length) {
+        container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Sin horas extras registradas en este período.</div>';
+        if (infoEl) infoEl.textContent = '—';
+        return;
+      }
+
+      const specialists = hm.specialists;
+      const categories = hm.categories;
+      const cells = hm.cells || {};
+      const rowTotals = hm.row_totals || {};
+      const colTotals = hm.col_totals || {};
+      const grandTotal = hm.grand_total_hours || 0;
+
+      const maxVal = Math.max(...Object.values(cells), 1);
+      if (infoEl) {
+        infoEl.textContent = `${specialists.length} integrante${specialists.length === 1 ? '' : 's'} · ${categories.length} categoría${categories.length === 1 ? '' : 's'} · ${grandTotal}h acumuladas`;
+      }
+
+      const thStyle = 'padding:6px 8px;font-size:11px;font-weight:700;color:var(--muted);text-align:center;white-space:nowrap';
+      const headHtml = categories.map(cat => `
+        <th style="${thStyle};cursor:pointer" onclick="drilldownOvertime('', '${escapeHtml(cat)}')" title="Filtrar por ${escapeHtml(cat)}">
+          <span style="display:inline-flex;align-items:center;gap:5px">
+            <span style="width:8px;height:8px;border-radius:2px;background:${RPT_CAT_COLORS[cat] || '#38bdf8'}"></span>${escapeHtml(cat)}
+          </span>
+        </th>
+      `).join('');
+
+      const bodyHtml = specialists.map(spec => {
+        const cellsHtml = categories.map(cat => {
+          const h = cells[`${spec}\u0000${cat}`] || 0;
+          if (!h) {
+            return `<td style="text-align:center;padding:0;height:34px;min-width:62px;border-radius:6px;background:rgba(255,255,255,0.015);color:rgba(255,255,255,0.15);font-size:11px">·</td>`;
+          }
+          const alpha = 0.16 + 0.68 * (h / maxVal);
+          const strong = alpha > 0.45;
+          const tip = `${spec} · ${cat}: ${h}h extras`;
+          return `
+            <td onclick="drilldownOvertime('${escapeHtml(spec)}', '${escapeHtml(cat)}')" title="${escapeHtml(tip)}"
+              style="cursor:pointer;text-align:center;padding:0;height:34px;min-width:62px;border-radius:6px;background:rgba(56,189,248,${alpha.toFixed(2)});color:${strong ? '#ffffff' : 'var(--text)'};font-size:12px;font-weight:800;position:relative;transition:transform .12s"
+              onmouseover="this.style.transform='scale(1.06)'" onmouseout="this.style.transform='none'">
+              ${h}h
+            </td>
+          `;
+        }).join('');
+
+        const specTotal = rowTotals[spec] || 0;
+        return `
+          <tr>
+            <th onclick="drilldownOvertime('${escapeHtml(spec)}', '')" title="Filtrar horas de ${escapeHtml(spec)}"
+              style="cursor:pointer;text-align:left;padding:6px 10px 6px 4px;font-size:12px;font-weight:700;white-space:nowrap;color:#38bdf8;position:sticky;left:0;background:var(--bg);z-index:1">
+              ${escapeHtml(spec)}
+            </th>
+            ${cellsHtml}
+            <td style="text-align:center;padding:0 8px;font-size:12px;font-weight:800;color:var(--text);border-left:1px solid rgba(255,255,255,0.08)">${specTotal}h</td>
+          </tr>
+        `;
+      }).join('');
+
+      const footHtml = `
+        <tr>
+          <th style="text-align:left;padding:8px 10px 4px 4px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;position:sticky;left:0;background:var(--bg);z-index:1">Total</th>
+          ${categories.map(cat => `<td style="text-align:center;padding-top:8px;font-size:12px;font-weight:800;color:var(--text);border-top:1px solid rgba(255,255,255,0.08)">${colTotals[cat] || 0}h</td>`).join('')}
+          <td style="text-align:center;padding:8px 8px 0 8px;font-size:12.5px;font-weight:900;color:var(--accent);border-top:1px solid rgba(255,255,255,0.08);border-left:1px solid rgba(255,255,255,0.08)">${grandTotal}h</td>
+        </tr>
+      `;
+
+      container.innerHTML = `
+        <div style="overflow-x:auto">
+          <table style="border-collapse:separate;border-spacing:4px;width:100%">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:6px 8px;font-size:11px;font-weight:700;color:var(--muted);min-width:160px;position:sticky;left:0;background:var(--bg);z-index:2">Especialista \\ Categoría</th>
+                ${headHtml}
+                <th style="${thStyle};border-left:1px solid rgba(255,255,255,0.08)">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyHtml}
+            </tbody>
+            <tfoot>
+              ${footHtml}
+            </tfoot>
+          </table>
+        </div>
+      `;
+    }
+
+    function drilldownOvertime(spec, cat) {
+      switchView('horas_extras');
+      setTimeout(() => {
+        if (spec) {
+          const selSpec = document.getElementById('fSpecialistOvertime');
+          if (selSpec) selSpec.value = spec;
+        }
+        if (cat) {
+          const selCat = document.getElementById('fCategoryOvertime');
+          if (selCat) selCat.value = cat;
+        }
+        filterOvertimeTable();
+      }, 50);
     }
 
     // Atajos de teclado para Modo TV
