@@ -2757,11 +2757,12 @@
                 <th>Estado</th>
                 <th>Tiempo de Atención</th>
                 <th>Fecha Escalado</th>
+                <th style="text-align:center;width:48px">Acción</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td colspan="9" style="text-align:center;padding:20px" class="muted">Cargando tickets en vivo...</td>
+                <td colspan="10" style="text-align:center;padding:20px" class="muted">Cargando tickets en vivo...</td>
               </tr>
             </tbody>
           </table>
@@ -2807,6 +2808,7 @@
                 <th>Prioridad</th>
                 <th>Tiempo de Atención</th>
                 <th>Fecha Escalada</th>
+                <th style="text-align:center;width:48px">Acción</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -3728,7 +3730,7 @@
       // 1. Tabla Resumen
       const tbody = document.querySelector('#tblItems tbody');
       if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px" class="muted">Sin tickets que coincidan con los filtros.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px" class="muted">Sin tickets que coincidan con los filtros.</td></tr>';
       } else {
         tbody.innerHTML = list.map(it => `
       <tr class="click ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new-row' : ''}" onclick="openModal(${it.id})">
@@ -3760,6 +3762,14 @@
         <td class="muted">
           <div>${formatDate(it.escalated_at || it.received_at || it.created_at)}</div>
         </td>
+        <td style="text-align:center" onclick="event.stopPropagation()">
+          ${isCoordinator() ? `
+          <button type="button" class="btn" onclick="event.stopPropagation(); deleteItem(${it.id})"
+            style="padding:5px 7px;font-size:11px;color:#f87171;background:rgba(255,93,93,0.1);border-color:rgba(255,93,93,0.25);display:inline-flex;align-items:center;justify-content:center"
+            title="Eliminar esta actividad permanentemente">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+          </button>` : ''}
+        </td>
       </tr>
     `).join('');
       }
@@ -3779,8 +3789,16 @@
             <td><span class="prio prio-${it.priority}">${it.priority}</span></td>
             <td><div style="font-weight:600;font-size:12px">${getItemAttentionTime(it)}</div></td>
             <td class="muted">${formatDate(it.escalated_at || it.received_at || it.created_at)}</td>
+            <td style="text-align:center" onclick="event.stopPropagation()">
+              ${isCoordinator() ? `
+              <button type="button" class="btn" onclick="event.stopPropagation(); deleteItem(${it.id})"
+                style="padding:5px 7px;font-size:11px;color:#f87171;background:rgba(255,93,93,0.1);border-color:rgba(255,93,93,0.25);display:inline-flex;align-items:center;justify-content:center"
+                title="Eliminar esta actividad permanentemente">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              </button>` : ''}
+            </td>
           </tr>
-        `).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:20px">Sin actividades en espera.</td></tr>';
+        `).join('') || '<tr><td colspan="7" class="muted" style="text-align:center;padding:20px">Sin actividades en espera.</td></tr>';
       }
       const tblOverdueTbody = document.querySelector('#tblOverdue tbody');
       if (tblOverdueTbody) {
