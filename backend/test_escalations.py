@@ -1434,6 +1434,62 @@ class TestEscalationFeatures(unittest.TestCase):
         )
         self.assertEqual(del_by_coord.status_code, 200)
 
+    def test_user_profile_endpoints(self):
+        """Verifica que /api/users/me y cambio de clave funcionen con tolerancia a acentos y username."""
+        db = TestingSessionLocal()
+        try:
+            # Asegurar usuario Juan Fernandez con acento en BD
+            db.query(User).filter(User.username == "j.fernandez").delete()
+            juan = User(
+                full_name="Juan Fernández",
+                username="j.fernandez",
+                email="j.fernandez@sycom.com.ve",
+                role="especialista",
+                password_hash=hash_password("clave123"),
+                phone="+58 412 1112233",
+                job_title="Especialista Linux",
+                bio="Administrador de sistemas"
+            )
+            db.add(juan)
+            db.commit()
+        finally:
+            db.close()
+
+        # 1. GET /api/users/me con header sin acento y username query
+        res = self.client.get(
+            "/api/users/me?username=j.fernandez",
+            headers={"X-User-Name": "Juan Fernandez", "X-User-Role": "especialista"}
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["username"], "j.fernandez")
+        self.assertEqual(data["full_name"], "Juan Fernández")
+
+        # 2. PUT /api/users/me para actualizar bio y foto
+        put_res = self.client.put(
+            "/api/users/me?username=j.fernandez",
+            headers={"X-User-Name": "Juan Fernandez", "X-User-Role": "especialista"},
+            json={
+                "full_name": "Juan Fernández Modificado",
+                "phone": "+58 414 9998877",
+                "bio": "Especialista Cloud & DB",
+                "avatar_data": "data:image/jpeg;base64,samplephoto"
+            }
+        )
+        self.assertEqual(put_res.status_code, 200)
+        updated = put_res.json()["user"]
+        self.assertEqual(updated["phone"], "+58 414 9998877")
+        self.assertEqual(updated["avatar_data"], "data:image/jpeg;base64,samplephoto")
+
+        # 3. POST /api/auth/change-password
+        pw_res = self.client.post("/api/auth/change-password", json={
+            "username": "j.fernandez",
+            "old_password": "clave123",
+            "new_password": "nuevaClave456"
+        })
+        self.assertEqual(pw_res.status_code, 200)
+        self.assertEqual(pw_res.json()["status"], "ok")
+
 
 if __name__ == "__main__":
     unittest.main()

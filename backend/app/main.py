@@ -877,24 +877,32 @@ def get_auth_users(db: Session = Depends(get_db)):
     users = db.query(User).filter(User.is_active == 1).all()
     return [_serialize_user(u) for u in users]
 
-@app.get("/api/users/me")
-def get_current_user_profile(
-    db: Session = Depends(get_db),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    username: str | None = Query(None)
-):
-    """Consulta el perfil completo del usuario autenticado."""
-    target = None
-    if x_user_name:
-        try:
-            target = urllib.parse.unquote(x_user_name).strip()
-        except Exception:
-            target = x_user_name.strip()
-    if not target and username:
-        target = username.strip()
-    if not target:
-        raise HTTPException(status_code=400, detail="Identificador de usuario requerido (X-User-Name o username).")
+def find_user_by_identifier(
+    db: Session,
+    target_raw: str | None = None,
+    username_param: str | None = None,
+    x_user_username: str | None = None
+) -> User | None:
+    """Busca un usuario por username, email o nombre completo, con tolerancia a acentos y codificación URL."""
+    # 1. Búsqueda prioritaria por username explícito (parámetro query o header)
+    u_candidate = username_param or x_user_username
+    if u_candidate and str(u_candidate).strip():
+        u_clean = decode_header_val(u_candidate).strip()
+        user = db.query(User).filter(User.username.ilike(u_clean)).first()
+        if user:
+            return user
+        u_norm = strip_accents_str(u_clean)
+        for u in db.query(User).all():
+            if strip_accents_str(u.username) == u_norm:
+                return u
 
+    if not target_raw:
+        return None
+    target = decode_header_val(target_raw).strip()
+    if not target:
+        return None
+
+    # 2. Búsqueda directa SQL
     user = db.query(User).filter(
         or_(
             User.username.ilike(target),
@@ -902,37 +910,55 @@ def get_current_user_profile(
             User.full_name.ilike(target)
         )
     ).first()
+    if user:
+        return user
+
+    # 3. Búsqueda en memoria con normalización de acentos (para SQLite y variaciones)
+    target_norm = strip_accents_str(target)
+    all_users = db.query(User).all()
+    for u in all_users:
+        if strip_accents_str(u.username) == target_norm:
+            return u
+        if strip_accents_str(u.full_name) == target_norm:
+            return u
+        if u.email and strip_accents_str(u.email) == target_norm:
+            return u
+
+    # 4. Coincidencia parcial si target_norm contiene o está contenido en username o full_name
+    for u in all_users:
+        u_norm = strip_accents_str(u.username)
+        fn_norm = strip_accents_str(u.full_name)
+        if (target_norm and target_norm in u_norm) or (fn_norm and target_norm and (target_norm in fn_norm or fn_norm in target_norm)):
+            return u
+
+    return None
+
+
+@app.get("/api/users/me")
+def get_current_user_profile(
+    db: Session = Depends(get_db),
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    x_user_username: str | None = Header(None, alias="X-User-Username"),
+    username: str | None = Query(None)
+):
+    """Consulta el perfil completo del usuario autenticado."""
+    user = find_user_by_identifier(db, target_raw=x_user_name, username_param=username, x_user_username=x_user_username)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
     return _serialize_user(user)
+
 
 @app.put("/api/users/me")
 def update_current_user_profile(
     req: UpdateUserProfileRequest,
     db: Session = Depends(get_db),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
+    x_user_username: str | None = Header(None, alias="X-User-Username"),
     username: str | None = Query(None)
 ):
     """Actualiza los datos personales y foto de perfil del usuario autenticado."""
-    target = None
-    if x_user_name:
-        try:
-            target = urllib.parse.unquote(x_user_name).strip()
-        except Exception:
-            target = x_user_name.strip()
-    if not target and username:
-        target = username.strip()
-    if not target:
-        raise HTTPException(status_code=400, detail="Identificador de usuario requerido (X-User-Name o username).")
-
-    user = db.query(User).filter(
-        or_(
-            User.username.ilike(target),
-            User.email.ilike(target),
-            User.full_name.ilike(target)
-        )
-    ).first()
+    user = find_user_by_identifier(db, target_raw=x_user_name, username_param=username, x_user_username=x_user_username)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
 
@@ -959,16 +985,11 @@ def update_current_user_profile(
         "user": _serialize_user(user)
     }
 
+
 @app.post("/api/auth/change-password")
 def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
     u_str = req.username.strip()
-    user = db.query(User).filter(
-        or_(
-            User.username.ilike(u_str),
-            User.email.ilike(u_str),
-            User.full_name.ilike(u_str)
-        )
-    ).first()
+    user = find_user_by_identifier(db, target_raw=u_str, username_param=u_str, x_user_username=u_str)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
     if not verify_password(req.old_password, user.password_hash):

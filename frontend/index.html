@@ -1419,29 +1419,89 @@
       color: var(--accent);
     }
 
-    .form-input {
+    .form-input,
+    .modal input[type="text"],
+    .modal input[type="email"],
+    .modal input[type="tel"],
+    .modal input[type="password"],
+    .modal input[type="url"],
+    .modal input[type="datetime-local"],
+    .modal textarea,
+    .modal select,
+    .profile-card input[type="text"],
+    .profile-card input[type="email"],
+    .profile-card input[type="tel"],
+    .profile-card input[type="password"],
+    .profile-card textarea,
+    .profile-card select {
       width: 100%;
-      padding: 9px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: rgba(255, 255, 255, .05);
+      padding: 10px 14px;
+      border-radius: 9px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
       color: var(--text);
       font-size: 13px;
+      font-family: inherit;
       outline: none;
-      transition: all .15s ease;
+      transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
       box-sizing: border-box;
     }
 
-    .form-input:focus {
+    .form-input:focus,
+    .modal input:focus,
+    .modal textarea:focus,
+    .modal select:focus,
+    .profile-card input:focus,
+    .profile-card textarea:focus,
+    .profile-card select:focus {
       border-color: var(--accent);
-      background: rgba(255, 255, 255, .09);
-      box-shadow: 0 0 0 2px rgba(79, 140, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.22);
     }
 
-    body.light .form-input {
-      background: #fff;
-      border-color: rgba(0, 0, 0, .15);
+    .form-input:disabled,
+    .modal input:disabled,
+    .modal textarea:disabled,
+    .profile-card input:disabled,
+    .profile-card textarea:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      background: rgba(255, 255, 255, 0.02);
+      border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    body.light .form-input,
+    body.light .modal input,
+    body.light .modal textarea,
+    body.light .modal select,
+    body.light .profile-card input,
+    body.light .profile-card textarea,
+    body.light .profile-card select {
+      background: #ffffff;
+      border-color: rgba(0, 0, 0, 0.15);
       color: #1e293b;
+    }
+
+    body.light .form-input:focus,
+    body.light .modal input:focus,
+    body.light .modal textarea:focus,
+    body.light .modal select:focus,
+    body.light .profile-card input:focus,
+    body.light .profile-card textarea:focus,
+    body.light .profile-card select:focus {
+      border-color: var(--accent);
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.18);
+    }
+
+    body.light .form-input:disabled,
+    body.light .modal input:disabled,
+    body.light .modal textarea:disabled,
+    body.light .profile-card input:disabled,
+    body.light .profile-card textarea:disabled {
+      background: #f1f5f9;
+      border-color: rgba(0, 0, 0, 0.08);
+      color: #64748b;
     }
 
     .create-platform-toggle {
@@ -3255,6 +3315,11 @@
         </div>
       </div>
     </div>
+
+    <!-- Vista de Perfil de Usuario -->
+    <div class="view" id="v-perfil">
+      <div id="vPerfilContainer"></div>
+    </div>
   </main>
 
   <!-- Modal Detalle -->
@@ -3365,6 +3430,7 @@
         if (CURRENT_USER.role) headers['X-User-Role'] = encodeURIComponent(CURRENT_USER.role);
         if (CURRENT_USER.full_name) headers['X-User-Name'] = encodeURIComponent(CURRENT_USER.full_name);
         else if (CURRENT_USER.username) headers['X-User-Name'] = encodeURIComponent(CURRENT_USER.username);
+        if (CURRENT_USER.username) headers['X-User-Username'] = encodeURIComponent(CURRENT_USER.username);
       }
       return headers;
     }
@@ -5317,15 +5383,19 @@
       const kpisEl = document.getElementById('kpisContainer');
       const subTitleEl = document.querySelector('header .sub');
 
-      if (viewName === 'reportes' || viewName === 'escalamientos') {
+      if (viewName === 'reportes' || viewName === 'escalamientos' || viewName === 'perfil') {
         if (filtersEl) filtersEl.style.display = 'none';
         if (kpisEl) kpisEl.style.display = 'none';
         if (subTitleEl) {
-          subTitleEl.textContent = (viewName === 'reportes')
-            ? (CURRENT_REPORTS_SUBVIEW === 'analytics'
-                ? 'Tablero de indicadores y gráficos de rendimiento de la gestión'
-                : 'Historial y generación de informes ejecutivos consolidados')
-            : 'Base documental y enlaces directos de escalamiento (Google Docs)';
+          if (viewName === 'reportes') {
+            subTitleEl.textContent = (CURRENT_REPORTS_SUBVIEW === 'analytics')
+              ? 'Tablero de indicadores y gráficos de rendimiento de la gestión'
+              : 'Historial y generación de informes ejecutivos consolidados';
+          } else if (viewName === 'escalamientos') {
+            subTitleEl.textContent = 'Base documental y enlaces directos de escalamiento (Google Docs)';
+          } else if (viewName === 'perfil') {
+            subTitleEl.textContent = 'Gestión de perfil personal, foto de usuario y credenciales';
+          }
         }
         if (viewName === 'reportes') {
           if (CURRENT_REPORTS_SUBVIEW === 'analytics') {
@@ -5337,6 +5407,9 @@
         if (viewName === 'escalamientos') {
           loadIbps();
           loadEscalations();
+        }
+        if (viewName === 'perfil') {
+          renderUserProfileView();
         }
       } else {
         if (filtersEl) filtersEl.style.display = 'flex';
@@ -6700,7 +6773,8 @@
     async function fetchCurrentUserProfile() {
       if (!CURRENT_USER) return;
       try {
-        const res = await fetch(`${API_URL}/users/me`, { headers: getAuthHeaders() });
+        const userParam = CURRENT_USER.username ? `?username=${encodeURIComponent(CURRENT_USER.username)}` : '';
+        const res = await fetch(`${API_URL}/users/me${userParam}`, { headers: getAuthHeaders() });
         if (res.ok) {
           const user = await res.json();
           CURRENT_USER = { ...CURRENT_USER, ...user };
@@ -6713,7 +6787,7 @@
     }
 
     // ==========================================
-    // SECCIÓN / MODAL DE USUARIO (PERFIL, FOTO, CLAVE)
+    // SECCIÓN Y MODAL DE USUARIO (PERFIL, FOTO, CLAVE)
     // ==========================================
     let CURRENT_PROFILE_TAB = 'datos'; // 'datos' | 'foto' | 'password'
     let PENDING_AVATAR_DATA = null;
@@ -6737,12 +6811,17 @@
 
     function switchProfileTab(tab) {
       CURRENT_PROFILE_TAB = tab;
-      renderUserProfileModalContent();
+      if (document.getElementById('modalBg')?.classList.contains('show')) {
+        renderUserProfileModalContent();
+      }
+      if (document.getElementById('v-perfil')?.classList.contains('active')) {
+        renderUserProfileView();
+      }
     }
 
     function renderUserProfileModalContent() {
       const modalContent = document.getElementById('modalContent');
-      if (!modalContent) return;
+      if (!modalContent || !CURRENT_USER) return;
 
       const isCoord = isCoordinator();
       const isAnal = isAnalyst();
@@ -6786,67 +6865,144 @@
           </button>
         </div>
 
-        <div id="profileTabBody">
-          ${renderProfileTabContent(previewAvatar, roleName, roleColor, initial, isCoord, isAnal)}
+        <div id="modalProfileTabBody">
+          ${renderProfileTabContent(previewAvatar, roleName, roleColor, initial, isCoord, isAnal, true)}
         </div>
       `;
     }
 
-    function renderProfileTabContent(previewAvatar, roleName, roleColor, initial, isCoord, isAnal) {
+    function renderUserProfileView() {
+      const container = document.getElementById('vPerfilContainer');
+      if (!container) return;
+
+      if (!CURRENT_USER) {
+        container.innerHTML = `
+          <div class="card" style="max-width:680px;margin:24px auto;text-align:center;padding:36px 20px">
+            <h3 style="margin-bottom:8px">Acceso Requerido</h3>
+            <p class="muted">Inicia sesión con tu cuenta de Sycom para consultar y modificar tu perfil.</p>
+            <button class="btn primary" onclick="showLoginModal()" style="margin-top:14px">Iniciar Sesión</button>
+          </div>
+        `;
+        return;
+      }
+
+      const isCoord = isCoordinator();
+      const isAnal = isAnalyst();
+      const roleName = formatRoleName(CURRENT_USER.role);
+      const roleColor = isCoord ? '#10b981' : (isAnal ? '#c084fc' : '#60a5fa');
+      const initial = (CURRENT_USER.full_name || 'U').charAt(0).toUpperCase();
+      const previewAvatar = PENDING_AVATAR_DATA !== null ? PENDING_AVATAR_DATA : CURRENT_USER.avatar_data;
+      const bgGrad = isCoord
+        ? 'linear-gradient(135deg, #10b981, #059669)'
+        : (isAnal ? 'linear-gradient(135deg, #a855f7, #7e22ce)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)');
+
+      container.innerHTML = `
+        <div class="card profile-card" style="max-width:760px;margin:0 auto;padding:26px 28px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.3)">
+          <!-- Cabecera de Perfil con Banner Resumen -->
+          <div style="display:flex;align-items:center;gap:18px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:20px;margin-bottom:20px;flex-wrap:wrap">
+            <div style="position:relative;width:68px;height:68px;border-radius:50%;overflow:hidden;border:2.5px solid var(--accent);background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 14px rgba(79,140,255,0.25)">
+              ${previewAvatar ? `
+                <img src="${previewAvatar}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover;display:block">
+              ` : `
+                <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#fff;background:${bgGrad}">
+                  ${initial}
+                </div>
+              `}
+            </div>
+            <div style="flex:1;min-width:200px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <h2 style="font-size:20px;font-weight:700;margin:0;color:#ffffff">${escapeHtml(CURRENT_USER.full_name || CURRENT_USER.username)}</h2>
+                <span class="badge" style="font-size:11px;font-weight:700;background:rgba(255,255,255,0.06);color:${roleColor};border:1px solid ${roleColor}40">
+                  ${escapeHtml(roleName)}
+                </span>
+              </div>
+              <div class="muted" style="font-size:12.5px;margin-top:4px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+                <span><strong>Usuario:</strong> ${escapeHtml(CURRENT_USER.username || 'N/A')}</span>
+                <span><strong>Email:</strong> ${escapeHtml(CURRENT_USER.email || 'N/A')}</span>
+                ${CURRENT_USER.job_title ? `<span><strong>Cargo:</strong> ${escapeHtml(CURRENT_USER.job_title)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+
+          <!-- Pestañas de Navegación -->
+          <div style="display:flex;gap:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:4px;margin-bottom:20px">
+            <button type="button" onclick="switchProfileTab('datos')" style="flex:1;padding:9px 14px;font-size:12.5px;font-weight:700;border-radius:7px;cursor:pointer;border:none;transition:all .15s;${CURRENT_PROFILE_TAB === 'datos' ? 'background:rgba(79,140,255,0.22);color:var(--accent);box-shadow:0 2px 8px rgba(79,140,255,0.15)' : 'background:transparent;color:var(--muted)'}">
+              Datos Personales
+            </button>
+            <button type="button" onclick="switchProfileTab('foto')" style="flex:1;padding:9px 14px;font-size:12.5px;font-weight:700;border-radius:7px;cursor:pointer;border:none;transition:all .15s;${CURRENT_PROFILE_TAB === 'foto' ? 'background:rgba(79,140,255,0.22);color:var(--accent);box-shadow:0 2px 8px rgba(79,140,255,0.15)' : 'background:transparent;color:var(--muted)'}">
+              Foto de Perfil
+            </button>
+            <button type="button" onclick="switchProfileTab('password')" style="flex:1;padding:9px 14px;font-size:12.5px;font-weight:700;border-radius:7px;cursor:pointer;border:none;transition:all .15s;${CURRENT_PROFILE_TAB === 'password' ? 'background:rgba(79,140,255,0.22);color:var(--accent);box-shadow:0 2px 8px rgba(79,140,255,0.15)' : 'background:transparent;color:var(--muted)'}">
+              Cambiar Contraseña
+            </button>
+          </div>
+
+          <!-- Formulario según pestaña activa -->
+          <div id="viewProfileTabBody">
+            ${renderProfileTabContent(previewAvatar, roleName, roleColor, initial, isCoord, isAnal, false)}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderProfileTabContent(previewAvatar, roleName, roleColor, initial, isCoord, isAnal, isModal = true) {
+      const cancelAction = isModal ? 'closeModal()' : "switchView('kanban')";
+      const cancelLabel = isModal ? 'Cancelar' : 'Volver al Kanban';
+
       if (CURRENT_PROFILE_TAB === 'datos') {
         return `
-          <form id="formProfileData" onsubmit="handleSaveProfileData(event)" style="display:flex;flex-direction:column;gap:12px">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <form class="formProfileData" onsubmit="handleSaveProfileData(event, ${isModal})" style="display:flex;flex-direction:column;gap:14px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
               <div>
-                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Nombre y Apellido</label>
-                <input type="text" id="profFullName" required value="${escapeHtml(CURRENT_USER.full_name || '')}" style="width:100%;box-sizing:border-box">
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Nombre y Apellido</label>
+                <input type="text" name="full_name" class="form-input" required value="${escapeHtml(CURRENT_USER.full_name || '')}" placeholder="Tu nombre y apellido">
               </div>
               <div>
-                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Usuario de Acceso</label>
-                <input type="text" id="profUsername" value="${escapeHtml(CURRENT_USER.username || '')}" disabled style="width:100%;box-sizing:border-box;opacity:0.65;cursor:not-allowed">
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Usuario de Acceso</label>
+                <input type="text" name="username" class="form-input" value="${escapeHtml(CURRENT_USER.username || '')}" disabled>
               </div>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
               <div>
-                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Correo Electrónico</label>
-                <input type="email" id="profEmail" placeholder="usuario@sycom.com.ve" value="${escapeHtml(CURRENT_USER.email || '')}" style="width:100%;box-sizing:border-box">
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Correo Electrónico</label>
+                <input type="email" name="email" class="form-input" placeholder="usuario@sycom.com.ve" value="${escapeHtml(CURRENT_USER.email || '')}">
               </div>
               <div>
-                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Rol en la Plataforma</label>
-                <div style="padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;display:flex;align-items:center;justify-content:space-between">
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Rol en la Plataforma</label>
+                <div style="padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:9px;display:flex;align-items:center;justify-content:space-between;min-height:42px;box-sizing:border-box">
                   <span style="font-size:12.5px;font-weight:700;color:${roleColor}">${escapeHtml(roleName)}</span>
                   <span class="badge" style="background:rgba(255,255,255,0.06);color:var(--muted);font-size:9.5px">Asignado por Sistema</span>
                 </div>
               </div>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
               <div>
-                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Teléfono / Móvil</label>
-                <input type="tel" id="profPhone" placeholder="+58 412 1234567" value="${escapeHtml(CURRENT_USER.phone || '')}" style="width:100%;box-sizing:border-box">
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Teléfono / Móvil</label>
+                <input type="tel" name="phone" class="form-input" placeholder="+58 412 1234567" value="${escapeHtml(CURRENT_USER.phone || '')}">
               </div>
               <div>
-                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Usuario Telegram (Alertas)</label>
-                <input type="text" id="profTelegram" placeholder="@usuario" value="${escapeHtml(CURRENT_USER.telegram_username || '')}" style="width:100%;box-sizing:border-box">
+                <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Usuario Telegram (Alertas)</label>
+                <input type="text" name="telegram" class="form-input" placeholder="@usuario" value="${escapeHtml(CURRENT_USER.telegram_username || '')}">
               </div>
             </div>
 
             <div>
-              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Cargo o Especialidad Técnica</label>
-              <input type="text" id="profJobTitle" placeholder="Ej: Especialista en Infraestructura & Base de Datos" value="${escapeHtml(CURRENT_USER.job_title || '')}" style="width:100%;box-sizing:border-box">
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Cargo o Especialidad Técnica</label>
+              <input type="text" name="job_title" class="form-input" placeholder="Ej: Especialista en Infraestructura & Base de Datos" value="${escapeHtml(CURRENT_USER.job_title || '')}">
             </div>
 
             <div>
-              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Breve Descripción / Funciones</label>
-              <textarea id="profBio" rows="2" placeholder="Resumen de funciones o responsabilidades..." style="width:100%;box-sizing:border-box">${escapeHtml(CURRENT_USER.bio || '')}</textarea>
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Breve Descripción / Funciones</label>
+              <textarea name="bio" class="form-input" rows="3" placeholder="Resumen de funciones o responsabilidades en el área...">${escapeHtml(CURRENT_USER.bio || '')}</textarea>
             </div>
 
-            <div id="profDataAlert" style="display:none;padding:9px 12px;border-radius:8px;font-size:12px;margin-top:2px"></div>
+            <div class="profile-data-alert" style="display:none;padding:10px 14px;border-radius:8px;font-size:12px;margin-top:2px"></div>
 
-            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">
-              <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
-              <button type="submit" class="btn primary" id="btnSaveProfileData" style="font-weight:700;padding:8px 18px">
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08)">
+              <button type="button" class="btn" onclick="${cancelAction}">${cancelLabel}</button>
+              <button type="submit" class="btn primary btnSaveProfileData" style="font-weight:700;padding:9px 20px">
                 <span>Guardar Cambios</span>
               </button>
             </div>
@@ -6858,27 +7014,27 @@
           : (isAnal ? 'linear-gradient(135deg, #a855f7, #7e22ce)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)');
 
         return `
-          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:8px 0">
-            <div style="position:relative;width:115px;height:115px;border-radius:50%;overflow:hidden;border:3px solid var(--accent);box-shadow:0 0 25px rgba(79,140,255,0.25);background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center">
+          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px;padding:10px 0">
+            <div style="position:relative;width:125px;height:125px;border-radius:50%;overflow:hidden;border:3px solid var(--accent);box-shadow:0 0 28px rgba(79,140,255,0.25);background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center">
               ${previewAvatar ? `
-                <img id="profAvatarPreviewImg" src="${previewAvatar}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover;display:block">
+                <img src="${previewAvatar}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover;display:block">
               ` : `
-                <div id="profAvatarPreviewInitial" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:42px;font-weight:800;color:#fff;background:${bgGrad}">
+                <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:46px;font-weight:800;color:#fff;background:${bgGrad}">
                   ${initial}
                 </div>
               `}
             </div>
 
             <div>
-              <strong style="font-size:15px;color:#ffffff;display:block">${escapeHtml(CURRENT_USER.full_name || CURRENT_USER.username)}</strong>
-              <span class="muted" style="font-size:11.5px">Formatos permitidos: JPG, PNG o WebP. Se optimiza automáticamente.</span>
+              <strong style="font-size:16px;color:#ffffff;display:block">${escapeHtml(CURRENT_USER.full_name || CURRENT_USER.username)}</strong>
+              <span class="muted" style="font-size:12px">Formatos permitidos: JPG, PNG o WebP. Se optimiza automáticamente.</span>
             </div>
 
             <input type="file" id="profAvatarFileInput" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="handleProfileAvatarSelected(event)">
 
             <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;justify-content:center">
-              <button type="button" class="btn" onclick="document.getElementById('profAvatarFileInput').click()" style="display:inline-flex;align-items:center;gap:6px">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <button type="button" class="btn" onclick="document.getElementById('profAvatarFileInput').click()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="17 8 12 3 7 8"/>
                   <line x1="12" y1="3" x2="12" y2="15"/>
@@ -6886,8 +7042,8 @@
                 <span>Subir Nueva Imagen</span>
               </button>
               ${previewAvatar ? `
-                <button type="button" class="btn danger" onclick="handleRemoveAvatar()" style="display:inline-flex;align-items:center;gap:6px">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <button type="button" class="btn danger" onclick="handleRemoveAvatar()" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="3 6 5 6 21 6"/>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                   </svg>
@@ -6896,11 +7052,11 @@
               ` : ''}
             </div>
 
-            <div id="profAvatarAlert" style="display:none;width:100%;padding:9px 12px;border-radius:8px;font-size:12px;margin-top:2px"></div>
+            <div class="profile-avatar-alert" style="display:none;width:100%;padding:10px 14px;border-radius:8px;font-size:12px;margin-top:2px"></div>
 
-            <div style="display:flex;justify-content:flex-end;width:100%;gap:10px;margin-top:10px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">
-              <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
-              <button type="button" class="btn primary" id="btnSaveAvatar" onclick="handleSaveAvatar()" style="font-weight:700;padding:8px 18px">
+            <div style="display:flex;justify-content:flex-end;width:100%;gap:10px;margin-top:12px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08)">
+              <button type="button" class="btn" onclick="${cancelAction}">${cancelLabel}</button>
+              <button type="button" class="btn primary btnSaveAvatar" onclick="handleSaveAvatar()" style="font-weight:700;padding:9px 20px">
                 <span>Guardar Foto</span>
               </button>
             </div>
@@ -6908,47 +7064,47 @@
         `;
       } else if (CURRENT_PROFILE_TAB === 'password') {
         return `
-          <form id="formProfilePassword" onsubmit="handleSaveProfilePassword(event)" style="display:flex;flex-direction:column;gap:12px">
-            <div style="background:rgba(79,140,255,0.06);border:1px solid rgba(79,140,255,0.18);border-radius:10px;padding:10px 12px;font-size:11.5px;color:var(--text)">
-              <strong style="color:var(--accent);display:block;margin-bottom:2px">Seguridad de la Cuenta</strong>
+          <form class="formProfilePassword" onsubmit="handleSaveProfilePassword(event, ${isModal})" style="display:flex;flex-direction:column;gap:14px">
+            <div style="background:rgba(79,140,255,0.06);border:1px solid rgba(79,140,255,0.18);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--text)">
+              <strong style="color:var(--accent);display:block;margin-bottom:3px">Seguridad de la Cuenta</strong>
               Ingresa tu contraseña actual y define una nueva clave de acceso de al menos 4 caracteres.
             </div>
 
             <div>
-              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Contraseña Actual</label>
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Contraseña Actual</label>
               <div style="position:relative">
-                <input type="password" id="profOldPassword" required placeholder="Tu contraseña actual" style="width:100%;box-sizing:border-box;padding-right:38px">
-                <button type="button" onclick="togglePassInput('profOldPassword', this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px">
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <input type="password" name="old_password" class="form-input" required placeholder="Tu contraseña actual" style="padding-right:42px">
+                <button type="button" onclick="togglePassInputSibling(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:6px">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
               </div>
             </div>
 
             <div>
-              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Nueva Contraseña</label>
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Nueva Contraseña</label>
               <div style="position:relative">
-                <input type="password" id="profNewPassword" required minlength="4" placeholder="Mínimo 4 caracteres" style="width:100%;box-sizing:border-box;padding-right:38px">
-                <button type="button" onclick="togglePassInput('profNewPassword', this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px">
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <input type="password" name="new_password" class="form-input" required minlength="4" placeholder="Mínimo 4 caracteres" style="padding-right:42px">
+                <button type="button" onclick="togglePassInputSibling(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:6px">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
               </div>
             </div>
 
             <div>
-              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:5px;color:var(--text)">Confirmar Nueva Contraseña</label>
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Confirmar Nueva Contraseña</label>
               <div style="position:relative">
-                <input type="password" id="profConfirmPassword" required minlength="4" placeholder="Repite la nueva contraseña" style="width:100%;box-sizing:border-box;padding-right:38px">
-                <button type="button" onclick="togglePassInput('profConfirmPassword', this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px">
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <input type="password" name="confirm_password" class="form-input" required minlength="4" placeholder="Repite la nueva contraseña" style="padding-right:42px">
+                <button type="button" onclick="togglePassInputSibling(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:6px">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
               </div>
             </div>
 
-            <div id="profPassAlert" style="display:none;padding:9px 12px;border-radius:8px;font-size:12px;margin-top:2px"></div>
+            <div class="profile-pass-alert" style="display:none;padding:10px 14px;border-radius:8px;font-size:12px;margin-top:2px"></div>
 
-            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08)">
-              <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
-              <button type="submit" class="btn primary" id="btnSavePassword" style="font-weight:700;padding:8px 18px">
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08)">
+              <button type="button" class="btn" onclick="${cancelAction}">${cancelLabel}</button>
+              <button type="submit" class="btn primary btnSavePassword" style="font-weight:700;padding:9px 20px">
                 <span>Actualizar Contraseña</span>
               </button>
             </div>
@@ -6958,8 +7114,8 @@
       return '';
     }
 
-    function showProfileAlert(alertId, msg, type = 'error') {
-      const el = document.getElementById(alertId);
+    function showScopedProfileAlert(containerOrForm, alertClass, msg, type = 'error') {
+      const el = containerOrForm ? containerOrForm.querySelector(`.${alertClass}`) : document.querySelector(`.${alertClass}`);
       if (!el) return;
       el.style.display = 'block';
       if (type === 'error') {
@@ -6974,15 +7130,15 @@
       el.textContent = msg;
     }
 
-    function togglePassInput(inputId, btn) {
-      const input = document.getElementById(inputId);
+    function togglePassInputSibling(btn) {
+      const input = btn.parentElement?.querySelector('input');
       if (!input) return;
       if (input.type === 'password') {
         input.type = 'text';
-        btn.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
       } else {
         input.type = 'password';
-        btn.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
       }
     }
 
@@ -6991,7 +7147,7 @@
       if (!file) return;
 
       if (file.size > 8 * 1024 * 1024) {
-        showProfileAlert('profAvatarAlert', 'El archivo es demasiado grande (máximo 8MB).', 'error');
+        showToast('Archivo Excesivo', 'El archivo es demasiado grande (máximo 8MB).', 'error');
         return;
       }
 
@@ -7017,7 +7173,12 @@
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
           PENDING_AVATAR_DATA = canvas.toDataURL('image/jpeg', 0.88);
-          renderUserProfileModalContent();
+          if (document.getElementById('modalBg')?.classList.contains('show')) {
+            renderUserProfileModalContent();
+          }
+          if (document.getElementById('v-perfil')?.classList.contains('active')) {
+            renderUserProfileView();
+          }
         };
         img.src = evt.target.result;
       };
@@ -7026,18 +7187,21 @@
 
     function handleRemoveAvatar() {
       PENDING_AVATAR_DATA = '';
-      renderUserProfileModalContent();
+      if (document.getElementById('modalBg')?.classList.contains('show')) {
+        renderUserProfileModalContent();
+      }
+      if (document.getElementById('v-perfil')?.classList.contains('active')) {
+        renderUserProfileView();
+      }
     }
 
     async function handleSaveAvatar() {
-      const btn = document.getElementById('btnSaveAvatar');
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = 'Guardando...';
-      }
+      const btns = document.querySelectorAll('.btnSaveAvatar');
+      btns.forEach(b => { b.disabled = true; b.textContent = 'Guardando...'; });
 
       try {
-        const res = await fetch(`${API_URL}/users/me`, {
+        const userParam = CURRENT_USER?.username ? `?username=${encodeURIComponent(CURRENT_USER.username)}` : '';
+        const res = await fetch(`${API_URL}/users/me${userParam}`, {
           method: 'PUT',
           headers: getAuthHeaders(),
           body: JSON.stringify({
@@ -7052,34 +7216,38 @@
         localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
         updateUserAvatarDisplay();
         showToast('Foto Actualizada', 'Tu foto de perfil se ha guardado exitosamente.', 'success');
-        closeModal();
-      } catch (err) {
-        showProfileAlert('profAvatarAlert', err.message, 'error');
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = 'Guardar Foto';
+        if (document.getElementById('modalBg')?.classList.contains('show')) {
+          closeModal();
         }
+        if (document.getElementById('v-perfil')?.classList.contains('active')) {
+          renderUserProfileView();
+        }
+      } catch (err) {
+        showToast('Error al Guardar Foto', err.message, 'error');
+      } finally {
+        btns.forEach(b => { b.disabled = false; b.textContent = 'Guardar Foto'; });
       }
     }
 
-    async function handleSaveProfileData(e) {
+    async function handleSaveProfileData(e, isModal) {
       e.preventDefault();
-      const fullName = (document.getElementById('profFullName').value || '').trim();
-      const email = (document.getElementById('profEmail').value || '').trim();
-      const phone = (document.getElementById('profPhone').value || '').trim();
-      const telegram = (document.getElementById('profTelegram').value || '').trim();
-      const jobTitle = (document.getElementById('profJobTitle').value || '').trim();
-      const bio = (document.getElementById('profBio').value || '').trim();
+      const form = e.target;
+      const fullName = (form.querySelector('input[name="full_name"]')?.value || '').trim();
+      const email = (form.querySelector('input[name="email"]')?.value || '').trim();
+      const phone = (form.querySelector('input[name="phone"]')?.value || '').trim();
+      const telegram = (form.querySelector('input[name="telegram"]')?.value || '').trim();
+      const jobTitle = (form.querySelector('input[name="job_title"]')?.value || '').trim();
+      const bio = (form.querySelector('textarea[name="bio"]')?.value || '').trim();
 
-      const btn = document.getElementById('btnSaveProfileData');
+      const btn = form.querySelector('.btnSaveProfileData');
       if (btn) {
         btn.disabled = true;
         btn.textContent = 'Guardando...';
       }
 
       try {
-        const res = await fetch(`${API_URL}/users/me`, {
+        const userParam = CURRENT_USER?.username ? `?username=${encodeURIComponent(CURRENT_USER.username)}` : '';
+        const res = await fetch(`${API_URL}/users/me${userParam}`, {
           method: 'PUT',
           headers: getAuthHeaders(),
           body: JSON.stringify({
@@ -7099,9 +7267,14 @@
         localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
         updateUserAvatarDisplay();
         showToast('Perfil Actualizado', 'Tus datos personales se han guardado con éxito.', 'success');
-        closeModal();
+        if (isModal && document.getElementById('modalBg')?.classList.contains('show')) {
+          closeModal();
+        }
+        if (document.getElementById('v-perfil')?.classList.contains('active')) {
+          renderUserProfileView();
+        }
       } catch (err) {
-        showProfileAlert('profDataAlert', err.message, 'error');
+        showScopedProfileAlert(form, 'profile-data-alert', err.message, 'error');
       } finally {
         if (btn) {
           btn.disabled = false;
@@ -7110,22 +7283,23 @@
       }
     }
 
-    async function handleSaveProfilePassword(e) {
+    async function handleSaveProfilePassword(e, isModal) {
       e.preventDefault();
-      const oldPass = (document.getElementById('profOldPassword').value || '').trim();
-      const newPass = (document.getElementById('profNewPassword').value || '').trim();
-      const confirmPass = (document.getElementById('profConfirmPassword').value || '').trim();
+      const form = e.target;
+      const oldPass = (form.querySelector('input[name="old_password"]')?.value || '').trim();
+      const newPass = (form.querySelector('input[name="new_password"]')?.value || '').trim();
+      const confirmPass = (form.querySelector('input[name="confirm_password"]')?.value || '').trim();
 
       if (newPass !== confirmPass) {
-        showProfileAlert('profPassAlert', 'Las nuevas contraseñas no coinciden.', 'error');
+        showScopedProfileAlert(form, 'profile-pass-alert', 'Las nuevas contraseñas no coinciden.', 'error');
         return;
       }
       if (newPass.length < 4) {
-        showProfileAlert('profPassAlert', 'La nueva contraseña debe tener al menos 4 caracteres.', 'error');
+        showScopedProfileAlert(form, 'profile-pass-alert', 'La nueva contraseña debe tener al menos 4 caracteres.', 'error');
         return;
       }
 
-      const btn = document.getElementById('btnSavePassword');
+      const btn = form.querySelector('.btnSavePassword');
       if (btn) {
         btn.disabled = true;
         btn.textContent = 'Actualizando...';
@@ -7146,9 +7320,14 @@
           throw new Error(data.detail || 'Error al actualizar contraseña');
         }
         showToast('Contraseña Actualizada', 'Tu contraseña se ha cambiado correctamente.', 'success');
-        closeModal();
+        if (isModal && document.getElementById('modalBg')?.classList.contains('show')) {
+          closeModal();
+        }
+        if (document.getElementById('v-perfil')?.classList.contains('active')) {
+          renderUserProfileView();
+        }
       } catch (err) {
-        showProfileAlert('profPassAlert', err.message, 'error');
+        showScopedProfileAlert(form, 'profile-pass-alert', err.message, 'error');
       } finally {
         if (btn) {
           btn.disabled = false;
