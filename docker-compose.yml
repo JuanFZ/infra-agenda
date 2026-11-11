@@ -34,9 +34,10 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql://tasks_user:tasks_secret_2026@db:5432/tasks_db}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://tasks_user:tasks_secret_2026@db:5432/tasks_db}
     volumes:
       - ./backend/app:/app/app
+      - ./backend/migrate_sqlite_to_pg.py:/app/migrate_sqlite_to_pg.py
       - dashboard_data:/app/
     depends_on:
       db:

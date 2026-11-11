@@ -19,8 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar el código de la aplicación
+# Copiar el código de la aplicación y scripts auxiliares
 COPY app/ ./app/
+COPY migrate_sqlite_to_pg.py .
 
 # Exponer el puerto de la API FastAPI
 EXPOSE 8000

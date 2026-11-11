@@ -30,6 +30,15 @@ TABLE_ORDER = [
     "sync_logs",
 ]
 
+def normalize_pg_url(url: str) -> str:
+    if not url:
+        return url
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if url.startswith("postgresql://") and not url.startswith("postgresql+"):
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return url
+
 def find_sqlite_db(custom_path: str | None = None) -> str | None:
     candidates = []
     if custom_path:
@@ -49,6 +58,7 @@ def find_sqlite_db(custom_path: str | None = None) -> str | None:
     return None
 
 def migrate(sqlite_path: str, pg_url: str, force: bool = False) -> bool:
+    pg_url = normalize_pg_url(pg_url)
     print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Iniciando proceso de migración...")
     print(f" -> Origen SQLite: {sqlite_path}")
     masked_url = pg_url.split("@")[-1] if "@" in pg_url else "PostgreSQL"
@@ -66,7 +76,10 @@ def migrate(sqlite_path: str, pg_url: str, force: bool = False) -> bool:
         return False
 
     # 2. Asegurar que las tablas existan en PostgreSQL
-    from app.models import Base
+    try:
+        from app.models import Base
+    except ImportError:
+        from .models import Base
     Base.metadata.create_all(bind=pg_engine)
 
     # 3. Validar si ya existen datos en PostgreSQL
@@ -164,7 +177,7 @@ def migrate(sqlite_path: str, pg_url: str, force: bool = False) -> bool:
 def auto_migrate_if_needed():
     """Ejecutado al iniciar el backend: si DATABASE_URL es PostgreSQL y la BD está vacía, migra automáticamente de dashboard.db si existe."""
     pg_url = os.getenv("DATABASE_URL", "")
-    if not (pg_url.startswith("postgresql://") or pg_url.startswith("postgres://")):
+    if not (pg_url.startswith("postgresql") or pg_url.startswith("postgres")):
         return
 
     sqlite_file = find_sqlite_db()
@@ -172,6 +185,7 @@ def auto_migrate_if_needed():
         return
 
     try:
+        pg_url = normalize_pg_url(pg_url)
         pg_engine = create_engine(pg_url)
         inspector = inspect(pg_engine)
         tables = inspector.get_table_names()

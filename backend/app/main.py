@@ -640,7 +640,10 @@ scheduler = BackgroundScheduler()
 def on_startup():
     # Auto-migrar datos si es la primera vez que se inicia en PostgreSQL y existe dashboard.db
     try:
-        from migrate_sqlite_to_pg import auto_migrate_if_needed
+        try:
+            from .migrate_sqlite_to_pg import auto_migrate_if_needed
+        except ImportError:
+            from migrate_sqlite_to_pg import auto_migrate_if_needed
         auto_migrate_if_needed()
     except Exception as mig_err:
         print(f"[Startup Migration Check] {mig_err}")
