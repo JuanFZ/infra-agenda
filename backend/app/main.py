@@ -10,7 +10,7 @@ from fastapi import FastAPI, Depends, Query, HTTPException, Header, Response
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import or_, and_, inspect, text
+from sqlalchemy import or_, and_, inspect, text, desc
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -2854,7 +2854,7 @@ def list_overtimes(
             )
         )
 
-    records = q.order_by(desc(OvertimeRecord.start_time), desc(OvertimeRecord.id)).all()
+    records = q.order_by(OvertimeRecord.start_time.desc(), OvertimeRecord.id.desc()).all()
     return [_serialize_overtime(r, x_user_name, x_user_role) for r in records]
 
 
