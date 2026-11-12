@@ -221,6 +221,30 @@ class OvertimeRecord(Base):
         return f"{rem_mins}m"
 
 
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    username = Column(String(100), nullable=True, index=True)          # ej. 'j.fernandez', 'a.lozada', 'anonimo'
+    user_fullname = Column(String(150), nullable=True)                 # ej. 'Juan Fernández'
+    user_role = Column(String(50), nullable=True)                     # 'coordinador', 'especialista', 'analista'
+    action = Column(String(50), nullable=False, index=True)            # ej. 'LOGIN_SUCCESS', 'CREATE_ITEM', 'UPDATE_STATUS'
+    entity_type = Column(String(50), nullable=True, index=True)        # 'auth', 'item', 'overtime', 'escalation', 'report', 'user'
+    entity_id = Column(String(100), nullable=True, index=True)         # ID de la entidad afectada
+    details = Column(Text, nullable=True)                              # Detalle textual o JSON de los cambios
+    ip_address = Column(String(45), nullable=True)                     # Dirección IP del cliente
+    user_agent = Column(String(255), nullable=True)                    # Navegador / Dispositivo
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+    __table_args__ = (
+        Index("ix_audit_user_action", "username", "action"),
+        Index("ix_audit_entity", "entity_type", "entity_id"),
+        Index("ix_audit_created_at_desc", created_at.desc()),
+    )
+
+
+
 
 
 

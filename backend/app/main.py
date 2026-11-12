@@ -1,4 +1,5 @@
 import os
+import json
 import uuid
 import re
 import base64
@@ -6,7 +7,7 @@ import datetime
 import hashlib
 import unicodedata
 import urllib.parse
-from fastapi import FastAPI, Depends, Query, HTTPException, Header, Response
+from fastapi import FastAPI, Depends, Query, HTTPException, Header, Response, Request
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -15,7 +16,7 @@ from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from .database import engine, Base, get_db, SessionLocal
-from .models import Item, SyncLog, AlertLog, User, GeneratedReport, EscalationDocument, IBP, OvertimeRecord
+from .models import Item, SyncLog, AlertLog, User, GeneratedReport, EscalationDocument, IBP, OvertimeRecord, AuditLog
 from .config import SYNC_INTERVAL_MINUTES
 from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
 from .sync.glpi_client import GLPIClient
@@ -40,6 +41,81 @@ def verify_password(plain_password: str, hashed_password: str | None) -> bool:
     if not hashed_password:
         return False
     return hash_password(plain_password) == hashed_password
+
+def _clean_header_user(val: str | None) -> str:
+    if not val:
+        return ""
+    try:
+        return urllib.parse.unquote(str(val)).strip()
+    except Exception:
+        return str(val).strip()
+
+def log_audit(
+    db: Session,
+    action: str,
+    entity_type: str | None = None,
+    entity_id: str | int | None = None,
+    username: str | None = None,
+    user_fullname: str | None = None,
+    user_role: str | None = None,
+    user_id: int | None = None,
+    details: dict | list | str | None = None,
+    request: Request | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> AuditLog | None:
+    """Registra de manera segura un evento de auditoría en la tabla audit_logs de PostgreSQL."""
+    try:
+        client_ip = ip_address
+        ua = user_agent
+        if request:
+            if not client_ip:
+                client_ip = request.headers.get("x-forwarded-for")
+                if client_ip and "," in client_ip:
+                    client_ip = client_ip.split(",")[0].strip()
+                if not client_ip and request.client:
+                    client_ip = request.client.host
+            if not ua:
+                ua = request.headers.get("user-agent")
+
+            if not username:
+                username = _clean_header_user(request.headers.get("x-user-username") or request.headers.get("x-user-name"))
+            if not user_role:
+                user_role = _clean_header_user(request.headers.get("x-user-role"))
+            if not user_fullname and username:
+                user_fullname = _clean_header_user(request.headers.get("x-user-name")) or username
+
+        if isinstance(details, (dict, list)):
+            details_str = json.dumps(details, ensure_ascii=False)
+        else:
+            details_str = str(details) if details is not None else None
+
+        if ua and len(ua) > 250:
+            ua = ua[:250]
+
+        entry = AuditLog(
+            user_id=user_id,
+            username=username or "anónimo",
+            user_fullname=user_fullname or username,
+            user_role=user_role or "Especialista",
+            action=action,
+            entity_type=entity_type,
+            entity_id=str(entity_id) if entity_id is not None else None,
+            details=details_str,
+            ip_address=client_ip,
+            user_agent=ua,
+            created_at=datetime.datetime.utcnow()
+        )
+        db.add(entry)
+        db.commit()
+        return entry
+    except Exception as err:
+        print(f"[Audit Log Error] No se pudo guardar auditoria para {action}: {err}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return None
 
 # Catálogo oficial de las 34 IBPs (Identificación Bancaria del Participante) de la plataforma SIMF
 IBP_INVENTORY = [
@@ -323,6 +399,32 @@ def ensure_db_schema():
                     conn.execute(text(f"ALTER TABLE overtime_records ADD COLUMN created_at {dt_type}"))
                 if "updated_at" not in ot_cols:
                     conn.execute(text(f"ALTER TABLE overtime_records ADD COLUMN updated_at {dt_type}"))
+
+            # 5. audit_logs
+            if "audit_logs" in table_names:
+                aud_cols = [c["name"] for c in inspector.get_columns("audit_logs")]
+                if "user_id" not in aud_cols:
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN user_id INTEGER"))
+                if "username" not in aud_cols:
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN username VARCHAR(100)"))
+                if "user_fullname" not in aud_cols:
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN user_fullname VARCHAR(150)"))
+                if "user_role" not in aud_cols:
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN user_role VARCHAR(50)"))
+                if "action" not in aud_cols:
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN action VARCHAR(50)"))
+                if "entity_type" not in aud_cols:
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN entity_type VARCHAR(50)"))
+                if "entity_id" not in aud_cols:
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN entity_id VARCHAR(100)"))
+                if "details" not in aud_cols:
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN details TEXT"))
+                if "ip_address" not in aud_cols:
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN ip_address VARCHAR(45)"))
+                if "user_agent" not in aud_cols:
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN user_agent VARCHAR(255)"))
+                if "created_at" not in aud_cols:
+                    conn.execute(text(f"ALTER TABLE audit_logs ADD COLUMN created_at {dt_type}"))
 
         # Poblar catálogo oficial de las 34 IBPs (Participantes SIMF) si no existen
         seed_db = SessionLocal()
@@ -924,7 +1026,7 @@ def _serialize_user(user: User) -> dict:
     }
 
 @app.post("/api/auth/login")
-def login(req: LoginRequest, db: Session = Depends(get_db)):
+def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     u_str = req.username.strip()
     user = db.query(User).filter(
         or_(
@@ -934,16 +1036,28 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         )
     ).first()
     if not user:
+        log_audit(db, action="LOGIN_FAILED", entity_type="auth", username=u_str,
+                  details={"razon": "Usuario no encontrado o no registrado"}, request=request)
         raise HTTPException(status_code=401, detail="Usuario no encontrado o no registrado.")
     
     if not user.is_active:
+        log_audit(db, action="LOGIN_BLOCKED", entity_type="auth", user_id=user.id,
+                  username=user.username, user_fullname=user.full_name, user_role=user.role,
+                  details={"razon": "Usuario inactivo en plataforma"}, request=request)
         raise HTTPException(status_code=403, detail="Usuario inactivo en la plataforma.")
         
     if not verify_password(req.password, user.password_hash):
+        log_audit(db, action="LOGIN_FAILED", entity_type="auth", user_id=user.id,
+                  username=user.username, user_fullname=user.full_name, user_role=user.role,
+                  details={"razon": "Contraseña incorrecta"}, request=request)
         raise HTTPException(status_code=401, detail="Contraseña incorrecta.")
         
     user.last_login = datetime.datetime.utcnow()
     db.commit()
+
+    log_audit(db, action="LOGIN_SUCCESS", entity_type="auth", user_id=user.id,
+              username=user.username, user_fullname=user.full_name, user_role=user.role,
+              details={"metodo": "formulario_acceso"}, request=request)
     
     return {
         "status": "ok",
@@ -1031,6 +1145,7 @@ def get_current_user_profile(
 @app.put("/api/users/me")
 def update_current_user_profile(
     req: UpdateUserProfileRequest,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
     x_user_username: str | None = Header(None, alias="X-User-Username"),
@@ -1058,6 +1173,11 @@ def update_current_user_profile(
 
     db.commit()
     db.refresh(user)
+
+    log_audit(db, action="UPDATE_PROFILE", entity_type="user", entity_id=user.id,
+              username=user.username, user_fullname=user.full_name, user_role=user.role,
+              details={"nombre": user.full_name, "email": user.email, "cargo": user.job_title}, request=request)
+
     return {
         "status": "ok",
         "message": "Datos personales y perfil actualizados con éxito",
@@ -1066,12 +1186,15 @@ def update_current_user_profile(
 
 
 @app.post("/api/auth/change-password")
-def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
+def change_password(req: ChangePasswordRequest, request: Request, db: Session = Depends(get_db)):
     u_str = req.username.strip()
     user = find_user_by_identifier(db, target_raw=u_str, username_param=u_str, x_user_username=u_str)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
     if not verify_password(req.old_password, user.password_hash):
+        log_audit(db, action="PASSWORD_CHANGE_FAILED", entity_type="user", entity_id=user.id,
+                  username=user.username, user_fullname=user.full_name, user_role=user.role,
+                  details={"razon": "Contraseña actual incorrecta"}, request=request)
         raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta.")
     
     new_pw = req.new_password
@@ -1086,6 +1209,11 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
     
     user.password_hash = hash_password(new_pw)
     db.commit()
+
+    log_audit(db, action="PASSWORD_CHANGE", entity_type="user", entity_id=user.id,
+              username=user.username, user_fullname=user.full_name, user_role=user.role,
+              details={"metodo": "cambio_clave_usuario"}, request=request)
+
     return {"status": "ok", "message": "Contraseña actualizada con éxito"}
 
 @app.get("/api/clients")
@@ -1123,7 +1251,7 @@ def get_clients_summary(db: Session = Depends(get_db)):
     return list(clients.values())
 
 @app.post("/api/items/{item_id}/assign")
-def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
+def assign_item(item_id: int, req: AssignRequest, request: Request, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item no encontrado")
@@ -1215,6 +1343,9 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db),
     except Exception as e:
         print(f"[Telegram Assign Alert Error] {e}")
 
+    log_audit(db, action="ASSIGN_ITEM", entity_type="item", entity_id=item.id,
+              details={"titulo": item.title, "asignados": combined_names, "fuente": item.source}, request=request)
+
     return {
         "status": "OK",
         "message": f"Asignado exitosamente a {combined_names}",
@@ -1235,6 +1366,7 @@ def assign_item(item_id: int, req: AssignRequest, db: Session = Depends(get_db),
 def update_item_status(
     item_id: int, 
     req: StatusUpdateRequest, 
+    request: Request,
     db: Session = Depends(get_db), 
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name")
@@ -1242,6 +1374,8 @@ def update_item_status(
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item no encontrado")
+
+    old_st = item.status
 
     role = decode_header_val(x_user_role).lower()
     if role in ("coordinador", "admin", "administrador"):
@@ -1366,6 +1500,9 @@ def update_item_status(
     except Exception as e:
         print(f"[Telegram Status Alert Error] {e}")
 
+    log_audit(db, action="UPDATE_STATUS", entity_type="item", entity_id=item.id,
+              details={"de": old_st, "a": new_st, "titulo": item.title, "fuente": item.source}, request=request)
+
     return {
         "status": "OK",
         "message": f"Estado cambiado a {new_st}",
@@ -1387,6 +1524,7 @@ def update_item_status(
 @app.post("/api/items")
 def create_item(
     req: CreateItemRequest,
+    request: Request,
     db: Session = Depends(get_db),
     _role: str = Depends(verify_coordinator_or_specialist_role),
     x_user_name: str | None = Header(None, alias="X-User-Name")
@@ -1521,6 +1659,10 @@ def create_item(
     db.commit()
     db.refresh(item)
 
+    log_audit(db, action="CREATE_ITEM", entity_type="item", entity_id=item.id,
+              details={"titulo": item.title, "fuente": item.source, "categoria": item.category,
+                       "prioridad": item.priority, "asignado": item.assignee_name}, request=request)
+
     # Disparar notificación a Telegram
     try:
         import html
@@ -1573,6 +1715,7 @@ def create_item(
 def update_item_details(
     item_id: int,
     req: UpdateItemRequest,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
@@ -1661,6 +1804,10 @@ def update_item_details(
     item.updated_at = datetime.datetime.utcnow()
     db.commit()
     db.refresh(item)
+
+    log_audit(db, action="UPDATE_ITEM", entity_type="item", entity_id=item.id,
+              details={"titulo": item.title, "prioridad": item.priority, "estado": item.status}, request=request)
+
     return {
         "status": "OK",
         "message": "Actividad actualizada con éxito",
@@ -1671,6 +1818,7 @@ def update_item_details(
 @app.delete("/api/items/{item_id}")
 def delete_item(
     item_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
@@ -1714,6 +1862,9 @@ def delete_item(
     # Eliminar de la base de datos operativa
     db.delete(item)
     db.commit()
+
+    log_audit(db, action="DELETE_ITEM", entity_type="item", entity_id=item_id,
+              details={"titulo": title, "fuente": source, "id_externo": ext_id}, request=request)
 
     # Notificar a Telegram
     try:
@@ -1959,6 +2110,7 @@ def api_reports_history(
 @app.post("/api/reports/generate-and-save")
 def api_reports_generate_and_save(
     req: SaveReportRequest,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
@@ -2019,6 +2171,9 @@ def api_reports_generate_and_save(
     db.commit()
     db.refresh(report_entry)
 
+    log_audit(db, action="GENERATE_REPORT", entity_type="report", entity_id=report_entry.id,
+              details={"titulo": report_entry.title, "periodo": report_entry.period_label, "especialista": spec_summary}, request=request)
+
     return {
         "status": "OK",
         "message": "Reporte generado y guardado en el historial",
@@ -2042,6 +2197,7 @@ def api_reports_generate_and_save(
 @app.delete("/api/reports/history/{report_id}")
 def api_reports_delete_history(
     report_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     role_param: str = Query(None, alias="role")
@@ -2058,8 +2214,13 @@ def api_reports_delete_history(
     if not entry:
         raise HTTPException(status_code=404, detail="Reporte no encontrado en el historial.")
 
+    rep_title = entry.title
     db.delete(entry)
     db.commit()
+
+    log_audit(db, action="DELETE_REPORT", entity_type="report", entity_id=report_id,
+              details={"titulo": rep_title}, request=request)
+
     return {"status": "OK", "deleted_id": report_id}
 
 
@@ -2225,6 +2386,7 @@ def api_get_escalations(db: Session = Depends(get_db)):
 @app.post("/api/escalations")
 def api_create_escalation(
     req: CreateEscalationRequest,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
@@ -2282,6 +2444,9 @@ def api_create_escalation(
     db.add(doc)
     db.commit()
     db.refresh(doc)
+
+    log_audit(db, action="CREATE_ESCALATION", entity_type="escalation", entity_id=doc.id,
+              details={"titulo": doc.title, "categoria": doc.category, "ibp": doc.ibp, "url": doc.doc_url}, request=request)
 
     # Notificación a Telegram (Google Docs)
     try:
@@ -2350,6 +2515,7 @@ def api_create_escalation(
 def api_update_escalation(
     doc_id: int,
     req: UpdateEscalationRequest,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
@@ -2456,6 +2622,9 @@ def api_update_escalation(
     rec_dt = doc.received_at or doc.created_at
     esc_dt = doc.escalated_at or rec_dt
 
+    log_audit(db, action="UPDATE_ESCALATION", entity_type="escalation", entity_id=doc.id,
+              details={"titulo": doc.title, "categoria": doc.category, "ibp": doc.ibp}, request=request)
+
     return {
         "status": "OK",
         "message": "Escalamiento actualizado exitosamente.",
@@ -2485,6 +2654,7 @@ def api_update_escalation(
 @app.post("/api/escalations/upload")
 def api_upload_escalation(
     req: UploadEscalationRequest,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name")
@@ -2567,6 +2737,9 @@ def api_upload_escalation(
     db.add(doc)
     db.commit()
     db.refresh(doc)
+
+    log_audit(db, action="UPLOAD_ESCALATION", entity_type="escalation", entity_id=doc.id,
+              details={"titulo": doc.title, "categoria": doc.category, "ibp": doc.ibp, "archivo": doc.original_filename, "tamano": doc.file_size_formatted}, request=request)
 
     # Notificación a Telegram
     try:
@@ -2672,6 +2845,7 @@ def api_download_escalation(doc_id: int, db: Session = Depends(get_db)):
 @app.delete("/api/escalations/{doc_id}")
 def api_delete_escalation(
     doc_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
@@ -2724,8 +2898,13 @@ def api_delete_escalation(
     for it in items_linked:
         it.escalation_id = None
 
+    doc_title = doc.title
     db.delete(doc)
     db.commit()
+
+    log_audit(db, action="DELETE_ESCALATION", entity_type="escalation", entity_id=doc_id,
+              details={"titulo": doc_title}, request=request)
+
     return {"status": "OK", "deleted_id": doc_id}
 
 
@@ -2752,14 +2931,6 @@ def _parse_overtime_datetime(dt_str: str) -> datetime.datetime:
             except ValueError:
                 pass
         raise HTTPException(status_code=400, detail=f"Formato de fecha u hora invalido: '{dt_str}'.")
-
-def _clean_header_user(val: str | None) -> str:
-    if not val:
-        return ""
-    try:
-        return urllib.parse.unquote(str(val)).strip()
-    except Exception:
-        return str(val).strip()
 
 def _serialize_overtime(
     ot: OvertimeRecord,
@@ -2879,6 +3050,7 @@ def list_overtimes(
 @app.post("/api/overtimes")
 def create_overtime(
     req: CreateOvertimeRequest,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name")
@@ -2943,6 +3115,12 @@ def create_overtime(
     db.add(record)
     db.commit()
     db.refresh(record)
+
+    log_audit(db, action="CREATE_OVERTIME", entity_type="overtime", entity_id=record.id,
+              username=creator_name, user_role=creator_role,
+              details={"especialista": record.specialist_name, "duracion_horas": record.duration_hours,
+                       "categoria": record.category, "inicio": str(record.start_time), "fin": str(record.end_time)},
+              request=request)
 
     return _serialize_overtime(record, x_user_name, x_user_role)
 
@@ -3096,6 +3274,7 @@ def get_overtime_detail(
 def update_overtime(
     record_id: int,
     req: UpdateOvertimeRequest,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name")
@@ -3163,12 +3342,18 @@ def update_overtime(
     db.commit()
     db.refresh(record)
 
+    log_audit(db, action="UPDATE_OVERTIME", entity_type="overtime", entity_id=record.id,
+              details={"especialista": record.specialist_name, "duracion_horas": record.duration_hours,
+                       "categoria": record.category, "inicio": str(record.start_time), "fin": str(record.end_time)},
+              request=request)
+
     return _serialize_overtime(record, x_user_name, x_user_role)
 
 
 @app.delete("/api/overtimes/{record_id}")
 def delete_overtime(
     record_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name")
@@ -3189,9 +3374,94 @@ def delete_overtime(
             detail="Permiso denegado: Solo el Coordinador o el autor del registro pueden eliminarlo."
         )
 
+    spec_name = record.specialist_name
+    dur_h = record.duration_hours
     db.delete(record)
     db.commit()
+
+    log_audit(db, action="DELETE_OVERTIME", entity_type="overtime", entity_id=record_id,
+              details={"especialista": spec_name, "duracion_horas": dur_h}, request=request)
+
     return {"status": "OK", "deleted_id": record_id}
+
+
+# ==============================================================================
+# MÓDULO DE AUDITORÍA Y REGISTRO DE ACTIVIDAD (AUDIT LOGS)
+# ==============================================================================
+
+@app.get("/api/audit-logs")
+def get_audit_logs(
+    limit: int = Query(100, ge=1, le=500),
+    action: str | None = Query(None),
+    entity_type: str | None = Query(None),
+    username: str | None = Query(None),
+    search: str | None = Query(None),
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name")
+):
+    """Retorna los registros de auditoría y bitácora de actividad en PostgreSQL."""
+    role = (x_user_role or "").strip().lower()
+    caller_name = _clean_header_user(x_user_name)
+    is_coord = role in ("coordinador", "admin", "administrador")
+
+    q = db.query(AuditLog)
+
+    # Si no es coordinador ni admin, restringir para ver únicamente sus propias acciones
+    if not is_coord and caller_name:
+        q = q.filter(
+            or_(
+                AuditLog.username.ilike(f"%{caller_name}%"),
+                AuditLog.user_fullname.ilike(f"%{caller_name}%")
+            )
+        )
+    elif username and username.strip():
+        q = q.filter(AuditLog.username.ilike(f"%{username.strip()}%"))
+
+    if action and action.strip():
+        q = q.filter(AuditLog.action == action.strip().upper())
+
+    if entity_type and entity_type.strip():
+        q = q.filter(AuditLog.entity_type == entity_type.strip().lower())
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        q = q.filter(
+            or_(
+                AuditLog.details.ilike(term),
+                AuditLog.action.ilike(term),
+                AuditLog.username.ilike(term),
+                AuditLog.user_fullname.ilike(term),
+                AuditLog.entity_type.ilike(term)
+            )
+        )
+
+    records = q.order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).limit(limit).all()
+
+    result = []
+    for r in records:
+        caracas_str = None
+        if r.created_at:
+            utc_dt = r.created_at.replace(tzinfo=datetime.timezone.utc)
+            caracas_str = utc_dt.astimezone(CARACAS_TZ).strftime("%d/%m/%Y %I:%M:%S %p")
+
+        result.append({
+            "id": r.id,
+            "user_id": r.user_id,
+            "username": r.username,
+            "user_fullname": r.user_fullname,
+            "user_role": r.user_role,
+            "action": r.action,
+            "entity_type": r.entity_type,
+            "entity_id": r.entity_id,
+            "details": r.details,
+            "ip_address": r.ip_address,
+            "user_agent": r.user_agent,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "created_at_caracas": caracas_str
+        })
+
+    return result
 
 
 
