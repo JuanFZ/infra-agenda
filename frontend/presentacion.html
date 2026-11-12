@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presentación Ejecutiva · Agenda de Infraestructura & BD</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0d14;
+      --bg-card: rgba(18, 24, 38, 0.75);
+      --bg-card-hover: rgba(26, 35, 54, 0.9);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(56, 189, 248, 0.4);
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.25);
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.25);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(99, 102, 241, 0.06) 0px, transparent 50%);
+      color: var(--text);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* Top Bar */
+    header {
+      height: 64px;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(10, 13, 20, 0.6);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand img {
+      height: 32px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .slide-indicator {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .btn-header {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn-header:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Presentation Viewport */
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 48px;
+      position: relative;
+    }
+
+    .slide-deck {
+      width: 100%;
+      max-width: 1200px;
+      height: 100%;
+      max-height: 680px;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(16px) scale(0.98);
+      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.4s;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 48px 56px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+    }
+
+    .slide-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--primary);
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 5px 14px;
+      border-radius: 9999px;
+      margin-bottom: 16px;
+      width: fit-content;
+    }
+
+    .slide-title {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+
+    .slide-subtitle {
+      font-size: 18px;
+      font-weight: 400;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 32px;
+      max-width: 900px;
+    }
+
+    /* Content Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      flex: 1;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 22px;
+      flex: 1;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-focus);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .card-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      flex-shrink: 0;
+    }
+
+    .card-icon.accent {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.25);
+      color: var(--accent);
+    }
+
+    .card-icon.purple {
+      background: rgba(168, 85, 247, 0.12);
+      border-color: rgba(168, 85, 247, 0.25);
+      color: #c084fc;
+    }
+
+    .card-icon.amber {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.25);
+      color: #fbbf24;
+    }
+
+    .card-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.01em;
+    }
+
+    .card-desc {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13.5px;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+
+    .feature-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--primary);
+      margin-top: 7px;
+      flex-shrink: 0;
+    }
+
+    .feature-dot.accent {
+      background: var(--accent);
+    }
+
+    /* Speaker Notes Bar */
+    .speaker-note {
+      margin-top: 24px;
+      padding: 14px 20px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .speaker-note-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-style: normal;
+      flex-shrink: 0;
+    }
+
+    /* Live Demo Slide Styling */
+    .demo-slide-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      flex: 1;
+      gap: 28px;
+    }
+
+    .demo-cta-box {
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 18px;
+      padding: 36px 48px;
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .btn-launch-demo {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, #0284c7 0%, #10b981 100%);
+      color: #fff;
+      font-size: 17px;
+      font-weight: 700;
+      padding: 16px 36px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 8px 24px rgba(2, 132, 199, 0.35);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-launch-demo:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 12px 32px rgba(16, 185, 129, 0.45);
+    }
+
+    .demo-steps {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 850px;
+    }
+
+    .step-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-pill strong {
+      color: var(--primary);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    /* Footer & Navigation Controls */
+    footer {
+      height: 72px;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(10, 13, 20, 0.6);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .nav-hints {
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .kbd {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-muted);
+    }
+
+    .nav-buttons {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-nav {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text);
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-nav:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-nav:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .btn-nav.primary {
+      background: var(--primary);
+      color: #04101d;
+      border-color: var(--primary);
+    }
+
+    .btn-nav.primary:hover:not(:disabled) {
+      background: #7dd3fc;
+      border-color: #7dd3fc;
+    }
+
+    /* Progress Bar */
+    .progress-bar-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.05);
+      z-index: 20;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      width: 16.666%;
+      transition: width 0.35s ease;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Barra de Progreso Superior -->
+  <div class="progress-bar-container">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <!-- Cabecera -->
+  <header>
+    <div class="brand">
+      <img src="ICOSYCOM.png" alt="Sycom">
+      <div>
+        <div class="brand-title">Agenda de Infraestructura &amp; BD</div>
+        <div class="brand-subtitle">Soluciones SYCOM · Presentación Ejecutiva</div>
+      </div>
+    </div>
+    <div class="header-controls">
+      <span class="slide-indicator" id="slideNumber">1 / 6</span>
+      <a href="index.html" class="btn-header" title="Abrir directamente la aplicación">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        <span>Ir a la Agenda</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal de Diapositivas -->
+  <main>
+    <div class="slide-deck">
+
+      <!-- Diapositiva 1: Portada y Propósito -->
+      <section class="slide active" id="slide-1">
+        <div>
+          <div class="slide-badge">Visión y Propósito</div>
+          <h1 class="slide-title">Agenda de Infraestructura &amp; Base de Datos</h1>
+          <p class="slide-subtitle">Plataforma integral de gobierno operativo, trazabilidad de incidentes, control de dedicación y analítica gerencial en tiempo real.</p>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              </div>
+              <div class="card-title">Centralización Total</div>
+            </div>
+            <p class="card-desc">Elimina la dispersión entre tickets de soporte y proyectos, reuniendo la operación en un solo punto de mando.</p>
+            <ul class="feature-list">
+              <li class="feature-item"><span class="feature-dot"></span>Conexión simultánea a GLPI y ClickUp</li>
+              <li class="feature-item"><span class="feature-dot"></span>Eliminación de silos operativos</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon accent">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="card-title">Precisión Operativa</div>
+            </div>
+            <p class="card-desc">Cálculo cronológico transparente de tiempos de atención, horas dedicadas y control de cuellos de botella.</p>
+            <ul class="feature-list">
+              <li class="feature-item"><span class="feature-dot accent"></span>Métricas exactas sin desfase horario</li>
+              <li class="feature-item"><span class="feature-dot accent"></span>Registro estructurado de esperas y motivos</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon purple">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              </div>
+              <div class="card-title">Analítica para Decidir</div>
+            </div>
+            <p class="card-desc">Conversión instantánea de la carga diaria en matrices de calor, balance de recursos y reportes ejecutivos.</p>
+            <ul class="feature-list">
+              <li class="feature-item"><span class="feature-dot"></span>Mapas de calor por banco y tecnología</li>
+              <li class="feature-item"><span class="feature-dot"></span>Exportaciones formales a PDF y Excel</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="speaker-note">
+          <span class="speaker-note-tag">Mensaje de Orador:</span>
+          <span>"Esta plataforma resuelve la fragmentación operativa, brindando claridad instantánea de quién atiende qué caso, cuánto tiempo toma y dónde se concentran los esfuerzos del equipo."</span>
+        </div>
+      </section>
+
+      <!-- Diapositiva 2: Ecosistema y Arquitectura -->
+      <section class="slide" id="slide-2">
+        <div>
+          <div class="slide-badge">Ecosistema Tecnológico</div>
+          <h2 class="slide-title">Arquitectura e Integraciones</h2>
+          <p class="slide-subtitle">Sincronización en segundo plano con persistencia robusta y trazabilidad documental automatizada.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              </div>
+              <div class="card-title">Fuentes de Datos y Persistencia</div>
+            </div>
+            <ul class="feature-list">
+              <li class="feature-item"><span class="feature-dot"></span><strong>Ingesta desde GLPI:</strong> Captura continua de incidentes y requerimientos entrantes de clientes.</li>
+              <li class="feature-item"><span class="feature-dot"></span><strong>Ingesta desde ClickUp:</strong> Sincronización de tareas de infraestructura, proyectos y mantenimientos.</li>
+              <li class="feature-item"><span class="feature-dot"></span><strong>PostgreSQL 16 en Producción:</strong> Persistencia transaccional de alto rendimiento montada en contenedor Docker, con auto-migración y compatibilidad SQLite local.</li>
+              <li class="feature-item"><span class="feature-dot"></span><strong>Sincronizador Asíncrono:</strong> Demonio en segundo plano que reconcilia cambios de estado y asignaciones sin bloquear la interfaz.</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon accent">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <div class="card-title">Canales de Salida y Notificación</div>
+            </div>
+            <ul class="feature-list">
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Google Docs API:</strong> Generación y vinculación automatizada de minutas técnicas estandarizadas de escalamiento.</li>
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Notificaciones por Telegram:</strong> Avisos al equipo ante nuevas asignaciones y cambios de estado con enlaces directos (deep links).</li>
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Seguridad de Datos:</strong> Aislamiento de horas extras en canal privado y autenticación por roles (Coordinador y Especialista).</li>
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Deep Linking Universal:</strong> Enlaces directos para abrir tickets específicos desde cualquier reporte o chat.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="speaker-note">
+          <span class="speaker-note-tag">Mensaje de Orador:</span>
+          <span>"No obligamos a abandonar las herramientas existentes: la agenda se alimenta directamente de GLPI y ClickUp, asegurando que todo cambio quede registrado en PostgreSQL y respaldado en Google Docs."</span>
+        </div>
+      </section>
+
+      <!-- Diapositiva 3: Tablero Kanban y Modo TV -->
+      <section class="slide" id="slide-3">
+        <div>
+          <div class="slide-badge">Operación Diaria</div>
+          <h2 class="slide-title">Tablero Kanban y Modo Sala Técnica</h2>
+          <p class="slide-subtitle">Monitoreo activo del flujo de trabajo, control de esperas y visualización para centros de operaciones.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon amber">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+              </div>
+              <div class="card-title">Tablero Kanban Interactivo</div>
+            </div>
+            <ul class="feature-list">
+              <li class="feature-item"><span class="feature-dot"></span><strong>4 Estados Operativos:</strong> Pendientes (tickets entrantes sin atender), En Curso, En Espera y Cerrados.</li>
+              <li class="feature-item"><span class="feature-dot"></span><strong>Sub-estados de Espera:</strong> Registro formal del motivo de pausa (espera por cliente, tercero o ventana de mantenimiento).</li>
+              <li class="feature-item"><span class="feature-dot"></span><strong>Reasignación en Caliente:</strong> Cambio ágil de responsable técnico con sincronización inmediata.</li>
+              <li class="feature-item"><span class="feature-dot"></span><strong>Política de 24h para Cerrados:</strong> Mantiene la pantalla limpia enfocándose en los casos activos del día y archivando el histórico a consulta.</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon accent">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
+              </div>
+              <div class="card-title">Modo TV / Pantalla Pública</div>
+            </div>
+            <ul class="feature-list">
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Diseñado para Monitores de Pared:</strong> Interfaz visual de alta legibilidad pensada para pantallas en la sala de operaciones.</li>
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Carrusel Automatizado:</strong> Rotación periódica configurable entre resumen ejecutivo, tablero activo y métricas clave.</li>
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Acceso Público Seguro:</strong> Permite proyectar en sala sin requerir credenciales operativas ni exponer funciones de edición.</li>
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Controles Rápidos:</strong> Botones de pausa, avance y retroceso accesibles desde el teclado.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="speaker-note">
+          <span class="speaker-note-tag">Mensaje de Orador:</span>
+          <span>"El tablero da respuesta inmediata al estado de cada caso, mientras que el Modo TV permite tener un tablero de control visible para todo el equipo en la oficina."</span>
+        </div>
+      </section>
+
+      <!-- Diapositiva 4: Escalamientos y Horas Extras -->
+      <section class="slide" id="slide-4">
+        <div>
+          <div class="slide-badge">Módulos Especializados</div>
+          <h2 class="slide-title">Escalamientos Técnicos y Horas Extras</h2>
+          <p class="slide-subtitle">Documentación estandarizada hacia clientes y registro auditable de dedicación fuera de horario.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              </div>
+              <div class="card-title">Gestión de Escalamientos</div>
+            </div>
+            <ul class="feature-list">
+              <li class="feature-item"><span class="feature-dot"></span><strong>Estandarización de Informes:</strong> Genera documentos formales en Google Docs asociados al ticket o incidente atendido.</li>
+              <li class="feature-item"><span class="feature-dot"></span><strong>Clasificación por IBP y Tecnología:</strong> Banco (BVC, Mercantil, Banplus, Bangente) y categoría (BD, Servidores, Antivirus, Redes).</li>
+              <li class="feature-item"><span class="feature-dot"></span><strong>Tabla Paginada con Búsqueda:</strong> Filtrado dinámico por fecha, responsable, institución bancaria o texto libre.</li>
+              <li class="feature-item"><span class="feature-dot"></span><strong>Detalle Plegable:</strong> Vista rápida de notas técnicas y recomendaciones sin salir de la lista.</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon accent">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+              </div>
+              <div class="card-title">Control de Horas Extras</div>
+            </div>
+            <ul class="feature-list">
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Cálculo Automático en Tiempo Real:</strong> Al ingresar fecha/hora inicio y fin, la interfaz calcula automáticamente las horas y minutos exactos.</li>
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Validación Estricta:</strong> Bloquea rangos invertidos o inconsistencias de horario antes del guardado.</li>
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Descripción de Actividad:</strong> Justificación técnica obligatoria asociada a proyectos y categorías.</li>
+              <li class="feature-item"><span class="feature-dot accent"></span><strong>Políticas de Acceso:</strong> Especialistas gestionan sus registros y los Coordinadores supervisan la carga global.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="speaker-note">
+          <span class="speaker-note-tag">Mensaje de Orador:</span>
+          <span>"Ambos módulos eliminan la improvisación: garantizan que cada escalamiento tenga su acta formal y que cada hora extra quede debidamente documentada y calculada con exactitud."</span>
+        </div>
+      </section>
+
+      <!-- Diapositiva 5: Analítica y Mapas de Calor -->
+      <section class="slide" id="slide-5">
+        <div>
+          <div class="slide-badge">Inteligencia Gerencial</div>
+          <h2 class="slide-title">Analítica Operativa y Mapas de Calor</h2>
+          <p class="slide-subtitle">De los registros individuales a patrones visuales de concentración para la toma estratégica de decisiones.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon purple">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+              </div>
+              <div class="card-title">Matriz IBP x Categoría Técnica</div>
+            </div>
+            <p class="card-desc">Mapa de calor que cruza los clientes bancarios frente al tipo de falla o componente técnico.</p>
+            <ul class="feature-list">
+              <li class="feature-item"><span class="feature-dot"></span>Identificación inmediata de puntos críticos y recurrencias por banco.</li>
+              <li class="feature-item"><span class="feature-dot"></span>Detección de necesidades de mantenimiento preventivo.</li>
+              <li class="feature-item"><span class="feature-dot"></span>Filtrado directo con un clic sobre cualquier celda de la matriz.</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon accent">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+              </div>
+              <div class="card-title">Matriz de Horas Extras por Especialista</div>
+            </div>
+            <p class="card-desc">Mapa de calor que consolida las horas acumuladas por cada miembro del equipo frente a la categoría técnica.</p>
+            <ul class="feature-list">
+              <li class="feature-item"><span class="feature-dot accent"></span>Visibilidad justa del balance de carga y sobreesfuerzo técnico.</li>
+              <li class="feature-item"><span class="feature-dot accent"></span>Totales horizontales por especialista y verticales por tecnología.</li>
+              <li class="feature-item"><span class="feature-dot accent"></span>Exportación formal a PDF ejecutivo y reportes consolidados en Excel.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="speaker-note">
+          <span class="speaker-note-tag">Mensaje de Orador:</span>
+          <span>"Con estos dos mapas de calor, la coordinación sabe con exactitud qué clientes consumen más soporte y qué especialistas están soportando la mayor carga extraordinaria."</span>
+        </div>
+      </section>
+
+      <!-- Diapositiva 6: Demostración en Vivo -->
+      <section class="slide" id="slide-6">
+        <div>
+          <div class="slide-badge" style="color:var(--accent);background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.3)">Demostración Operativa</div>
+          <h2 class="slide-title">Recorrido por el Aplicativo en Vivo</h2>
+          <p class="slide-subtitle">Interacción en tiempo real con el tablero, los módulos técnicos y la analítica gerencial.</p>
+        </div>
+
+        <div class="demo-slide-content">
+          <div class="demo-cta-box">
+            <div style="font-size:15px;color:var(--text);font-weight:600">
+              La plataforma se encuentra completamente desplegada y en producción en el servidor local.
+            </div>
+
+            <a href="index.html" class="btn-launch-demo" id="btnLaunchApp">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Abrir Agenda de Infraestructura</span>
+            </a>
+
+            <div style="font-size:12px;color:var(--text-dim)">
+              Haga clic en el botón o presione <span class="kbd">Enter</span> para iniciar la demostración en vivo
+            </div>
+          </div>
+
+          <div class="demo-steps">
+            <div class="step-pill"><strong>1</strong> Tablero Kanban y Flujo de Estados</div>
+            <div class="step-pill"><strong>2</strong> Reasignación y Detalle de Tickets</div>
+            <div class="step-pill"><strong>3</strong> Registro de Escalamiento a Google Docs</div>
+            <div class="step-pill"><strong>4</strong> Carga de Horas Extras y Cálculo en Vivo</div>
+            <div class="step-pill"><strong>5</strong> Navegación por Mapas de Calor</div>
+            <div class="step-pill"><strong>6</strong> Vista de Pantalla en Modo TV</div>
+          </div>
+        </div>
+
+        <div class="speaker-note" style="border-left-color:var(--accent)">
+          <span class="speaker-note-tag" style="color:var(--accent)">Pase a la Demostración:</span>
+          <span>"Para comprobar la fluidez y precisión de estos componentes en la dinámica real de trabajo, pasemos directamente a interactuar con el sistema."</span>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Barra de Navegación Inferior -->
+  <footer>
+    <div class="nav-hints">
+      <span>Navegación: <span class="kbd">&larr;</span> <span class="kbd">&rarr;</span> o <span class="kbd">Espacio</span></span>
+      <span>Pantalla completa: <span class="kbd">F</span></span>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn-nav" id="btnPrev" onclick="prevSlide()" disabled>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        <span>Anterior</span>
+      </button>
+
+      <button class="btn-nav primary" id="btnNext" onclick="nextSlide()">
+        <span>Siguiente</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+  </footer>
+
+  <script>
+    let currentSlide = 1;
+    const totalSlides = 6;
+
+    function updateSlide() {
+      // Ocultar todas y mostrar la activa
+      document.querySelectorAll('.slide').forEach((slide, idx) => {
+        const slideIdx = idx + 1;
+        if (slideIdx === currentSlide) {
+          slide.classList.add('active');
+        } else {
+          slide.classList.remove('active');
+        }
+      });
+
+      // Actualizar contador y barra de progreso
+      document.getElementById('slideNumber').textContent = `${currentSlide} / ${totalSlides}`;
+      const pct = (currentSlide / totalSlides) * 100;
+      document.getElementById('progressBar').style.width = `${pct}%`;
+
+      // Actualizar estado de botones
+      const btnPrev = document.getElementById('btnPrev');
+      const btnNext = document.getElementById('btnNext');
+
+      btnPrev.disabled = (currentSlide === 1);
+
+      if (currentSlide === totalSlides) {
+        btnNext.innerHTML = '<span>Abrir App</span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+      } else {
+        btnNext.innerHTML = '<span>Siguiente</span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>';
+      }
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) {
+        currentSlide++;
+        updateSlide();
+      } else {
+        // En la última diapositiva, el botón "Siguiente" abre la aplicación
+        window.location.href = 'index.html';
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        currentSlide--;
+        updateSlide();
+      }
+    }
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    }
+
+    // Atajos de teclado para el presentador
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        prevSlide();
+      } else if (e.key === 'Enter') {
+        if (currentSlide === totalSlides) {
+          window.location.href = 'index.html';
+        }
+      } else if (e.key === 'f' || e.key === 'F') {
+        toggleFullScreen();
+      } else if (e.key >= '1' && e.key <= '6') {
+        currentSlide = parseInt(e.key, 10);
+        updateSlide();
+      }
+    });
+
+    // Inicializar estado
+    updateSlide();
+  </script>
+</body>
+</html>
