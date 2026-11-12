@@ -738,5 +738,43 @@ function simulateDeepLink(opts) {
 
   console.log('✓ Test 11: Overtime UI elements, live duration preview, and heatmap matrix integration verified');
 
+  // Test 12: Specialist activity creation and SPECIALISTS_MAP definition
+  assert(content.includes('const SPECIALISTS_MAP'), 'SPECIALISTS_MAP constant missing');
+  assert(content.includes('const SYCOM_SPECIALISTS'), 'SYCOM_SPECIALISTS array missing');
+
+  const specialistMatchRunner = new Function(`
+    const SYCOM_SPECIALISTS = [
+      { key: 'adonis', name: 'Adonis Lozada', email: 'a.lozada@sycom.com.ve', role: 'Coordinador Infra & BD' },
+      { key: 'juan', name: 'Juan Fernández', email: 'j.fernandez@sycom.com.ve', role: 'Especialista Infra & BD' },
+      { key: 'yoxaide', name: 'Yoxaide Jiménez', email: 'y.jimenez@sycom.com.ve', role: 'Especialista Infra & BD' },
+      { key: 'luis', name: 'Luis Acosta', email: 'l.acosta@sycom.com.ve', role: 'Especialista Infra & BD' }
+    ];
+    const SPECIALISTS_MAP = Object.fromEntries(SYCOM_SPECIALISTS.map(s => [s.key, s]));
+
+    function matchSpecialist(currentUser) {
+      let CREATE_SELECTED_KEYS = [];
+      const u = (currentUser.username || '').toLowerCase();
+      const fn = (currentUser.full_name || '').toLowerCase();
+      const em = (currentUser.email || '').toLowerCase();
+      const matched = SYCOM_SPECIALISTS.find(s =>
+        (s.key && u.includes(s.key)) ||
+        (s.email && (em.includes(s.email.toLowerCase()) || s.email.toLowerCase().includes(u))) ||
+        (fn && (fn.includes(s.key) || s.name.toLowerCase().includes(fn) || fn.includes(s.name.toLowerCase().split(' ')[0])))
+      );
+      if (matched) {
+        CREATE_SELECTED_KEYS = [matched.key];
+      }
+      return CREATE_SELECTED_KEYS;
+    }
+
+    return { matchSpecialist, SPECIALISTS_MAP };
+  `)();
+
+  const juanKeys = specialistMatchRunner.matchSpecialist({ username: 'j.fernandez', full_name: 'Juan Fernández', email: 'j.fernandez@sycom.com.ve' });
+  assert.deepStrictEqual(juanKeys, ['juan'], 'Juan Fernández should be automatically matched to key "juan"');
+  assert(specialistMatchRunner.SPECIALISTS_MAP['juan'], 'SPECIALISTS_MAP must contain entry for "juan"');
+
+  console.log('✓ Test 12: Specialist auto-matching and SPECIALISTS_MAP integrity verified');
+
   console.log('ALL FRONTEND TESTS PASSED SUCCESSFULLY!');
 })();

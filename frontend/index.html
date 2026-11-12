@@ -4475,6 +4475,7 @@
       { key: 'yoxaide', name: 'Yoxaide Jiménez', email: 'y.jimenez@sycom.com.ve', role: 'Especialista Infra & BD' },
       { key: 'luis', name: 'Luis Acosta', email: 'l.acosta@sycom.com.ve', role: 'Especialista Infra & BD' }
     ];
+    const SPECIALISTS_MAP = Object.fromEntries(SYCOM_SPECIALISTS.map(s => [s.key, s]));
 
     let MODAL_SELECTED_KEYS = [];
 
@@ -4954,9 +4955,15 @@
       CREATE_SELECTED_KEYS = [];
       if (isSpecialist() && CURRENT_USER) {
         const u = (CURRENT_USER.username || '').toLowerCase();
-        const matchedKey = Object.keys(SPECIALISTS_MAP).find(k => u.includes(k) || (CURRENT_USER.full_name && CURRENT_USER.full_name.toLowerCase().includes(k)));
-        if (matchedKey) {
-          CREATE_SELECTED_KEYS = [matchedKey];
+        const fn = (CURRENT_USER.full_name || '').toLowerCase();
+        const em = (CURRENT_USER.email || '').toLowerCase();
+        const matched = SYCOM_SPECIALISTS.find(s =>
+          (s.key && u.includes(s.key)) ||
+          (s.email && (em.includes(s.email.toLowerCase()) || s.email.toLowerCase().includes(u))) ||
+          (fn && (fn.includes(s.key) || s.name.toLowerCase().includes(fn) || fn.includes(s.name.toLowerCase().split(' ')[0])))
+        );
+        if (matched) {
+          CREATE_SELECTED_KEYS = [matched.key];
         }
       }
 
