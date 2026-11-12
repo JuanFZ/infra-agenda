@@ -21,7 +21,6 @@ Eliminar la dispersión operativa entre GLPI y ClickUp permitiendo al equipo de 
   - **Matriz IBP x Categoría Técnica:** Concentración de incidentes por banco y tecnología.
   * **Matriz de Horas Extras:** Distribución de horas acumuladas por especialista y componente técnico con filtrado interactivo directo.
 - **Modo TV para Sala de Operaciones:** Carrusel interactivo para pantallas y Smart TVs con diapositivas del Tablero Kanban y de Analítica de Indicadores sin requerir credenciales operativas.
-- **Presentación Ejecutiva Integrada (`presentacion.html`):** Plataforma web de diapositivas interactiva en pantalla completa con atajos de teclado y botón directo de transición a la demostración en vivo.
 - **Gestión de Mi Perfil:** Autenticación por roles (Coordinador, Especialista, Analista), personalización de foto de perfil (avatar optimizado), datos personales, teléfono, Telegram y cambio de contraseñas.
 - **Alertas Proactivas en Telegram:** Bot (@sycominfrabot) con notificaciones tempranas y enlaces directos (*deep linking*) que abren la actividad seleccionada en el navegador.
 
@@ -41,7 +40,7 @@ flowchart LR
     end
     
     SYNC --> TG["Bot Telegram (@sycominfrabot)<br>(Alertas & Deep Linking)"]
-    NGINX --> DASH["Dashboard Web<br>(Kanban, Resumen, Escalamientos, Horas Extras, Reportes, TV, Presentacion)"]
+    NGINX --> DASH["Dashboard Web<br>(Kanban, Resumen, Escalamientos, Horas Extras, Reportes, Modo TV)"]
 ```
 
 ---
@@ -84,11 +83,7 @@ flowchart LR
 - Carrusel rotativo continuo que alterna entre el **Tablero Kanban operativo** y el **Tablero de Indicadores y Gráficos**.
 - Controles de teclado: Pausar/Reanudar (`Espacio`), Navegar (`←` / `→`) y Salir (`Esc`).
 
-### 7. Presentación Ejecutiva en Diapositivas (`presentacion.html`)
-- Módulo de 6 diapositivas interactivo integrado en el frontend para exposición ante la Gerencia.
-- Soporta modo pantalla completa (`F`), navegación con teclado (`←` / `→` / `Espacio`) y botón de transición directa hacia la aplicación en vivo (`Enter`).
-
-### 8. Perfil de Usuario y Autenticación RBAC
+### 7. Perfil de Usuario y Autenticación RBAC
 - Roles: **Coordinador** (gestión total y reportes ejecutivos), **Especialista** (gestión operativa, creación y eliminación propia), **Analista** (seguimiento y visualización).
 - Login manual limpio y seguro sin credenciales precargadas.
 - Panel **Mi Perfil**: Foto de perfil (avatar recortado y optimizado en base64), datos de contacto, especialidad y cambio de contraseña.
@@ -148,7 +143,6 @@ flowchart LR
 
 4. **Acceder al sistema:**
    - **Dashboard Web:** `http://<IP_DEL_SERVIDOR>` (puerto 80)
-   - **Presentación Ejecutiva:** `http://<IP_DEL_SERVIDOR>/presentacion.html`
    - **Documentación Swagger API:** `http://<IP_DEL_SERVIDOR>:8000/docs`
 
 ---
@@ -233,7 +227,6 @@ tasks-infra/
 │           └── scheduler.py      # Tarea programada de sincronización continua
 ├── frontend/
 │   ├── index.html                # Interfaz completa Glassmorphism (Kanban, Escalamientos, Horas Extras, Reportes)
-│   ├── presentacion.html         # Diapositivas interactivas en pantalla completa para la Gerencia
 │   ├── nginx.conf                # Configuración de proxy inverso Nginx y enrutamiento web
 │   └── test_deeplink.js          # Pruebas unitarias de frontend, interfaz y deep linking
 ├── docker-compose.yml            # Orquestación de servicios: PostgreSQL 16, Backend API y Frontend Nginx

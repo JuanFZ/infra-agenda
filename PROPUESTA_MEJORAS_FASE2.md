@@ -18,7 +18,7 @@ flowchart LR
     SYNC --> DB[("PostgreSQL 16 (tasks_db)")]
     DB --> REG["Regla 24h Kanban (Histórico Permanente en Resumen)"]
     DB --> API["Backend FastAPI (Tiempos Reales, Escalamientos, Horas Extras, Reportes, Perfiles)"]
-    API --> WEB["Agenda de Infra (Kanban, Resumen, Escalamientos, Horas Extras, Reportes, Modo TV, Presentacion)"]
+    API --> WEB["Agenda de Infra (Kanban, Resumen, Escalamientos, Horas Extras, Reportes, Modo TV)"]
     SYNC --> TG["Bot Telegram (@sycominfrabot) · Alertas Proactivas & Deep Linking"]
 ```
 
@@ -44,8 +44,7 @@ flowchart LR
 | **M14** | **Base de Datos Relacional PostgreSQL 16 y Auto-Migrador de Datos** | **100% OPERATIVO EN PRODUCCIÓN** | **Crítico (Resuelto)** |
 | **M15** | **Módulo de Horas Extras con Cálculo de Duración en Tiempo Real** | **100% OPERATIVO EN PRODUCCIÓN** | **Alto (Resuelto)** |
 | **M16** | **Mapa de Calor de Horas Extras por Especialista y Categoría Técnica** | **100% OPERATIVO EN PRODUCCIÓN** | **Alto (Resuelto)** |
-| **M17** | **Presentación Ejecutiva Interactiva en Diapositivas (`presentacion.html`)** | **100% OPERATIVO EN PRODUCCIÓN** | **Medio-Alto (Resuelto)** |
-| **M18** | **Paginación Uniforme de 10 Elementos por Página con Controles Centrados** | **100% OPERATIVO EN PRODUCCIÓN** | **Medio (Resuelto)** |
+| **M17** | **Paginación Uniforme de 10 Elementos por Página con Controles Centrados** | **100% OPERATIVO EN PRODUCCIÓN** | **Medio (Resuelto)** |
 
 ---
 
@@ -90,18 +89,14 @@ flowchart LR
 - Script de migración y sincronización de esquema (`migrate_sqlite_to_pg.py`) para migrar datos históricos desde SQLite sin pérdida de información.
 - Conexión de alto rendimiento mediante SQLAlchemy con soporte de fallback local.
 
-### 9. Presentación Ejecutiva en Diapositivas (`presentacion.html`)
-- Módulo de 6 diapositivas interactivo integrado en el frontend para exposición ante la Gerencia y la Dirección.
-- Soporta modo pantalla completa (`F`), navegación con teclado (`←` / `→` / `Espacio`) y botón de transición directa hacia la aplicación en vivo (`Enter`).
-
-### 10. Perfil de Usuario y Seguridad
+### 9. Perfil de Usuario y Seguridad
 - Módulo **Mi Perfil** accesible desde el menú lateral y la cabecera:
   - Personalización de foto de perfil (avatar recortado y optimizado en base64).
   - Actualización de datos de contacto (correo, teléfono, usuario de Telegram, cargo y especialidad).
   - Cambio seguro de contraseñas con verificación de clave actual.
 - Interfaz de acceso limpia sin usuarios ni contraseñas guardadas por defecto.
 
-### 11. Alertas Proactivas en Telegram (@sycominfrabot)
+### 10. Alertas Proactivas en Telegram (@sycominfrabot)
 - Notificaciones automáticas ante nuevos casos y asignaciones.
 - Enlaces directos (*deep linking*) que abren y enfocan automáticamente la actividad en el navegador al hacer clic en el mensaje de Telegram.
 
