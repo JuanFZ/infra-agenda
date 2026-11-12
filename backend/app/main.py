@@ -2815,7 +2815,25 @@ def list_overtimes(
     x_user_name: str | None = Header(None, alias="X-User-Name")
 ):
     """Retorna la lista de registros de horas extras con filtros opcionales."""
+    role = (x_user_role or "").strip().lower()
+    caller_name = _clean_header_user(x_user_name)
+    is_coord = role in ("coordinador", "admin", "administrador")
+
     q = db.query(OvertimeRecord)
+
+    # Si no es coordinador/admin, únicamente puede listar sus propias horas extras
+    if not is_coord and caller_name:
+        first_token = caller_name.split()[0] if caller_name.split() else caller_name
+        filter_conds = [
+            OvertimeRecord.specialist_name.ilike(f"%{caller_name}%"),
+            OvertimeRecord.created_by.ilike(f"%{caller_name}%")
+        ]
+        if len(first_token) >= 3:
+            filter_conds.extend([
+                OvertimeRecord.specialist_name.ilike(f"%{first_token}%"),
+                OvertimeRecord.created_by.ilike(f"%{first_token}%")
+            ])
+        q = q.filter(or_(*filter_conds))
 
     if start_date:
         try:
@@ -2934,10 +2952,30 @@ def get_overtimes_analytics(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
     specialist: str | None = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
+    x_user_name: str | None = Header(None, alias="X-User-Name")
 ):
     """Retorna métricas consolidadas y la matriz para el mapa de calor de horas extras por especialista."""
+    role = (x_user_role or "").strip().lower()
+    caller_name = _clean_header_user(x_user_name)
+    is_coord = role in ("coordinador", "admin", "administrador")
+
     q = db.query(OvertimeRecord)
+
+    # Si no es coordinador/admin, únicamente puede ver sus propias analíticas
+    if not is_coord and caller_name:
+        first_token = caller_name.split()[0] if caller_name.split() else caller_name
+        filter_conds = [
+            OvertimeRecord.specialist_name.ilike(f"%{caller_name}%"),
+            OvertimeRecord.created_by.ilike(f"%{caller_name}%")
+        ]
+        if len(first_token) >= 3:
+            filter_conds.extend([
+                OvertimeRecord.specialist_name.ilike(f"%{first_token}%"),
+                OvertimeRecord.created_by.ilike(f"%{first_token}%")
+            ])
+        q = q.filter(or_(*filter_conds))
 
     if start_date:
         try:

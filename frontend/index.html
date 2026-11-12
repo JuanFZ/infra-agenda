@@ -1244,6 +1244,41 @@
       margin-top: 16px
     }
 
+    .btn-close {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: var(--muted);
+      border-radius: 8px;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all .15s ease;
+      line-height: 1;
+    }
+
+    .btn-close:hover {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #ef4444;
+      transform: scale(1.05);
+    }
+
+    body.light .btn-close {
+      background: rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      color: #64748b;
+    }
+
+    body.light .btn-close:hover {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.25);
+      color: #dc2626;
+    }
+
     .selected-chips-wrap {
       display: flex;
       flex-wrap: wrap;
@@ -10285,17 +10320,28 @@
         const list = await res.json();
         ALL_OVERTIMES = list || [];
 
-        const totalHours = ALL_OVERTIMES.reduce((acc, r) => acc + (Number(r.duration_hours) || 0), 0);
+        const isCoord = isCoordinator();
+        const myNameNorm = (!isCoord && CURRENT_USER) ? normalizeSearchText(CURRENT_USER.full_name || CURRENT_USER.username || '') : '';
+        const userRecords = (!isCoord && myNameNorm)
+          ? ALL_OVERTIMES.filter(r => {
+              const rSpec = normalizeSearchText(r.specialist_name);
+              const rCreated = normalizeSearchText(r.created_by);
+              return rSpec.includes(myNameNorm) || myNameNorm.includes(rSpec) ||
+                     rCreated.includes(myNameNorm) || myNameNorm.includes(rCreated);
+            })
+          : ALL_OVERTIMES;
+
+        const totalHours = userRecords.reduce((acc, r) => acc + (Number(r.duration_hours) || 0), 0);
         const totalHoursFormatted = totalHours.toFixed(1);
 
         if (countBadge) {
-          countBadge.textContent = `${ALL_OVERTIMES.length} registro${ALL_OVERTIMES.length === 1 ? '' : 's'}`;
+          countBadge.textContent = `${userRecords.length} registro${userRecords.length === 1 ? '' : 's'}`;
         }
         if (hoursBadge) {
           hoursBadge.textContent = `${totalHoursFormatted}h acumuladas`;
         }
         if (navBadge) {
-          if (ALL_OVERTIMES.length > 0) {
+          if (userRecords.length > 0) {
             navBadge.style.display = 'inline-block';
             navBadge.textContent = `${totalHoursFormatted}h`;
           } else {
@@ -10321,7 +10367,24 @@
 
     function populateOvertimeSpecialistFilter() {
       const select = document.getElementById('fSpecialistOvertime');
+      const sInput = document.getElementById('fSearchOvertime');
+      const isCoord = isCoordinator();
+
+      if (sInput) {
+        sInput.placeholder = isCoord
+          ? 'Buscar por especialista, actividad, categoría...'
+          : 'Buscar por actividad, categoría...';
+      }
+
       if (!select) return;
+
+      if (!isCoord) {
+        select.style.display = 'none';
+        select.value = '';
+        return;
+      }
+
+      select.style.display = '';
       const currentVal = select.value;
       const specs = new Set();
       (ALL_OVERTIMES || []).forEach(r => {
@@ -10343,11 +10406,23 @@
       const specSelect = document.getElementById('fSpecialistOvertime');
       const catSelect = document.getElementById('fCategoryOvertime');
 
+      const isCoord = isCoordinator();
       const q = normalizeSearchText(sInput ? sInput.value : '');
-      const specFilter = specSelect ? specSelect.value.trim().toLowerCase() : '';
+      const specFilter = (isCoord && specSelect) ? specSelect.value.trim().toLowerCase() : '';
       const catFilter = catSelect ? catSelect.value.trim().toLowerCase() : '';
 
+      const myNameNorm = (!isCoord && CURRENT_USER) ? normalizeSearchText(CURRENT_USER.full_name || CURRENT_USER.username || '') : '';
+
       const filtered = (ALL_OVERTIMES || []).filter(r => {
+        // Para especialistas (no admin/coordinador), únicamente mostrar sus propios registros
+        if (!isCoord && myNameNorm) {
+          const rSpec = normalizeSearchText(r.specialist_name);
+          const rCreated = normalizeSearchText(r.created_by);
+          const isMyRecord = rSpec.includes(myNameNorm) || myNameNorm.includes(rSpec) ||
+                             rCreated.includes(myNameNorm) || myNameNorm.includes(rCreated);
+          if (!isMyRecord) return false;
+        }
+
         if (specFilter && (r.specialist_name || '').toLowerCase() !== specFilter) {
           return false;
         }
@@ -10590,7 +10665,12 @@
               <span class="muted" style="font-size:11.5px">Jornada técnica extraordinaria con cálculo cronológico exacto</span>
             </div>
           </div>
-          <button type="button" class="btn-close" onclick="closeModal()" title="Cerrar modal">&times;</button>
+          <button type="button" class="btn-close" onclick="closeModal()" title="Cerrar modal">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
 
         <form id="formOvertime" onsubmit="event.preventDefault(); submitOvertimeForm(${editId});" style="display:flex;flex-direction:column;gap:14px">
