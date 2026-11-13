@@ -3953,20 +3953,44 @@
     }
 
     async function loadData() {
-      try {
-        const resKpi = await fetch(`${API_URL}/kpis`, { headers: getAuthHeaders() });
-        const kpis = await resKpi.json();
-        document.getElementById('apiStatus').textContent = 'API Conectada';
-        document.getElementById('syncTime').textContent = kpis.last_sync ? `Última sync: ${formatDate(kpis.last_sync, true)}` : 'Sync: OK';
+      // 1. Renderizado instantáneo desde caché de sesión si existe (stale-while-revalidate)
+      if (!ALL_ITEMS || !ALL_ITEMS.length) {
+        try {
+          const cached = JSON.parse(sessionStorage.getItem('sycom_cached_items') || 'null');
+          if (cached && Array.isArray(cached) && cached.length) {
+            ALL_ITEMS = cached;
+            renderAll();
+          }
+        } catch (e) {}
+      }
 
-        const resItems = await fetch(`${API_URL}/items`, { headers: getAuthHeaders() });
-        ALL_ITEMS = await resItems.json();
+      try {
+        // Ejecución en paralelo de /kpis y /items para máxima velocidad de respuesta
+        const [resKpi, resItems] = await Promise.all([
+          fetch(`${API_URL}/kpis`, { headers: getAuthHeaders() }),
+          fetch(`${API_URL}/items`, { headers: getAuthHeaders() })
+        ]);
+
+        if (!resKpi.ok || !resItems.ok) {
+          throw new Error('Error en respuesta de la API');
+        }
+
+        const [kpis, items] = await Promise.all([resKpi.json(), resItems.json()]);
+        ALL_ITEMS = items;
+        try { sessionStorage.setItem('sycom_cached_items', JSON.stringify(items)); } catch (e) {}
+
+        const statusEl = document.getElementById('apiStatus');
+        const syncEl = document.getElementById('syncTime');
+        if (statusEl) statusEl.textContent = 'API Conectada';
+        if (syncEl) syncEl.textContent = kpis.last_sync ? `Última sync: ${formatDate(kpis.last_sync, true)}` : 'Sync: OK';
+
         renderAll();
         loadIbps().catch(e => console.warn('Preload IBPs:', e));
         loadEscalations().catch(e => console.warn('Preload escalations:', e));
         await handleDeepLink();
       } catch (err) {
-        document.getElementById('apiStatus').textContent = 'API Desconectada';
+        const statusEl = document.getElementById('apiStatus');
+        if (statusEl) statusEl.textContent = 'API Desconectada';
         console.error('Error conectando a FastAPI:', err);
       }
     }

@@ -816,11 +816,14 @@ def on_startup():
         purge_old_closed_items(db)
     finally:
         db.close()
-    # Sincronización inicial al arrancar
-    sync_all()
+
     # Programar sincronización periódica
     scheduler.add_job(sync_all, "interval", minutes=SYNC_INTERVAL_MINUTES, id="sync_job")
     scheduler.start()
+
+    # Ejecutar primera sincronización en segundo plano para NO bloquear el arranque ni demorar la respuesta del dashboard
+    import threading
+    threading.Thread(target=sync_all, daemon=True, name="startup_sync_thread").start()
 
 @app.on_event("shutdown")
 def on_shutdown():
@@ -1482,7 +1485,8 @@ def update_item_status(
         safe_status_orig = html.escape(item.status_origin or "")
         safe_assignee = html.escape(item.assignee_name or "Sin asignar")
         now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
-        user_info = f" por {html.escape(x_user_name)}" if x_user_name else ""
+        user_clean = decode_header_val(x_user_name)
+        user_info = f" por {html.escape(user_clean)}" if user_clean else ""
         rec_info = f"\n💡 <b>Recomendaciones:</b>\n{html.escape(req.recommendations.strip())}\n" if (new_st == "cerrado" and req.recommendations and req.recommendations.strip()) else ""
         agenda_url = get_agenda_deep_link(item.id, view="kanban")
         msg = (
@@ -1494,7 +1498,7 @@ def update_item_status(
             f"🕒 <b>Hora:</b> {now_str}\n"
             f"{rec_info}\n"
             f"🔗 <a href=\"{agenda_url}\"><b>Abrir Agenda</b></a>\n\n"
-            f"⚡ <i>Actualizado{user_info} desde la Agenda</i>"
+            f"⚡ <i>Actualizado{user_info} desde la Agenda de Infraestructura</i>"
         )
         send_telegram_message(msg, parse_mode="HTML")
     except Exception as e:
