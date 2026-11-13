@@ -3582,6 +3582,18 @@
         <div class="tv-progress-bar" id="tvProgressBar"></div>
       </div>
       <div class="tv-controls">
+        <div class="tv-sync-pill" id="tvSyncStatusPill" style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#34d399" title="Sincronización en tiempo real con GLPI y ClickUp">
+          <span style="width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;display:inline-block"></span>
+          <span id="tvSyncLabel">En Vivo</span>
+          <span class="muted" id="tvSyncTimeLabel" style="font-size:11px;color:#94a3b8;margin-left:2px">· Sync OK</span>
+        </div>
+        <button class="tv-btn" onclick="triggerTvSync()" title="Forzar sincronización inmediata con GLPI y ClickUp">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
         <button class="tv-btn" id="tvBtnNewActivity" onclick="openCreateModal()"
           style="background:linear-gradient(135deg, rgba(16,185,129,.22), rgba(5,150,105,.32));border-color:rgba(16,185,129,.5);color:#34d399;font-weight:600"
           title="Crear nueva actividad en ClickUp o GLPI">
@@ -3985,6 +3997,10 @@
         if (syncEl) syncEl.textContent = kpis.last_sync ? `Última sync: ${formatDate(kpis.last_sync, true)}` : 'Sync: OK';
 
         renderAll();
+        if (TV_MODE_ACTIVE) {
+          fetchTvItems().then(() => renderTvSlide()).catch(() => {});
+        }
+        updateTvSyncUI(kpis);
         loadIbps().catch(e => console.warn('Preload IBPs:', e));
         loadEscalations().catch(e => console.warn('Preload escalations:', e));
         await handleDeepLink();
@@ -6082,6 +6098,55 @@
       { name: "Luis Acosta", tag: "@lapsy0", key: "luis" }
     ];
 
+    let TV_ITEMS = [];
+
+    async function fetchTvItems() {
+      try {
+        const headers = { ...getAuthHeaders(), 'X-TV-Mode': 'true' };
+        const res = await fetch(`${API_URL}/items?tv_mode=true`, { headers });
+        if (res.ok) {
+          TV_ITEMS = await res.json();
+          updateTvSyncUI();
+        }
+      } catch (e) {
+        console.warn('Error cargando actividades para Modo TV:', e);
+      }
+    }
+
+    function updateTvSyncUI(kpis) {
+      const label = document.getElementById('tvSyncLabel');
+      const timeLabel = document.getElementById('tvSyncTimeLabel');
+      if (label) label.textContent = 'En Vivo';
+      if (timeLabel) {
+        let lastSyncStr = '';
+        if (kpis && kpis.last_sync) {
+          lastSyncStr = formatDate(kpis.last_sync, true);
+        } else {
+          const syncEl = document.getElementById('syncTime');
+          if (syncEl && syncEl.textContent) {
+            lastSyncStr = syncEl.textContent.replace('Última sync: ', '').trim();
+          }
+        }
+        timeLabel.textContent = lastSyncStr ? `· Sync: ${lastSyncStr}` : '· Sync OK';
+      }
+    }
+
+    async function triggerTvSync() {
+      const label = document.getElementById('tvSyncLabel');
+      if (label) label.textContent = 'Sincronizando...';
+      try {
+        await fetch(`${API_URL}/sync`, { method: 'POST', headers: getAuthHeaders() });
+        await fetchTvItems();
+        await ensureTvAnalyticsData(true);
+        await loadData();
+        renderTvSlide();
+      } catch (e) {
+        console.warn('Error en sincronización forzada TV:', e);
+      } finally {
+        updateTvSyncUI();
+      }
+    }
+
     function getTvSlides() {
       const slides = [
         { type: 'resumen', title: 'Panorama General del Equipo', sub: 'Indicadores globales y casos prioritarios en curso' },
@@ -6090,27 +6155,15 @@
         { type: 'tv_analytics_distribution', title: 'Reporte Operativo: Categorías & Bancos (IBP)', sub: 'Distribución técnica por área, balance de plataformas y entidades bancarias' },
         { type: 'unassigned', title: 'Asuntos Sin Asignar', sub: 'Disponibles para asignación inmediata del equipo' }
       ];
-      if (!CURRENT_USER || isCoordinator() || CURRENT_USER.username === 'modo.tv') {
-        TV_SPECIALISTS.forEach(spec => {
-          slides.push({
-            type: 'specialist',
-            spec: spec,
-            title: `${spec.isCoord ? 'Coordinación' : 'Especialista'}: ${spec.name}`,
-            sub: `Tareas y tickets asignados (${spec.tag})`
-          });
+      // En Sala de Operaciones / Modo TV siempre se muestran todos los especialistas del equipo
+      TV_SPECIALISTS.forEach(spec => {
+        slides.push({
+          type: 'specialist',
+          spec: spec,
+          title: `${spec.isCoord ? 'Coordinación' : 'Especialista'}: ${spec.name}`,
+          sub: `Tareas y tickets asignados (${spec.tag})`
         });
-      } else {
-        const myFirst = (CURRENT_USER.full_name || '').split(' ')[0].toLowerCase();
-        const mySpec = TV_SPECIALISTS.find(s => s.name.toLowerCase().includes(myFirst));
-        if (mySpec) {
-          slides.push({
-            type: 'specialist',
-            spec: mySpec,
-            title: `Mi Carga de Trabajo: ${mySpec.name}`,
-            sub: `Tus tareas y tickets asignados (${mySpec.tag})`
-          });
-        }
-      }
+      });
       return slides;
     }
 
@@ -6127,13 +6180,10 @@
       TV_ANALYTICS_LOADING = true;
       try {
         const params = new URLSearchParams();
-        if (CURRENT_USER) {
-          if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
-          if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
-          else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
-        }
+        params.set('role', 'tv');
+        params.set('user', 'Pantalla Modo TV');
         const res = await fetch(`${API_URL}/reports/data?${params.toString()}`, {
-          headers: getAuthHeaders()
+          headers: { ...getAuthHeaders(), 'X-TV-Mode': 'true' }
         });
         if (res.ok) {
           const data = await res.json();
@@ -6166,8 +6216,8 @@
       }
       ensureTvAnalyticsData();
 
-      // Cómputo local inmediato derivado de ALL_ITEMS para evitar pantallas vacías
-      const items = (ALL_ITEMS || []).filter(it => isItemVisibleForUser(it, CURRENT_USER));
+      // Cómputo local inmediato derivado de TV_ITEMS / ALL_ITEMS para evitar pantallas vacías
+      const items = (TV_ITEMS && TV_ITEMS.length) ? TV_ITEMS : (ALL_ITEMS || []);
       const total = items.length;
       const cerrados = items.filter(i => i.status === 'cerrado').length;
       const enCurso = items.filter(i => i.status === 'curso').length;
@@ -6258,13 +6308,15 @@
       };
     }
 
-    function toggleTvMode() {
+    async function toggleTvMode() {
       TV_MODE_ACTIVE = !TV_MODE_ACTIVE;
       const overlay = document.getElementById('tvOverlay');
       if (TV_MODE_ACTIVE) {
         overlay.style.display = 'flex';
         TV_CURRENT_SLIDE = 0;
         TV_IS_PAUSED = false;
+        updateTvSyncUI();
+        await fetchTvItems();
         ensureTvAnalyticsData();
         renderTvSlide();
         startTvTimer();
@@ -6339,10 +6391,12 @@
       document.getElementById('tvSlideSub').textContent = s.sub;
 
       const container = document.getElementById('tvBody');
-      const visibleTvItems = (ALL_ITEMS || []).filter(it => isItemVisibleForUser(it, CURRENT_USER));
+      const rawItems = (TV_ITEMS && TV_ITEMS.length) ? TV_ITEMS : (ALL_ITEMS || []);
+      const visibleTvItems = rawItems;
 
       if (s.type === 'resumen') {
         const active = visibleTvItems.filter(i => i.status !== 'cerrado');
+        const closed = visibleTvItems.filter(i => i.status === 'cerrado');
         const criticos = active.filter(i => i.priority === 'Crítica').length;
         const enEspera = active.filter(i => i.status === 'espera').length;
         const enCurso = active.filter(i => i.status === 'curso').length;
@@ -6367,7 +6421,8 @@
           <div class="num" style="color:var(--yellow)">${criticos}</div>
         </div>
       </div>
-      <h3 style="margin-bottom:12px;font-size:16px">Casos Prioritarios y Actividades en Atención</h3>
+      <h3 style="margin-bottom:12px;font-size:16px">Estado Operativo de la Infraestructura</h3>
+      ${active.length > 0 ? `
       <div class="tv-card-grid">
         ${active.slice(0, 6).map(it => `
           <div class="tv-item-card ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}">
@@ -6382,12 +6437,41 @@
               <span class="muted">Recibido: ${formatDate(it.received_at || it.created_at, true)}</span>
             </div>
           </div>
-        `).join('') || '<div class="muted" style="padding:40px;text-align:center">No hay tickets activos en este momento.</div>'}
+        `).join('')}
       </div>
+      ` : `
+      <div style="background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.25);border-radius:14px;padding:22px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,.15);display:flex;align-items:center;justify-content:center;color:#34d399">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div>
+            <div style="font-size:16px;font-weight:700;color:#34d399">Operación al Día · Sin Asuntos Pendientes en Cola</div>
+            <div class="muted" style="font-size:12.5px;margin-top:2px">Todas las actividades han sido resueltas o se encuentran programadas. Mostrando las últimas actividades resueltas por el equipo.</div>
+          </div>
+        </div>
+        <span class="badge" style="background:rgba(16,185,129,.2);color:#34d399;font-weight:700;font-size:12px;padding:6px 12px">100% Eficiencia</span>
+      </div>
+      <div class="tv-card-grid">
+        ${closed.slice(0, 6).map(it => `
+          <div class="tv-item-card" style="border-left-color:#10b981">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+              <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
+              <span class="badge" style="margin-left:auto;background:rgba(16,185,129,.15);color:#34d399;font-size:10.5px">Resuelto</span>
+            </div>
+            <div style="font-size:15px;font-weight:700">${escapeHtml(it.title)}</div>
+            <div class="muted" style="font-size:12px">Cliente: ${escapeHtml(it.client_name || it.project_name || 'Interno')} · Resuelto por: <b>${escapeHtml(it.assignee_name || 'Equipo')}</b></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;font-size:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px">
+              <span style="font-weight:600;color:#34d399">${getItemAttentionTime(it)}</span>
+              <span class="muted">Cierre: ${formatDate(it.closed_at || it.updated_at, true)}</span>
+            </div>
+          </div>
+        `).join('') || '<div class="muted" style="padding:40px;text-align:center">Sin actividades registradas en la base de datos.</div>'}
+      </div>
+      `}
     `;
       } else if (s.type === 'kanban') {
-        const srcFilter = document.getElementById('fSrc') ? document.getElementById('fSrc').value : '';
-        const tvKanbanItems = srcFilter ? visibleTvItems.filter(i => i.source === srcFilter) : visibleTvItems;
+        const tvKanbanItems = visibleTvItems;
         const visibleBoardItems = tvKanbanItems.filter(i => i.status !== 'cerrado' || isItemRecentClosed(i));
         const cols = [
           { k: 'pendiente', title: 'Pendientes', color: '#4f8cff' },
@@ -6399,7 +6483,7 @@
         container.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 16px;backdrop-filter:blur(14px);flex-wrap:gap:10px">
         <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-weight:700;font-size:14px">Tablero Kanban en Tiempo Real${srcFilter ? ` · ${srcFilter}` : ''}</span>
+          <span style="font-weight:700;font-size:14px">Tablero Kanban en Tiempo Real</span>
           <span class="badge" style="background:rgba(79,140,255,.15);color:var(--accent);font-size:11px">${visibleBoardItems.length} asuntos visibles</span>
         </div>
         ${(isCoordinator() || isSpecialist()) ? `
@@ -6418,8 +6502,9 @@
         ${cols.map(c => {
           let colItems = tvKanbanItems.filter(i => i.status === c.k);
           if (c.k === 'cerrado') {
-            // Filtro visual de las últimas 24 horas para mantener limpio el flujo de trabajo del Kanban en Modo TV
-            colItems = colItems.filter(isItemRecentClosed);
+            // Filtro visual: muestra recientes o últimas cerradas si no hay en 24h
+            const recent = colItems.filter(isItemRecentClosed);
+            colItems = recent.length ? recent : colItems.slice(0, 8);
           }
           return `
             <div class="tv-kanban-col" data-col="${c.k}" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${c.k}')">
@@ -6435,7 +6520,7 @@
                       Crear
                     </button>
                   ` : ''}
-                  <span class="badge" style="background:rgba(255,255,255,.08);color:#fff;font-size:12px" ${c.k === 'cerrado' ? 'title="Mostrando actividades cerradas en las últimas 24 horas"' : ''}>${colItems.length}</span>
+                  <span class="badge" style="background:rgba(255,255,255,.08);color:#fff;font-size:12px" ${c.k === 'cerrado' ? 'title="Mostrando actividades cerradas"' : ''}>${colItems.length}</span>
                 </div>
               </div>
               <div class="tv-kanban-cards">
@@ -6466,7 +6551,7 @@
       </div>
     `;
       } else if (s.type === 'unassigned') {
-        const unassigned = ALL_ITEMS.filter(it => it.status !== 'cerrado' && (!it.assignee_name || it.assignee_name.toLowerCase().includes('sin asignar') || it.assignee_name.toLowerCase().includes('técnico glpi')));
+        const unassigned = visibleTvItems.filter(it => it.status !== 'cerrado' && (!it.assignee_name || it.assignee_name.toLowerCase().includes('sin asignar') || it.assignee_name.toLowerCase().includes('técnico glpi')));
 
         container.innerHTML = `
       <div class="tv-unassigned-banner">
@@ -6887,7 +6972,7 @@
         `;
       } else if (s.type === 'specialist') {
         const spec = s.spec;
-        const items = ALL_ITEMS.filter(it => it.status !== 'cerrado' && it.assignee_name && it.assignee_name.toLowerCase().includes(spec.key));
+        const items = visibleTvItems.filter(it => it.status !== 'cerrado' && it.assignee_name && it.assignee_name.toLowerCase().includes(spec.key));
         const enCurso = items.filter(i => i.status === 'curso').length;
         const enEspera = items.filter(i => i.status === 'espera').length;
         const pendientes = items.filter(i => i.status === 'pendiente').length;
@@ -7045,7 +7130,7 @@
         id: 0,
         full_name: 'Pantalla Modo TV',
         username: 'modo.tv',
-        role: 'especialista'
+        role: 'coordinador'
       };
       localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
       document.getElementById('loginOverlay').style.display = 'none';
@@ -7053,7 +7138,7 @@
       await loadData();
       await handleDeepLink(true);
       if (!TV_MODE_ACTIVE) {
-        toggleTvMode();
+        await toggleTvMode();
       }
     }
 

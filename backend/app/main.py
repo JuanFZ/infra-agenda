@@ -579,10 +579,12 @@ def is_user_creator_of_item(created_by: str | None, user_name_raw: str | None) -
 
 
 def is_item_visible_to_user(item: Item, role_raw: str | None, user_name_raw: str | None) -> bool:
-    """Coordinador/Admin ve todas; Especialista/Analista ve sus asignadas y las sin asignar."""
+    """Coordinador/Admin y Modo TV ven todas; Especialista/Analista ve sus asignadas y las sin asignar."""
     role = decode_header_val(role_raw).lower()
     user_clean = decode_header_val(user_name_raw)
-    if not role or role in ("coordinador", "admin", "administrador"):
+    if not role or role in ("coordinador", "admin", "administrador", "tv", "modo.tv", "publico"):
+        return True
+    if user_clean and user_clean.lower() in ("pantalla modo tv", "modo.tv", "tv"):
         return True
     if not user_clean:
         return True
@@ -896,9 +898,11 @@ def get_items(
     prio: str = Query(None, description="Crítica, Alta, Media, Baja"),
     status: str = Query(None, description="pendiente, curso, espera, cerrado"),
     q: str = Query(None, description="Búsqueda por texto en título"),
+    tv_mode: bool = Query(False, description="Modo TV: retorna todas las actividades del equipo"),
     db: Session = Depends(get_db),
     x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name")
+    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    x_tv_mode: str | None = Header(None, alias="X-TV-Mode")
 ):
     query = db.query(Item)
 
@@ -921,6 +925,14 @@ def get_items(
         query = query.filter(Item.title.ilike(f"%{q}%"))
 
     items = query.order_by(Item.updated_at.desc()).all()
+
+    # Si la petición es explícitamente para Modo TV / Sala de Operaciones, retorna todas las actividades del equipo
+    role_clean = decode_header_val(x_user_role).lower()
+    user_clean = decode_header_val(x_user_name).lower()
+    is_tv_req = tv_mode or (x_tv_mode and x_tv_mode.lower() in ("true", "1")) or role_clean in ("tv", "modo.tv") or user_clean in ("pantalla modo tv", "modo.tv", "tv")
+    if is_tv_req:
+        return [serialize_item(item) for item in items]
+
     # Control de visibilidad por perfil (con decodificación URL y normalización de acentos):
     # El usuario regular solo ve las asignadas a él y las que están sin asignar (NO las de los demás)
     visible_items = [item for item in items if is_item_visible_to_user(item, x_user_role, x_user_name)]
@@ -1928,10 +1940,12 @@ def api_test_telegram(_role: str = Depends(verify_coordinator_role)):
 # ==============================================================================
 
 def _resolve_report_filters(start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param, ibp=None, category=None):
-    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
+    role = decode_header_val(x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
+    user = decode_header_val(x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")).strip().lower()
 
-    # Restricción estricta: Solo el rol Coordinador / Administrador puede generar reportes
-    if role not in ("coordinador", "admin", "administrador"):
+    # Permitir Coordinador/Admin, Modo TV, y roles operativos para lectura de métricas
+    is_tv = role in ("tv", "modo.tv", "publico") or user in ("pantalla modo tv", "modo.tv", "tv")
+    if not is_tv and role not in ("coordinador", "admin", "administrador", "especialista", "analista"):
         raise HTTPException(
             status_code=403,
             detail="Acceso restringido: La generación de reportes ejecutivos está reservada exclusivamente para el rol Coordinador."
