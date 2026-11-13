@@ -245,9 +245,12 @@ class TestTelegramDeepLinks(unittest.TestCase):
         finally:
             db.close()
 
+    @patch("app.sync.clickup_client.ClickUpClient.create_task")
     @patch("app.notifications.telegram_notifier.send_telegram_message")
-    def test_08_create_item_telegram_notification_link(self, mock_send):
+    def test_08_create_item_telegram_notification_link(self, mock_send, mock_cu_create):
         mock_send.return_value = True
+        # Nunca crear tareas reales en ClickUp desde las pruebas
+        mock_cu_create.return_value = {"id": "cu_test_deeplink", "url": "https://app.clickup.com/t/cu_test_deeplink"}
 
         headers = self._auth_headers_for("a.lozada")
         payload = {

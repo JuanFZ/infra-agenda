@@ -45,10 +45,19 @@ from .sync.clickup_client import ClickUpClient
 from .notifications.telegram_notifier import CARACAS_TZ, format_caracas_time, now_caracas_str, test_telegram_connection, get_agenda_deep_link
 from .reports.report_generator import get_report_data, generate_excel_report, generate_executive_html
 
+def _resolve_default_upload_dir() -> str:
+    env_dir = (os.getenv("UPLOAD_ESCALATIONS_DIR") or "").strip()
+    if env_dir:
+        return os.path.abspath(env_dir)
+    app_root = Path(__file__).resolve().parent.parent
+    data_dir = app_root / "data"
+    if data_dir.is_dir():
+        return str((data_dir / "uploads" / "escalations").resolve())
+    return os.path.abspath(os.path.join(str(app_root), "uploads", "escalations"))
+
+
 # Directorio de almacenamiento permanente para documentos de escalamiento (PDFs)
-UPLOAD_ESCALATIONS_DIR = os.path.abspath(
-    os.getenv("UPLOAD_ESCALATIONS_DIR", os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "escalations"))
-)
+UPLOAD_ESCALATIONS_DIR = _resolve_default_upload_dir()
 os.makedirs(UPLOAD_ESCALATIONS_DIR, exist_ok=True)
 
 # Crear tablas si no existen
