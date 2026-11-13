@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tasks_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tasks_secret_2026}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env de la raiz}
       POSTGRES_DB: ${POSTGRES_DB:-tasks_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -29,12 +29,12 @@ services:
       dockerfile: Dockerfile
     container_name: dashboard_backend
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     env_file:
       - ./backend/.env
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://tasks_user:tasks_secret_2026@db:5432/tasks_db}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://${POSTGRES_USER:-tasks_user}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env de la raiz}@db:5432/${POSTGRES_DB:-tasks_db}}
     volumes:
       - ./backend/app:/app/app
       - ./backend/migrate_sqlite_to_pg.py:/app/migrate_sqlite_to_pg.py

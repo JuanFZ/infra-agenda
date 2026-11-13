@@ -131,7 +131,10 @@ def test_05_permissions_on_delete():
     assert res_del_ok.status_code == 200
 
 def test_06_analytics_and_heatmap_matrix():
-    res = client.get("/api/overtimes/analytics")
+    res = client.get(
+        "/api/overtimes/analytics",
+        headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+    )
     print("ANALYTICS RESULT:", res.status_code, res.text)
     assert res.status_code == 200
     data = res.json()

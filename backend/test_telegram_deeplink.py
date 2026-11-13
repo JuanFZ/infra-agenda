@@ -357,15 +357,16 @@ class TestTelegramDeepLinks(unittest.TestCase):
         finally:
             db.close()
 
+        coord_headers = {"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
         # Fetch by PK
-        res_pk = self.client.get(f"/api/items/{item_id}")
+        res_pk = self.client.get(f"/api/items/{item_id}", headers=coord_headers)
         self.assertEqual(res_pk.status_code, 200)
         data_pk = res_pk.json()
         self.assertEqual(data_pk["id"], item_id)
         self.assertEqual(data_pk["external_id"], "CU-DETAIL-99")
 
         # Fetch by external_id
-        res_ext = self.client.get("/api/items/CU-DETAIL-99")
+        res_ext = self.client.get("/api/items/CU-DETAIL-99", headers=coord_headers)
         self.assertEqual(res_ext.status_code, 200)
         data_ext = res_ext.json()
         self.assertEqual(data_ext["id"], item_id)
@@ -392,19 +393,23 @@ class TestTelegramDeepLinks(unittest.TestCase):
         finally:
             db.close()
 
+        coord_headers = {"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
         # Verify it IS retained in GET /api/items (desacoplado para histórico de Resumen)
-        list_res = self.client.get("/api/items")
+        list_res = self.client.get("/api/items", headers=coord_headers)
         self.assertEqual(list_res.status_code, 200)
         item_ids_in_list = [x["id"] for x in list_res.json()]
         self.assertIn(item_id, item_ids_in_list)
 
         # But CAN be retrieved directly via GET /api/items/{id} for deep linking
-        detail_res = self.client.get(f"/api/items/{item_id}")
+        detail_res = self.client.get(f"/api/items/{item_id}", headers=coord_headers)
         self.assertEqual(detail_res.status_code, 200)
         self.assertEqual(detail_res.json()["title"], "Actividad cerrada hace dos semanas")
 
     def test_13_get_single_item_not_found(self):
-        res = self.client.get("/api/items/99999999")
+        res = self.client.get(
+            "/api/items/99999999",
+            headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+        )
         self.assertEqual(res.status_code, 404)
 
     def test_14_get_single_item_permissions_specialist(self):

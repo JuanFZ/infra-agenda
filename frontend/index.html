@@ -3587,7 +3587,7 @@
           <span id="tvSyncLabel">En Vivo</span>
           <span class="muted" id="tvSyncTimeLabel" style="font-size:11px;color:#94a3b8;margin-left:2px">· Sync OK</span>
         </div>
-        <button class="tv-btn" onclick="triggerTvSync()" title="Forzar sincronización inmediata con GLPI y ClickUp">
+        <button class="tv-btn" id="tvBtnSync" onclick="triggerTvSync()" title="Forzar sincronización inmediata con GLPI y ClickUp">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="23 4 23 10 17 10"></polyline>
             <polyline points="1 20 1 14 7 14"></polyline>
@@ -3763,6 +3763,7 @@
       if (r === 'coordinador' || r === 'admin' || r === 'administrador') return 'Coordinador';
       if (r === 'analista') return 'Analista';
       if (r === 'especialista') return 'Especialista';
+      if (r === 'tv' || r === 'modo.tv') return 'Modo TV (Solo Lectura)';
       return role;
     }
 
@@ -3965,6 +3966,9 @@
     }
 
     async function loadData() {
+      if (!CURRENT_USER) {
+        return;
+      }
       // 1. Renderizado instantáneo desde caché de sesión si existe (stale-while-revalidate)
       if (!ALL_ITEMS || !ALL_ITEMS.length) {
         try {
@@ -5741,7 +5745,10 @@
       btn.title = "Sincronizando datos...";
       btn.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;color:var(--accent)"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"/></svg>`;
       try {
-        await fetch(`${API_URL}/sync`, { method: 'POST' });
+        const syncRes = await fetch(`${API_URL}/sync`, { method: 'POST', headers: getAuthHeaders() });
+        if (!syncRes.ok) {
+          throw new Error(`HTTP ${syncRes.status}`);
+        }
         await loadData();
         btn.title = "¡Sincronizado con éxito!";
         btn.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
@@ -6452,6 +6459,15 @@
         clearInterval(TV_TIMER);
         if (document.fullscreenElement && document.exitFullscreen) {
           document.exitFullscreen().catch(() => { });
+        }
+        const tvRole = (CURRENT_USER?.role || '').toLowerCase();
+        if (tvRole === 'tv' || tvRole === 'modo.tv') {
+          CURRENT_USER = null;
+          ALL_ITEMS = [];
+          TV_ITEMS = [];
+          localStorage.removeItem('sycom_user');
+          try { sessionStorage.removeItem('sycom_cached_items'); } catch (e) {}
+          checkAuthAndInit();
         }
       }
     }
@@ -7253,7 +7269,7 @@
         id: 0,
         full_name: 'Pantalla Modo TV',
         username: 'modo.tv',
-        role: 'coordinador'
+        role: 'tv'
       };
       localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
       document.getElementById('loginOverlay').style.display = 'none';
@@ -7280,6 +7296,7 @@
       const isCoord = role === 'coordinador';
       const isSpec = role === 'especialista';
       const isAnal = role === 'analista';
+      const isTvGuest = role === 'tv' || role === 'modo.tv';
       const roleName = formatRoleName(role);
 
       // 1. Sidebar user widget y avatar
@@ -7289,12 +7306,24 @@
       updateHeaderActionButton(CURRENT_ACTIVE_VIEW);
       const btnReports = document.getElementById('btnReports');
       const sideNavReports = document.getElementById('sidebarNavReports');
+      const btnSync = document.getElementById('btnSync');
+      const btnTvSync = document.getElementById('tvBtnSync');
+      const btnHeaderProfile = document.getElementById('btnHeaderProfile');
       const rolePill = document.getElementById('roleBadgeHeader');
       if (btnReports) {
         btnReports.style.display = isCoord ? 'inline-flex' : 'none';
       }
       if (sideNavReports) {
         sideNavReports.style.display = isCoord ? 'flex' : 'none';
+      }
+      if (btnSync) {
+        btnSync.style.display = isTvGuest ? 'none' : 'inline-flex';
+      }
+      if (btnTvSync) {
+        btnTvSync.style.display = isTvGuest ? 'none' : 'inline-flex';
+      }
+      if (btnHeaderProfile) {
+        btnHeaderProfile.style.display = isTvGuest ? 'none' : 'inline-flex';
       }
       if (rolePill) {
         if (isCoord) {
@@ -7305,6 +7334,14 @@
             <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(59,130,246,0.14);border:1px solid rgba(59,130,246,0.35);border-radius:20px;font-size:12px;color:#93c5fd;font-weight:600">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               <span>Especialista · ${CURRENT_USER.full_name || CURRENT_USER.username}</span>
+            </div>
+          `;
+        } else if (isTvGuest) {
+          rolePill.style.display = 'inline-flex';
+          rolePill.innerHTML = `
+            <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(16,185,129,0.14);border:1px solid rgba(16,185,129,0.35);border-radius:20px;font-size:12px;color:#6ee7b7;font-weight:600">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
+              <span>Modo TV · Solo Lectura</span>
             </div>
           `;
         } else {
@@ -7329,6 +7366,8 @@
           kanbanSub.textContent = 'Arrastra actividades entre columnas para sincronizar su estado';
         } else if (isSpec) {
           kanbanSub.textContent = `Modo Especialista (${CURRENT_USER.full_name || CURRENT_USER.username}) · Puedes arrastrar y actualizar tus propias tareas asignadas`;
+        } else if (isTvGuest) {
+          kanbanSub.textContent = 'Modo TV · Visualización operativa en pantalla (solo lectura)';
         } else {
           kanbanSub.textContent = `Modo Analista · Visualización global y análisis de métricas (solo lectura)`;
         }
@@ -7386,7 +7425,14 @@
       } else {
         if (overlay) overlay.style.display = 'none';
         applyRolePermissions();
-        fetchCurrentUserProfile();
+        const roleLower = (CURRENT_USER.role || '').toLowerCase();
+        if (roleLower === 'tv' || roleLower === 'modo.tv') {
+          if (!TV_MODE_ACTIVE) {
+            toggleTvMode();
+          }
+        } else {
+          fetchCurrentUserProfile();
+        }
       }
     }
 

@@ -2,11 +2,14 @@ import os
 import json
 import uuid
 import re
+import hmac
+import secrets
 import base64
 import datetime
 import hashlib
 import unicodedata
 import urllib.parse
+from urllib.parse import urlparse
 from fastapi import FastAPI, Depends, Query, HTTPException, Header, Response, Request
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +20,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from .database import engine, Base, get_db, SessionLocal
 from .models import Item, SyncLog, AlertLog, User, GeneratedReport, EscalationDocument, IBP, OvertimeRecord, AuditLog
-from .config import SYNC_INTERVAL_MINUTES
+from .config import SYNC_INTERVAL_MINUTES, ENABLE_API_DOCS, CORS_ALLOWED_ORIGINS, DEFAULT_INIT_PASSWORD
 from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
 from .sync.glpi_client import GLPIClient
 from .sync.clickup_client import ClickUpClient
@@ -40,7 +43,7 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str | None) -> bool:
     if not hashed_password:
         return False
-    return hash_password(plain_password) == hashed_password
+    return hmac.compare_digest(hash_password(plain_password), hashed_password)
 
 def _clean_header_user(val: str | None) -> str:
     if not val:
@@ -578,16 +581,50 @@ def is_user_creator_of_item(created_by: str | None, user_name_raw: str | None) -
     return False
 
 
+COORDINATOR_ROLES = ("coordinador", "admin", "administrador")
+OPERATIONAL_ROLES = ("coordinador", "admin", "administrador", "especialista", "specialist")
+AUTHENTICATED_ROLES = ("coordinador", "admin", "administrador", "especialista", "specialist", "analista")
+TV_ROLES = ("tv", "modo.tv")
+
+
+def _extract_role_and_user(
+    x_user_role: str | None,
+    x_user_name: str | None,
+    role_param: str | None = None,
+    user_param: str | None = None
+) -> tuple[str, str]:
+    raw_role = x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")
+    raw_name = x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")
+    return decode_header_val(raw_role).lower(), decode_header_val(raw_name)
+
+
+def _require_valid_caller(
+    x_user_role: str | None,
+    x_user_name: str | None,
+    allowed_roles: tuple[str, ...],
+    require_name: bool = False,
+    detail: str = "Acceso restringido: sesión o rol no autorizado.",
+    role_param: str | None = None,
+    user_param: str | None = None
+) -> tuple[str, str]:
+    role_clean, user_clean = _extract_role_and_user(x_user_role, x_user_name, role_param, user_param)
+    if not role_clean or role_clean not in allowed_roles:
+        raise HTTPException(status_code=403, detail=detail)
+    if require_name and not user_clean:
+        raise HTTPException(status_code=403, detail="Acceso restringido: identidad de usuario requerida.")
+    return role_clean, user_clean
+
+
 def is_item_visible_to_user(item: Item, role_raw: str | None, user_name_raw: str | None) -> bool:
-    """Coordinador/Admin y Modo TV ven todas; Especialista/Analista ve sus asignadas y las sin asignar."""
+    """Coordinador/Admin y Modo TV ven todas; Especialista/Analista ve sus asignadas y las sin asignar (fail-closed)."""
     role = decode_header_val(role_raw).lower()
     user_clean = decode_header_val(user_name_raw)
-    if not role or role in ("coordinador", "admin", "administrador", "tv", "modo.tv", "publico"):
+    if not role:
+        return False
+    if role in COORDINATOR_ROLES or role in TV_ROLES:
         return True
-    if user_clean and user_clean.lower() in ("pantalla modo tv", "modo.tv", "tv"):
-        return True
-    if not user_clean:
-        return True
+    if role not in ("especialista", "specialist", "analista") or not user_clean:
+        return False
     assignee_raw = (item.assignee_name or "").strip()
     assignee_lower = assignee_raw.lower()
     if not assignee_raw or "sin asignar" in assignee_lower or "técnico glpi" in assignee_lower or "tecnico glpi" in assignee_lower:
@@ -595,10 +632,32 @@ def is_item_visible_to_user(item: Item, role_raw: str | None, user_name_raw: str
     return is_item_assigned_to_user_name(assignee_raw, user_clean)
 
 
+def verify_authenticated_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
+    """Valida que la solicitud provenga de un rol reconocido (operativo, analista o Modo TV)."""
+    role_clean = decode_header_val(x_user_role).lower()
+    if not role_clean or role_clean not in (*AUTHENTICATED_ROLES, *TV_ROLES):
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Debe iniciar sesión o acceder mediante un perfil autorizado."
+        )
+    return role_clean
+
+
+def verify_operational_user_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
+    """Valida que la solicitud provenga de un usuario operativo autenticado (excluye modo TV e invitados)."""
+    role_clean = decode_header_val(x_user_role).lower()
+    if not role_clean or role_clean not in AUTHENTICATED_ROLES:
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Requiere perfil autenticado (Coordinador, Especialista o Analista)."
+        )
+    return role_clean
+
+
 def verify_coordinator_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
     """Valida que la solicitud provenga de un usuario con rol Coordinador o Administrador."""
     role_clean = decode_header_val(x_user_role).lower()
-    if not role_clean or role_clean not in ("coordinador", "admin", "administrador"):
+    if not role_clean or role_clean not in COORDINATOR_ROLES:
         raise HTTPException(
             status_code=403,
             detail="Acceso restringido: Solo el rol Coordinador / Administrador tiene permisos para crear, asignar, mover estados o eliminar actividades."
@@ -609,7 +668,7 @@ def verify_coordinator_role(x_user_role: str | None = Header(None, alias="X-User
 def verify_coordinator_or_specialist_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
     """Valida que la solicitud provenga de un usuario con rol Coordinador, Administrador o Especialista."""
     role_clean = decode_header_val(x_user_role).lower()
-    if not role_clean or role_clean not in ("coordinador", "admin", "administrador", "especialista", "specialist"):
+    if not role_clean or role_clean not in OPERATIONAL_ROLES:
         raise HTTPException(
             status_code=403,
             detail="Acceso restringido: Solo Coordinadores y Especialistas tienen permisos para crear actividades."
@@ -758,7 +817,8 @@ def init_users():
         ).delete()
         db.commit()
 
-        default_pw_hash = hash_password("sycom2026")
+        generated_notice = False
+        seed_pw_hash = hash_password(DEFAULT_INIT_PASSWORD) if DEFAULT_INIT_PASSWORD else None
         for u in DEFAULT_USERS:
             exists = db.query(User).filter(
                 or_(
@@ -768,14 +828,22 @@ def init_users():
                 )
             ).first()
             if not exists:
-                db.add(User(**u, password_hash=default_pw_hash))
+                if not seed_pw_hash:
+                    seed_pw_hash = hash_password(secrets.token_urlsafe(12))
+                    generated_notice = True
+                db.add(User(**u, password_hash=seed_pw_hash))
             else:
                 exists.telegram_username = u["telegram_username"]
                 exists.role = u["role"]
                 exists.username = u["username"]
                 exists.email = u["email"]
                 if not exists.password_hash:
-                    exists.password_hash = default_pw_hash
+                    if not seed_pw_hash:
+                        seed_pw_hash = hash_password(secrets.token_urlsafe(12))
+                        generated_notice = True
+                    exists.password_hash = seed_pw_hash
+        if generated_notice:
+            print("[Init Users] AVISO: Se generó contraseña inicial aleatoria para cuentas nuevas sin hash previo (defina DEFAULT_INIT_PASSWORD si desea inicializar con una clave específica).")
         db.commit()
     finally:
         db.close()
@@ -783,16 +851,19 @@ def init_users():
 app = FastAPI(
     title="Agenda de Infra - Infraestructura y BD",
     description="API de consolidación y sincronización en tiempo real de GLPI y ClickUp",
-    version="2.0.0"
+    version="2.0.0",
+    docs_url="/docs" if ENABLE_API_DOCS else None,
+    redoc_url="/redoc" if ENABLE_API_DOCS else None,
+    openapi_url="/openapi.json" if ENABLE_API_DOCS else None,
 )
 
-# Permitir CORS para que el dashboard web pueda consumir la API
+# Restringir CORS al origen real de la aplicación y orígenes de desarrollo locales
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-User-Role", "X-User-Name", "X-User-Username", "X-TV-Mode"],
 )
 
 # Planificador en segundo plano (cada 2 minutos según requerimiento)
@@ -836,8 +907,8 @@ def health_check():
     return {"status": "ok", "timestamp": datetime.datetime.utcnow().isoformat()}
 
 @app.post("/api/sync")
-def trigger_sync():
-    """Permite forzar una sincronización inmediata desde el dashboard."""
+def trigger_sync(_role: str = Depends(verify_operational_user_role)):
+    """Permite forzar una sincronización inmediata desde el dashboard autenticado."""
     sync_all()
     return {"message": "Sincronización completada con éxito"}
 
@@ -927,10 +998,18 @@ def get_items(
 
     items = query.order_by(Item.updated_at.desc()).all()
 
-    # Si la petición es explícitamente para Modo TV / Sala de Operaciones, retorna todas las actividades del equipo
+    # Requiere un rol autenticado o perfil TV reconocido (sin fallback abierto)
     role_clean = decode_header_val(x_user_role).lower()
-    user_clean = decode_header_val(x_user_name).lower()
-    is_tv_req = tv_mode or (x_tv_mode and x_tv_mode.lower() in ("true", "1")) or role_clean in ("tv", "modo.tv") or user_clean in ("pantalla modo tv", "modo.tv", "tv")
+    if not role_clean or role_clean not in (*AUTHENTICATED_ROLES, *TV_ROLES):
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Debe iniciar sesión o acceder mediante un perfil autorizado."
+        )
+
+    is_tv_req = (
+        role_clean in TV_ROLES
+        or ((tv_mode or (x_tv_mode and x_tv_mode.lower() in ("true", "1"))) and role_clean in AUTHENTICATED_ROLES)
+    )
     if is_tv_req:
         return [serialize_item(item) for item in items]
 
@@ -949,6 +1028,12 @@ def get_item_by_id(
     user_param: str = Query(None, alias="user")
 ):
     """Obtiene una actividad individual por su ID de BD o ID externo (deep linking)."""
+    role_raw = x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")
+    user_name_raw = x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")
+    role_clean = decode_header_val(role_raw).lower()
+    if not role_clean or role_clean not in (*AUTHENTICATED_ROLES, *TV_ROLES):
+        raise HTTPException(status_code=403, detail="Acceso restringido: Debe iniciar sesión o acceder mediante un perfil autorizado.")
+
     item = None
     if item_id.isdigit():
         item = db.query(Item).filter(Item.id == int(item_id)).first()
@@ -958,8 +1043,6 @@ def get_item_by_id(
         raise HTTPException(status_code=404, detail=f"Actividad #{item_id} no encontrada.")
 
     # Control de visibilidad por perfil
-    role_raw = x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")
-    user_name_raw = x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")
     if not is_item_visible_to_user(item, role_raw, user_name_raw):
         raise HTTPException(status_code=403, detail="No tienes permisos para visualizar esta actividad.")
 
@@ -967,7 +1050,7 @@ def get_item_by_id(
 
 
 @app.get("/api/kpis")
-def get_kpis(db: Session = Depends(get_db)):
+def get_kpis(db: Session = Depends(get_db), _role: str = Depends(verify_authenticated_role)):
     all_items = db.query(Item).all()
     now = datetime.datetime.utcnow()
     today_start = datetime.datetime(now.year, now.month, now.day, 0, 0, 0)
@@ -996,7 +1079,7 @@ def get_kpis(db: Session = Depends(get_db)):
     }
 
 @app.get("/api/team")
-def get_team_workload(db: Session = Depends(get_db)):
+def get_team_workload(db: Session = Depends(get_db), _role: str = Depends(verify_authenticated_role)):
     active_items = db.query(Item).filter(Item.status != "cerrado").all()
     workload = {}
     for item in active_items:
@@ -1015,7 +1098,7 @@ def get_team_workload(db: Session = Depends(get_db)):
     return list(workload.values())
 
 @app.get("/api/users")
-def get_users(db: Session = Depends(get_db)):
+def get_users(db: Session = Depends(get_db), _role: str = Depends(verify_operational_user_role)):
     users = db.query(User).filter(User.is_active == 1).all()
     return [{
         "id": u.id,
@@ -1081,8 +1164,8 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     }
 
 @app.get("/api/auth/users")
-def get_auth_users(db: Session = Depends(get_db)):
-    """Retorna los usuarios activos para el selector rápido del formulario de acceso."""
+def get_auth_users(db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
+    """Retorna los usuarios activos (solo Coordinador)."""
     users = db.query(User).filter(User.is_active == 1).all()
     return [_serialize_user(u) for u in users]
 
@@ -1143,18 +1226,48 @@ def find_user_by_identifier(
     return None
 
 
+def _resolve_profile_user(
+    db: Session,
+    x_user_role: str | None,
+    x_user_name: str | None,
+    x_user_username: str | None,
+    username_param: str | None
+) -> User:
+    role_clean = decode_header_val(x_user_role).lower()
+    if role_clean in TV_ROLES:
+        raise HTTPException(status_code=403, detail="Acceso restringido en Modo TV.")
+    if not role_clean or role_clean not in AUTHENTICATED_ROLES:
+        raise HTTPException(status_code=403, detail="Acceso restringido: perfil autorizado requerido.")
+
+    has_header_id = bool(decode_header_val(x_user_username) or decode_header_val(x_user_name))
+    if not has_header_id:
+        raise HTTPException(status_code=403, detail="Acceso restringido: identidad de usuario requerida en cabecera.")
+
+    caller_user = find_user_by_identifier(db, target_raw=x_user_name, x_user_username=x_user_username)
+    if not caller_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    if username_param and username_param.strip():
+        target_user = find_user_by_identifier(db, username_param=username_param)
+        if not target_user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        if target_user.id != caller_user.id and role_clean not in COORDINATOR_ROLES:
+            raise HTTPException(status_code=403, detail="Permiso denegado: solo puedes acceder a tu propio perfil.")
+        return target_user
+
+    return caller_user
+
+
 @app.get("/api/users/me")
 def get_current_user_profile(
     db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
     x_user_username: str | None = Header(None, alias="X-User-Username"),
     username: str | None = Query(None)
 ):
     """Consulta el perfil completo del usuario autenticado."""
-    user = find_user_by_identifier(db, target_raw=x_user_name, username_param=username, x_user_username=x_user_username)
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-
+    user = _resolve_profile_user(db, x_user_role, x_user_name, x_user_username, username)
     return _serialize_user(user)
 
 
@@ -1163,14 +1276,13 @@ def update_current_user_profile(
     req: UpdateUserProfileRequest,
     request: Request,
     db: Session = Depends(get_db),
+    x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name"),
     x_user_username: str | None = Header(None, alias="X-User-Username"),
     username: str | None = Query(None)
 ):
     """Actualiza los datos personales y foto de perfil del usuario autenticado."""
-    user = find_user_by_identifier(db, target_raw=x_user_name, username_param=username, x_user_username=x_user_username)
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    user = _resolve_profile_user(db, x_user_role, x_user_name, x_user_username, username)
 
     if req.full_name is not None and req.full_name.strip():
         user.full_name = req.full_name.strip()
@@ -1233,7 +1345,7 @@ def change_password(req: ChangePasswordRequest, request: Request, db: Session = 
     return {"status": "ok", "message": "Contraseña actualizada con éxito"}
 
 @app.get("/api/clients")
-def get_clients_summary(db: Session = Depends(get_db)):
+def get_clients_summary(db: Session = Depends(get_db), _role: str = Depends(verify_authenticated_role)):
     items = db.query(Item).all()
     clients = {}
     for item in items:
@@ -1913,18 +2025,16 @@ def delete_item(
 # ==============================================================================
 
 @app.get("/api/notifications/telegram-status")
-def api_telegram_status():
-    """Verifica si las credenciales del bot de Telegram están cargadas en el entorno."""
+def api_telegram_status(_role: str = Depends(verify_coordinator_role)):
+    """Verifica si las credenciales del bot de Telegram están cargadas en el entorno (solo Coordinador)."""
     from . import config
     token = (config.TELEGRAM_BOT_TOKEN or "").strip()
     chat_id = (config.TELEGRAM_CHAT_ID or "").strip()
-    masked_token = f"{token[:6]}...{token[-4:]}" if len(token) > 10 else ("Configurado" if token else "NO CONFIGURADO")
-    masked_chat = f"{chat_id[:3]}...{chat_id[-2:]}" if len(chat_id) > 5 else ("Configurado" if chat_id else "NO CONFIGURADO")
     return {
         "bot_configured": bool(token),
         "chat_configured": bool(chat_id),
-        "bot_token_preview": masked_token,
-        "chat_id_preview": masked_chat,
+        "bot_token_preview": "Configurado" if token else "NO CONFIGURADO",
+        "chat_id_preview": "Configurado" if chat_id else "NO CONFIGURADO",
         "status": "READY" if (token and chat_id) else "MISSING_ENV"
     }
 
@@ -2096,7 +2206,7 @@ def api_reports_history(
             start_date=start_str,
             end_date=end_str,
             specialist_filter="Todo el equipo",
-            generated_by="Adonis Lozada Figueroa",
+            generated_by="Sistema (Coordinación)",
             total_items=k.get("total_items", 0),
             total_closed=k.get("total_cerrados", 0),
             avg_resolution_time=k.get("avg_resolution_str", "0m"),
@@ -2144,7 +2254,7 @@ def api_reports_generate_and_save(
             detail="Acceso restringido: Solo el Coordinador puede generar reportes ejecutivos."
         )
 
-    user_name = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")).strip() or "Adonis Lozada Figueroa"
+    user_name = decode_header_val(x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")).strip() or "Coordinador"
 
     s_date, e_date, spec, ibp_val, cat_val = _resolve_report_filters(
         req.start_date, req.end_date, req.specialist, x_user_role, x_user_name, role_param, user_param, req.ibp, req.category
@@ -2301,7 +2411,7 @@ class UploadEscalationRequest(BaseModel):
 
 
 @app.get("/api/ibps")
-def api_get_ibps(db: Session = Depends(get_db)):
+def api_get_ibps(db: Session = Depends(get_db), _role: str = Depends(verify_authenticated_role)):
     """Lista el catálogo oficial de Identificación Bancaria del Participante (IBP) de la plataforma SIMF."""
     db_ibps = db.query(IBP).filter(IBP.is_active == 1).order_by(IBP.code.asc()).all()
     if db_ibps:
@@ -2360,8 +2470,22 @@ def api_create_ibp(
     }
 
 
+def _normalize_http_url(url_raw: str) -> str:
+    cleaned = (url_raw or "").strip()
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="Debe indicar el enlace (URL) de Google Docs.")
+    if not (cleaned.startswith("http://") or cleaned.startswith("https://")):
+        if "://" in cleaned or cleaned.lower().startswith("javascript:") or cleaned.lower().startswith("data:"):
+            raise HTTPException(status_code=400, detail="Esquema de URL no permitido; use http:// o https://.")
+        cleaned = "https://" + cleaned
+    parsed = urlparse(cleaned)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="El enlace (URL) indicado no es válido.")
+    return cleaned
+
+
 @app.get("/api/escalations")
-def api_get_escalations(db: Session = Depends(get_db)):
+def api_get_escalations(db: Session = Depends(get_db), _role: str = Depends(verify_authenticated_role)):
     """Lista todos los documentos de escalamiento registrados (con fecha de recibimiento, escalada, autor e IBP asociada)."""
     docs = db.query(EscalationDocument).order_by(EscalationDocument.created_at.desc()).all()
     ibp_map = {i.id: i for i in db.query(IBP).all()}
@@ -2413,16 +2537,22 @@ def api_create_escalation(
     user_param: str = Query(None, alias="user")
 ):
     """Registra un nuevo documento de escalamiento mediante enlace oficial a Google Docs o Drive."""
+    role_clean, user_name = _require_valid_caller(
+        x_user_role,
+        x_user_name,
+        allowed_roles=OPERATIONAL_ROLES,
+        require_name=True,
+        detail="Acceso restringido: Solo Coordinadores y Especialistas pueden registrar escalamientos.",
+        role_param=role_param,
+        user_param=user_param
+    )
+    role = role_clean.capitalize()
+
     title = (req.title or "").strip()
     if not title:
         raise HTTPException(status_code=400, detail="Debe indicar el código o título del escalamiento.")
 
-    doc_url = (req.doc_url or "").strip()
-    if not doc_url:
-        raise HTTPException(status_code=400, detail="Debe indicar el enlace (URL) de Google Docs.")
-
-    if not (doc_url.startswith("http://") or doc_url.startswith("https://")):
-        doc_url = "https://" + doc_url
+    doc_url = _normalize_http_url(req.doc_url)
 
     category = (req.category or "").strip()
     if category == "Servicios BD":
@@ -2431,9 +2561,6 @@ def api_create_escalation(
         category = "Disco"
     if category not in VALID_ESCALATION_CATEGORIES:
         category = "Servicios"
-
-    role = (decode_header_val(x_user_role) if x_user_role else (decode_header_val(role_param) if role_param else "Coordinador")).capitalize()
-    user_name = (decode_header_val(x_user_name) if x_user_name else (decode_header_val(user_param) if user_param else "Adonis Lozada Figueroa")) or "Adonis Lozada Figueroa"
 
     clean_ibp, ibp_id = resolve_ibp(db, req.ibp, req.ibp_id)
     ibp_obj = db.query(IBP).filter(IBP.id == ibp_id).first() if ibp_id else None
@@ -2542,12 +2669,20 @@ def api_update_escalation(
     user_param: str = Query(None, alias="user")
 ):
     """Actualiza los datos, fechas cronológicas, categoría o recomendaciones de un escalamiento."""
+    role_clean, user_name = _require_valid_caller(
+        x_user_role,
+        x_user_name,
+        allowed_roles=OPERATIONAL_ROLES,
+        require_name=True,
+        detail="Acceso restringido: Solo Coordinadores y Especialistas pueden modificar escalamientos.",
+        role_param=role_param,
+        user_param=user_param
+    )
+    role = role_clean.capitalize()
+
     doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Documento de escalamiento no encontrado.")
-
-    role = (decode_header_val(x_user_role) if x_user_role else (decode_header_val(role_param) if role_param else "Coordinador")).capitalize()
-    user_name = (decode_header_val(x_user_name) if x_user_name else (decode_header_val(user_param) if user_param else "Adonis Lozada Figueroa")) or "Adonis Lozada Figueroa"
 
     if req.title is not None:
         t = req.title.strip()
@@ -2570,12 +2705,7 @@ def api_update_escalation(
         doc.ibp_id = ibp_id
 
     if req.doc_url is not None:
-        u = req.doc_url.strip()
-        if not u:
-            raise HTTPException(status_code=400, detail="El enlace (URL) no puede estar vacío.")
-        if not (u.startswith("http://") or u.startswith("https://")):
-            u = "https://" + u
-        doc.doc_url = u
+        doc.doc_url = _normalize_http_url(req.doc_url)
 
     if "notes" in req.model_fields_set:
         doc.notes = req.notes.strip() if req.notes else None
@@ -2679,6 +2809,15 @@ def api_upload_escalation(
     x_user_name: str | None = Header(None, alias="X-User-Name")
 ):
     """Carga y registra un documento de escalamiento en formato PDF."""
+    role_clean, user_name = _require_valid_caller(
+        x_user_role,
+        x_user_name,
+        allowed_roles=OPERATIONAL_ROLES,
+        require_name=True,
+        detail="Acceso restringido: Solo Coordinadores y Especialistas pueden cargar documentos de escalamiento."
+    )
+    user_role = role_clean.capitalize()
+
     if not req.filename or not req.file_base64:
         raise HTTPException(status_code=400, detail="Debe suministrar un archivo PDF válido.")
 
@@ -2724,9 +2863,6 @@ def api_upload_escalation(
     except Exception as e:
         print(f"[Upload Escalation Disk Error] {e}")
         raise HTTPException(status_code=500, detail="Error al guardar el archivo en el servidor de almacenamiento.")
-
-    user_name = decode_header_val(x_user_name) or "Adonis Lozada Figueroa"
-    user_role = decode_header_val(x_user_role).capitalize() or "Coordinador"
 
     clean_ibp, ibp_id = resolve_ibp(db, req.ibp, req.ibp_id)
     ibp_obj = db.query(IBP).filter(IBP.id == ibp_id).first() if ibp_id else None
@@ -2871,15 +3007,23 @@ def api_delete_escalation(
     role_param: str = Query(None, alias="role")
 ):
     """Elimina un documento de escalamiento de la BD y borra su archivo de disco."""
+    role, user_name = _require_valid_caller(
+        x_user_role,
+        x_user_name,
+        allowed_roles=OPERATIONAL_ROLES,
+        require_name=False,
+        detail="Permiso denegado: Solo el Coordinador o el autor del documento pueden eliminarlo.",
+        role_param=role_param
+    )
+
     doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Documento no encontrado.")
 
-    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
-    user_name = (x_user_name.strip().lower()) if isinstance(x_user_name, str) else ""
-    doc_author = (doc.uploaded_by or "").strip().lower()
+    doc_author_norm = strip_accents_str(doc.uploaded_by or "")
+    user_norm = strip_accents_str(user_name)
 
-    if role not in ("coordinador", "admin", "administrador") and (not user_name or user_name not in doc_author):
+    if role not in COORDINATOR_ROLES and (not user_norm or not doc_author_norm or user_norm not in doc_author_norm):
         raise HTTPException(
             status_code=403,
             detail="Permiso denegado: Solo el Coordinador o el autor del documento pueden eliminarlo."
@@ -2991,6 +3135,39 @@ def _serialize_overtime(
     }
 
 
+def _resolve_overtime_caller(x_user_role: str | None, x_user_name: str | None) -> tuple[bool, str]:
+    role = decode_header_val(x_user_role).lower()
+    caller_name = _clean_header_user(x_user_name)
+    if not role or role not in AUTHENTICATED_ROLES:
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Debe iniciar sesión con un perfil autorizado para consultar horas extras."
+        )
+    is_coord = role in COORDINATOR_ROLES
+    if not is_coord and not caller_name:
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Identidad de usuario requerida para consultar horas extras."
+        )
+    return is_coord, caller_name
+
+
+def _scope_overtime_query(q, is_coord: bool, caller_name: str):
+    if is_coord:
+        return q
+    first_token = caller_name.split()[0] if caller_name.split() else caller_name
+    filter_conds = [
+        OvertimeRecord.specialist_name.ilike(f"%{caller_name}%"),
+        OvertimeRecord.created_by.ilike(f"%{caller_name}%")
+    ]
+    if len(first_token) >= 3:
+        filter_conds.extend([
+            OvertimeRecord.specialist_name.ilike(f"%{first_token}%"),
+            OvertimeRecord.created_by.ilike(f"%{first_token}%")
+        ])
+    return q.filter(or_(*filter_conds))
+
+
 @app.get("/api/overtimes")
 def list_overtimes(
     start_date: str | None = Query(None),
@@ -3005,25 +3182,9 @@ def list_overtimes(
     x_user_name: str | None = Header(None, alias="X-User-Name")
 ):
     """Retorna la lista de registros de horas extras con filtros opcionales."""
-    role = (x_user_role or "").strip().lower()
-    caller_name = _clean_header_user(x_user_name)
-    is_coord = role in ("coordinador", "admin", "administrador")
+    is_coord, caller_name = _resolve_overtime_caller(x_user_role, x_user_name)
 
-    q = db.query(OvertimeRecord)
-
-    # Si no es coordinador/admin, únicamente puede listar sus propias horas extras
-    if not is_coord and caller_name:
-        first_token = caller_name.split()[0] if caller_name.split() else caller_name
-        filter_conds = [
-            OvertimeRecord.specialist_name.ilike(f"%{caller_name}%"),
-            OvertimeRecord.created_by.ilike(f"%{caller_name}%")
-        ]
-        if len(first_token) >= 3:
-            filter_conds.extend([
-                OvertimeRecord.specialist_name.ilike(f"%{first_token}%"),
-                OvertimeRecord.created_by.ilike(f"%{first_token}%")
-            ])
-        q = q.filter(or_(*filter_conds))
+    q = _scope_overtime_query(db.query(OvertimeRecord), is_coord, caller_name)
 
     if start_date:
         try:
@@ -3039,7 +3200,7 @@ def list_overtimes(
         except Exception:
             pass
 
-    if specialist and specialist.strip():
+    if is_coord and specialist and specialist.strip():
         q = q.filter(OvertimeRecord.specialist_name.ilike(f"%{specialist.strip()}%"))
 
     if category and category.strip():
@@ -3075,8 +3236,13 @@ def create_overtime(
     x_user_name: str | None = Header(None, alias="X-User-Name")
 ):
     """Crea un nuevo registro de horas extras con cálculo de duración y control de autoría."""
-    role = (x_user_role or "").strip().lower()
-    caller_name = _clean_header_user(x_user_name)
+    role, caller_name = _require_valid_caller(
+        x_user_role,
+        x_user_name,
+        allowed_roles=OPERATIONAL_ROLES,
+        require_name=True,
+        detail="Acceso restringido: Solo Coordinadores y Especialistas pueden registrar horas extras."
+    )
 
     # Validar fechas
     start_dt = _parse_overtime_datetime(req.start_time)
@@ -3095,15 +3261,11 @@ def create_overtime(
         raise HTTPException(status_code=400, detail="La descripción de la actividad debe contener al menos 5 caracteres.")
 
     # Resolver especialista
-    is_coord = role in ("coordinador", "admin", "administrador")
+    is_coord = role in COORDINATOR_ROLES
     if is_coord and req.specialist_name and req.specialist_name.strip():
         target_specialist = req.specialist_name.strip()
-    elif caller_name:
-        target_specialist = caller_name
-    elif req.specialist_name and req.specialist_name.strip():
-        target_specialist = req.specialist_name.strip()
     else:
-        target_specialist = "Juan Fernández"
+        target_specialist = caller_name
 
     # Resolver rol del especialista
     spec_user = db.query(User).filter(
@@ -3154,25 +3316,8 @@ def get_overtimes_analytics(
     x_user_name: str | None = Header(None, alias="X-User-Name")
 ):
     """Retorna métricas consolidadas y la matriz para el mapa de calor de horas extras por especialista."""
-    role = (x_user_role or "").strip().lower()
-    caller_name = _clean_header_user(x_user_name)
-    is_coord = role in ("coordinador", "admin", "administrador")
-
-    q = db.query(OvertimeRecord)
-
-    # Si no es coordinador/admin, únicamente puede ver sus propias analíticas
-    if not is_coord and caller_name:
-        first_token = caller_name.split()[0] if caller_name.split() else caller_name
-        filter_conds = [
-            OvertimeRecord.specialist_name.ilike(f"%{caller_name}%"),
-            OvertimeRecord.created_by.ilike(f"%{caller_name}%")
-        ]
-        if len(first_token) >= 3:
-            filter_conds.extend([
-                OvertimeRecord.specialist_name.ilike(f"%{first_token}%"),
-                OvertimeRecord.created_by.ilike(f"%{first_token}%")
-            ])
-        q = q.filter(or_(*filter_conds))
+    is_coord, caller_name = _resolve_overtime_caller(x_user_role, x_user_name)
+    q = _scope_overtime_query(db.query(OvertimeRecord), is_coord, caller_name)
 
     if start_date:
         try:
@@ -3188,7 +3333,7 @@ def get_overtimes_analytics(
         except Exception:
             pass
 
-    if specialist and specialist.strip():
+    if is_coord and specialist and specialist.strip():
         q = q.filter(OvertimeRecord.specialist_name.ilike(f"%{specialist.strip()}%"))
 
     records = q.all()
@@ -3282,9 +3427,14 @@ def get_overtime_detail(
     x_user_role: str | None = Header(None, alias="X-User-Role"),
     x_user_name: str | None = Header(None, alias="X-User-Name")
 ):
+    is_coord, caller_name = _resolve_overtime_caller(x_user_role, x_user_name)
     record = db.query(OvertimeRecord).filter(OvertimeRecord.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Registro de hora extra no encontrado.")
+    caller_low = caller_name.lower()
+    is_owner = bool(caller_low and (caller_low in (record.created_by or "").lower() or caller_low in (record.specialist_name or "").lower()))
+    if not is_coord and not is_owner:
+        raise HTTPException(status_code=403, detail="Permiso denegado: solo puedes ver tus propios registros de horas extras.")
     return _serialize_overtime(record, x_user_name, x_user_role)
 
 
@@ -3420,14 +3570,24 @@ def get_audit_logs(
     x_user_name: str | None = Header(None, alias="X-User-Name")
 ):
     """Retorna los registros de auditoría y bitácora de actividad en PostgreSQL."""
-    role = (x_user_role or "").strip().lower()
+    role = decode_header_val(x_user_role).lower()
     caller_name = _clean_header_user(x_user_name)
-    is_coord = role in ("coordinador", "admin", "administrador")
+    if not role or role not in AUTHENTICATED_ROLES:
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Debe iniciar sesión con un perfil autorizado para consultar auditoría."
+        )
+    is_coord = role in COORDINATOR_ROLES
+    if not is_coord and not caller_name:
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso restringido: Identidad de usuario requerida para consultar registros propios."
+        )
 
     q = db.query(AuditLog)
 
     # Si no es coordinador ni admin, restringir para ver únicamente sus propias acciones
-    if not is_coord and caller_name:
+    if not is_coord:
         q = q.filter(
             or_(
                 AuditLog.username.ilike(f"%{caller_name}%"),
