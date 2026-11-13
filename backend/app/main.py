@@ -885,6 +885,7 @@ def serialize_item(item: Item) -> dict:
         "description": item.description,
         "escalation_id": item.escalation_id,
         "recommendations": item.recommendations,
+        "elapsed_seconds": round(item.elapsed_seconds, 2),
         "duration_human": item.duration_human,
         "time_attention_label": item.time_attention_label,
         "is_recent_closed": is_recent_closed

@@ -30,6 +30,11 @@ TECH_CATEGORIES = [
     "Infraestructura",
 ]
 
+# Corte oficial para estadísticas y métricas de rendimiento: 01-11-2026 00:00 (Hora Caracas UTC-4)
+STATS_EPOCH_START_STR = "2026-11-01"
+STATS_EPOCH_START_CARACAS = datetime.datetime(2026, 11, 1, 0, 0, 0, tzinfo=CARACAS_TZ)
+STATS_EPOCH_START_UTC = STATS_EPOCH_START_CARACAS.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+
 
 def _infer_tech_category(text: str, fallback: str = "") -> str:
     """Infiere la categoría técnica del texto o usa el fallback."""
@@ -140,23 +145,21 @@ def get_report_data(
     clean_ibp = ibp_filter.strip() if isinstance(ibp_filter, str) and ibp_filter.strip() else None
     clean_cat = category_filter.strip() if isinstance(category_filter, str) and category_filter.strip() else None
 
-    if clean_start:
-        query = query.filter(
-            or_(
-                Item.created_at >= clean_start,
-                Item.closed_at >= clean_start,
-                Item.updated_at >= clean_start
-            )
-        )
-        esc_query = esc_query.filter(
-            or_(
-                EscalationDocument.created_at >= clean_start,
-                EscalationDocument.received_at >= clean_start
-            )
-        )
+    # Todas las estadísticas y métricas operativas se contabilizan desde las actividades de noviembre 2026 en adelante.
+    # Se utiliza el inicio real de la actividad (escalated_at -> received_at -> created_at) para no incluir
+    # tickets históricos de octubre que hayan sido cerrados o sincronizados en noviembre.
+    effective_start = max(clean_start, STATS_EPOCH_START_UTC) if clean_start else STATS_EPOCH_START_UTC
+    item_start_expr = func.coalesce(Item.escalated_at, Item.received_at, Item.created_at)
+    query = query.filter(item_start_expr >= effective_start)
     if clean_end:
-        query = query.filter(Item.created_at <= clean_end)
-        esc_query = esc_query.filter(EscalationDocument.created_at <= clean_end)
+        query = query.filter(item_start_expr <= clean_end)
+
+    esc_start_expr = func.coalesce(
+        EscalationDocument.escalated_at, EscalationDocument.received_at, EscalationDocument.created_at
+    )
+    esc_query = esc_query.filter(esc_start_expr >= effective_start)
+    if clean_end:
+        esc_query = esc_query.filter(esc_start_expr <= clean_end)
 
     if clean_spec:
         s_clean = clean_spec.lower()
@@ -287,8 +290,22 @@ def get_report_data(
             "en_curso": len(s_curso),
             "pendientes": len(s_pendientes),
             "en_espera": len(s_espera),
+            "avg_seconds": round(s_avg_dur, 2),
             "avg_time_str": format_duration_seconds(s_avg_dur)
         })
+
+    # Ordenar listado de especialistas desde el menor tiempo promedio hasta el mayor tiempo promedio
+    # Perfiles sin casos cerrados y "Sin asignar" se ubican al final
+    por_especialista.sort(
+        key=lambda s: (
+            1 if "sin asignar" in (s["name"] or "").lower() else 0,
+            0 if s["cerrados"] > 0 else 1,
+            s["avg_seconds"],
+            -s["cerrados"],
+            -s["total"],
+            s["name"],
+        )
+    )
 
     # Desglose por Cliente
     client_map: Dict[str, List[Item]] = {}
@@ -432,16 +449,15 @@ def get_report_data(
             "closed_at_str": format_caracas_time(it.closed_at) if it.closed_at else "—",
         })
 
-    # Determinación de etiquetas de fechas
+    # Determinación de etiquetas de fechas (estadísticas válidas desde 01-11-2026)
     now_caracas = datetime.datetime.now(CARACAS_TZ)
+    effective_start_str = format_caracas_time(effective_start, '%d-%m-%Y')
     if not clean_start and not clean_end:
-        period_str = f"Mes en curso ({now_caracas.strftime('%B %Y').capitalize()})"
-    elif clean_start and clean_end:
-        period_str = f"{format_caracas_time(clean_start, '%d-%m-%Y')} al {format_caracas_time(clean_end, '%d-%m-%Y')}"
-    elif clean_start:
-        period_str = f"Desde {format_caracas_time(clean_start, '%d-%m-%Y')}"
+        period_str = f"Desde {effective_start_str} ({now_caracas.strftime('%B %Y').capitalize()})"
+    elif clean_end:
+        period_str = f"{effective_start_str} al {format_caracas_time(clean_end, '%d-%m-%Y')}"
     else:
-        period_str = f"Hasta {format_caracas_time(clean_end, '%d-%m-%Y')}"
+        period_str = f"Desde {effective_start_str}"
 
     return {
         "generated_at": now_caracas.strftime("%d-%m-%Y %I:%M %p"),

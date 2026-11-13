@@ -3302,7 +3302,7 @@
                 <span class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:11px" id="lblAnalyticsStatus">En Vivo</span>
               </h3>
               <span class="muted" style="font-size:12px;margin-top:3px;display:block">
-                Analítica visual de rendimiento, balance de carga y tiempos de atención
+                Analítica visual de rendimiento, balance de carga y tiempos de atención (desde Noviembre 2026)
               </span>
             </div>
 
@@ -3315,7 +3315,7 @@
                   <option value="month" selected>Mes en Curso</option>
                   <option value="last30">Últimos 30 días</option>
                   <option value="last7">Últimos 7 días</option>
-                  <option value="all">Todo el Historial</option>
+                  <option value="all">Desde Noviembre 2026 (Todo)</option>
                 </select>
               </div>
 
@@ -6167,6 +6167,111 @@
       return slides;
     }
 
+    const STATS_EPOCH_START_DATE = '2026-11-01';
+    const STATS_EPOCH_START_MS = Date.parse('2026-11-01T04:00:00Z'); // 00:00 America/Caracas (UTC-4)
+
+    function clampStatsStartDate(dateStr) {
+      if (!dateStr || dateStr < STATS_EPOCH_START_DATE) return STATS_EPOCH_START_DATE;
+      return dateStr;
+    }
+
+    function parseStatsTimestampMs(raw) {
+      if (!raw) return 0;
+      let str = String(raw).trim();
+      if (!str) return 0;
+      if (str.includes(' ') && !str.includes('T')) str = str.replace(' ', 'T');
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        return Date.parse(str + 'T04:00:00Z') || 0;
+      }
+      if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(str)) {
+        str += 'Z';
+      }
+      const ms = Date.parse(str);
+      return Number.isNaN(ms) ? 0 : ms;
+    }
+
+    function getItemStatsStartMs(item) {
+      if (!item) return 0;
+      return parseStatsTimestampMs(item.escalated_at || item.received_at || item.created_at);
+    }
+
+    function getItemDurationSecs(item) {
+      if (!item) return 0;
+      if (typeof item.elapsed_seconds === 'number' && Number.isFinite(item.elapsed_seconds)) {
+        return Math.max(0, item.elapsed_seconds);
+      }
+      const startMs = getItemStatsStartMs(item);
+      const endMs = item.closed_at ? parseStatsTimestampMs(item.closed_at) : Date.now();
+      if (startMs > 0 && endMs > startMs) return (endMs - startMs) / 1000;
+      return 0;
+    }
+
+    function parseDurationToSeconds(str) {
+      if (!str || str === '—' || str === '-') return 0;
+      const text = String(str).trim().toLowerCase();
+      let total = 0;
+      const dMatch = text.match(/(\d+(?:\.\d+)?)\s*d/);
+      const hMatch = text.match(/(\d+(?:\.\d+)?)\s*h/);
+      const mMatch = text.match(/(\d+(?:\.\d+)?)\s*m/);
+      const sMatch = text.match(/(\d+(?:\.\d+)?)\s*s/);
+      if (dMatch) total += parseFloat(dMatch[1]) * 86400;
+      if (hMatch) total += parseFloat(hMatch[1]) * 3600;
+      if (mMatch) total += parseFloat(mMatch[1]) * 60;
+      if (sMatch) total += parseFloat(sMatch[1]);
+      return total;
+    }
+
+    function formatDurationSecs(secs) {
+      const total = Math.max(0, Math.round(Number(secs) || 0));
+      if (total === 0) return '0m';
+      const days = Math.floor(total / 86400);
+      const hours = Math.floor((total % 86400) / 3600);
+      const mins = Math.floor((total % 3600) / 60);
+      if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+      if (hours > 0) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+      if (mins === 0) return `${total}s`;
+      return `${mins}m`;
+    }
+
+    function getSpecialistAvgSeconds(spec) {
+      if (!spec) return 0;
+      if (typeof spec.avg_seconds === 'number' && Number.isFinite(spec.avg_seconds)) {
+        return spec.avg_seconds;
+      }
+      return parseDurationToSeconds(spec.avg_time_str);
+    }
+
+    function sortSpecialistsByAvgTime(list) {
+      return [...(list || [])].sort((a, b) => {
+        const aUnassigned = (a.name || '').toLowerCase().includes('sin asignar') ? 1 : 0;
+        const bUnassigned = (b.name || '').toLowerCase().includes('sin asignar') ? 1 : 0;
+        if (aUnassigned !== bUnassigned) return aUnassigned - bUnassigned;
+
+        const aHasClosed = (a.cerrados || 0) > 0 ? 0 : 1;
+        const bHasClosed = (b.cerrados || 0) > 0 ? 0 : 1;
+        if (aHasClosed !== bHasClosed) return aHasClosed - bHasClosed;
+
+        const aAvg = getSpecialistAvgSeconds(a);
+        const bAvg = getSpecialistAvgSeconds(b);
+        if (aAvg !== bAvg) return aAvg - bAvg;
+
+        if ((b.cerrados || 0) !== (a.cerrados || 0)) return (b.cerrados || 0) - (a.cerrados || 0);
+        if ((b.total || 0) !== (a.total || 0)) return (b.total || 0) - (a.total || 0);
+        return (a.name || '').localeCompare(b.name || '', 'es');
+      });
+    }
+
+    function sortSpecialistsByVolume(list) {
+      return [...(list || [])].sort((a, b) => {
+        const aUnassigned = (a.name || '').toLowerCase().includes('sin asignar') ? 1 : 0;
+        const bUnassigned = (b.name || '').toLowerCase().includes('sin asignar') ? 1 : 0;
+        if (aUnassigned !== bUnassigned) return aUnassigned - bUnassigned;
+        if ((b.total || 0) !== (a.total || 0)) return (b.total || 0) - (a.total || 0);
+        if ((b.cerrados || 0) !== (a.cerrados || 0)) return (b.cerrados || 0) - (a.cerrados || 0);
+        return getSpecialistAvgSeconds(a) - getSpecialistAvgSeconds(b);
+      });
+    }
+
     let TV_ANALYTICS_CACHE = null;
     let TV_ANALYTICS_LOADING = false;
 
@@ -6182,6 +6287,7 @@
         const params = new URLSearchParams();
         params.set('role', 'tv');
         params.set('user', 'Pantalla Modo TV');
+        params.set('start_date', STATS_EPOCH_START_DATE);
         const res = await fetch(`${API_URL}/reports/data?${params.toString()}`, {
           headers: { ...getAuthHeaders(), 'X-TV-Mode': 'true' }
         });
@@ -6216,13 +6322,18 @@
       }
       ensureTvAnalyticsData();
 
-      // Cómputo local inmediato derivado de TV_ITEMS / ALL_ITEMS para evitar pantallas vacías
-      const items = (TV_ITEMS && TV_ITEMS.length) ? TV_ITEMS : (ALL_ITEMS || []);
+      // Cómputo local inmediato derivado de TV_ITEMS / ALL_ITEMS (solo actividades desde Noviembre 2026)
+      const rawItems = (TV_ITEMS && TV_ITEMS.length) ? TV_ITEMS : (ALL_ITEMS || []);
+      const items = rawItems.filter(it => getItemStatsStartMs(it) >= STATS_EPOCH_START_MS);
       const total = items.length;
-      const cerrados = items.filter(i => i.status === 'cerrado').length;
+      const closedItems = items.filter(i => i.status === 'cerrado');
+      const cerrados = closedItems.length;
       const enCurso = items.filter(i => i.status === 'curso').length;
       const enEspera = items.filter(i => i.status === 'espera').length;
       const pendientes = items.filter(i => i.status === 'pendiente').length;
+      const globalAvgSecs = cerrados > 0
+        ? closedItems.reduce((acc, it) => acc + getItemDurationSecs(it), 0) / cerrados
+        : 0;
 
       let glpi = 0;
       let clickup = 0;
@@ -6231,33 +6342,45 @@
         else if (i.source === 'ClickUp') clickup++;
       });
 
-      const porEspecialista = TV_SPECIALISTS.map(spec => {
+      const rawPorEspecialista = TV_SPECIALISTS.map(spec => {
         const specItems = items.filter(it => it.assignee_name && it.assignee_name.toLowerCase().includes(spec.key));
+        const specClosed = specItems.filter(i => i.status === 'cerrado');
+        const specAvgSecs = specClosed.length > 0
+          ? specClosed.reduce((acc, it) => acc + getItemDurationSecs(it), 0) / specClosed.length
+          : 0;
         return {
           name: spec.name,
           role: spec.isCoord ? 'Coordinador' : 'Especialista',
           total: specItems.length,
-          cerrados: specItems.filter(i => i.status === 'cerrado').length,
+          cerrados: specClosed.length,
           en_curso: specItems.filter(i => i.status === 'curso').length,
           en_espera: specItems.filter(i => i.status === 'espera').length,
           pendientes: specItems.filter(i => i.status === 'pendiente').length,
-          avg_time_str: '—'
+          avg_seconds: Math.round(specAvgSecs * 100) / 100,
+          avg_time_str: formatDurationSecs(specAvgSecs)
         };
       });
 
       const unassignedItems = items.filter(it => !it.assignee_name || it.assignee_name.toLowerCase().includes('sin asignar') || it.assignee_name.toLowerCase().includes('técnico glpi'));
       if (unassignedItems.length > 0) {
-        porEspecialista.push({
+        const unClosed = unassignedItems.filter(i => i.status === 'cerrado');
+        const unAvgSecs = unClosed.length > 0
+          ? unClosed.reduce((acc, it) => acc + getItemDurationSecs(it), 0) / unClosed.length
+          : 0;
+        rawPorEspecialista.push({
           name: 'Sin asignar',
           role: 'Bolsa de trabajo',
           total: unassignedItems.length,
-          cerrados: unassignedItems.filter(i => i.status === 'cerrado').length,
+          cerrados: unClosed.length,
           en_curso: unassignedItems.filter(i => i.status === 'curso').length,
           en_espera: unassignedItems.filter(i => i.status === 'espera').length,
           pendientes: unassignedItems.filter(i => i.status === 'pendiente').length,
-          avg_time_str: '—'
+          avg_seconds: Math.round(unAvgSecs * 100) / 100,
+          avg_time_str: formatDurationSecs(unAvgSecs)
         });
       }
+
+      const porEspecialista = sortSpecialistsByAvgTime(rawPorEspecialista);
 
       const catMap = {};
       items.forEach(it => {
@@ -6297,7 +6420,7 @@
           total_en_curso: enCurso,
           total_en_espera: enEspera,
           total_pendientes: pendientes,
-          avg_resolution_str: '—'
+          avg_resolution_str: formatDurationSecs(globalAvgSecs)
         },
         por_origen: { GLPI: glpi, ClickUp: clickup },
         por_especialista: porEspecialista,
@@ -6645,7 +6768,7 @@
           return `<circle cx="80" cy="80" r="${cr}" fill="none" stroke="${st.color}" stroke-width="18" stroke-dasharray="${dash} ${cc}" stroke-dashoffset="${offset}" transform="rotate(-90 80 80)" style="transition:all .5s ease" />`;
         }).join('');
 
-        const specialists = data.por_especialista || [];
+        const specialists = sortSpecialistsByAvgTime(data.por_especialista || []);
         const maxSpecTotal = Math.max(...specialists.map(x => x.total), 1);
 
         container.innerHTML = `
@@ -7924,7 +8047,7 @@
       const dd = String(now.getDate()).padStart(2, '0');
 
       if (REPORT_FILTER_STATE.period === 'month') {
-        REPORT_FILTER_STATE.startDate = `${yyyy}-${mm}-01`;
+        REPORT_FILTER_STATE.startDate = clampStatsStartDate(`${yyyy}-${mm}-01`);
         REPORT_FILTER_STATE.endDate = `${yyyy}-${mm}-${dd}`;
       } else if (REPORT_FILTER_STATE.period === '30days') {
         const past = new Date();
@@ -7932,11 +8055,11 @@
         const pY = past.getFullYear();
         const pM = String(past.getMonth() + 1).padStart(2, '0');
         const pD = String(past.getDate()).padStart(2, '0');
-        REPORT_FILTER_STATE.startDate = `${pY}-${pM}-${pD}`;
+        REPORT_FILTER_STATE.startDate = clampStatsStartDate(`${pY}-${pM}-${pD}`);
         REPORT_FILTER_STATE.endDate = `${yyyy}-${mm}-${dd}`;
       } else if (REPORT_FILTER_STATE.period === 'all') {
-        REPORT_FILTER_STATE.startDate = '';
-        REPORT_FILTER_STATE.endDate = '';
+        REPORT_FILTER_STATE.startDate = STATS_EPOCH_START_DATE;
+        REPORT_FILTER_STATE.endDate = `${yyyy}-${mm}-${dd}`;
       }
     }
 
@@ -8021,7 +8144,7 @@
               <select id="reportPeriodSelect" class="form-input" onchange="onReportPeriodChange(this.value)" style="width:100%">
                 <option value="month" ${REPORT_FILTER_STATE.period === 'month' ? 'selected' : ''}>Mes en Curso (${monthLabel})</option>
                 <option value="30days" ${REPORT_FILTER_STATE.period === '30days' ? 'selected' : ''}>Últimos 30 días</option>
-                <option value="all" ${REPORT_FILTER_STATE.period === 'all' ? 'selected' : ''}>Histórico completo</option>
+                <option value="all" ${REPORT_FILTER_STATE.period === 'all' ? 'selected' : ''}>Desde Noviembre 2026 (Todo)</option>
                 <option value="custom" ${REPORT_FILTER_STATE.period === 'custom' ? 'selected' : ''}>Rango personalizado...</option>
               </select>
             </div>
@@ -8051,11 +8174,11 @@
           <div id="reportCustomDates" style="display:${REPORT_FILTER_STATE.period === 'custom' ? 'grid' : 'none'};grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,255,255,.08)">
             <div>
               <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px">Fecha Inicio:</label>
-              <input type="date" id="reportStartDate" class="form-input" value="${REPORT_FILTER_STATE.startDate || ''}" onchange="onReportCustomDateChange()">
+              <input type="date" id="reportStartDate" class="form-input" min="2026-11-01" value="${REPORT_FILTER_STATE.startDate || ''}" onchange="onReportCustomDateChange()">
             </div>
             <div>
               <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px">Fecha Fin:</label>
-              <input type="date" id="reportEndDate" class="form-input" value="${REPORT_FILTER_STATE.endDate || ''}" onchange="onReportCustomDateChange()">
+              <input type="date" id="reportEndDate" class="form-input" min="2026-11-01" value="${REPORT_FILTER_STATE.endDate || ''}" onchange="onReportCustomDateChange()">
             </div>
           </div>
         </div>
@@ -8114,8 +8237,14 @@
     async function onReportCustomDateChange() {
       const s = document.getElementById('reportStartDate');
       const e = document.getElementById('reportEndDate');
-      if (s) REPORT_FILTER_STATE.startDate = s.value;
-      if (e) REPORT_FILTER_STATE.endDate = e.value;
+      if (s) {
+        s.value = clampStatsStartDate(s.value);
+        REPORT_FILTER_STATE.startDate = s.value;
+      }
+      if (e) {
+        if (e.value && e.value < STATS_EPOCH_START_DATE) e.value = STATS_EPOCH_START_DATE;
+        REPORT_FILTER_STATE.endDate = e.value;
+      }
       await loadReportsPreview();
     }
 
@@ -8172,7 +8301,7 @@
 
         let specRows = '';
         if (data.por_especialista && data.por_especialista.length > 0) {
-          specRows = data.por_especialista.map(s => {
+          specRows = sortSpecialistsByAvgTime(data.por_especialista).map(s => {
             return `
               <tr style="border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px">
                 <td style="padding:7px 8px"><strong>${escapeHtml(s.name)}</strong></td>
@@ -8736,22 +8865,22 @@
 
       if (periodVal === 'month') {
         REPORT_FILTER_STATE.period = 'month';
-        REPORT_FILTER_STATE.startDate = `${yyyy}-${mm}-01`;
+        REPORT_FILTER_STATE.startDate = clampStatsStartDate(`${yyyy}-${mm}-01`);
         REPORT_FILTER_STATE.endDate = todayStr;
       } else if (periodVal === 'last30') {
         REPORT_FILTER_STATE.period = '30days';
         const d30 = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-        REPORT_FILTER_STATE.startDate = `${d30.getFullYear()}-${String(d30.getMonth() + 1).padStart(2, '0')}-${String(d30.getDate()).padStart(2, '0')}`;
+        REPORT_FILTER_STATE.startDate = clampStatsStartDate(`${d30.getFullYear()}-${String(d30.getMonth() + 1).padStart(2, '0')}-${String(d30.getDate()).padStart(2, '0')}`);
         REPORT_FILTER_STATE.endDate = todayStr;
       } else if (periodVal === 'last7') {
         REPORT_FILTER_STATE.period = 'custom';
         const d7 = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-        REPORT_FILTER_STATE.startDate = `${d7.getFullYear()}-${String(d7.getMonth() + 1).padStart(2, '0')}-${String(d7.getDate()).padStart(2, '0')}`;
+        REPORT_FILTER_STATE.startDate = clampStatsStartDate(`${d7.getFullYear()}-${String(d7.getMonth() + 1).padStart(2, '0')}-${String(d7.getDate()).padStart(2, '0')}`);
         REPORT_FILTER_STATE.endDate = todayStr;
       } else {
         REPORT_FILTER_STATE.period = 'all';
-        REPORT_FILTER_STATE.startDate = '';
-        REPORT_FILTER_STATE.endDate = '';
+        REPORT_FILTER_STATE.startDate = STATS_EPOCH_START_DATE;
+        REPORT_FILTER_STATE.endDate = todayStr;
       }
 
       REPORT_FILTER_STATE.specialist = specSelect ? specSelect.value : '';
@@ -8793,25 +8922,25 @@
       const todayStr = `${yyyy}-${mm}-${dd}`;
 
       if (periodVal === 'month') {
-        startDate = `${yyyy}-${mm}-01`;
+        startDate = clampStatsStartDate(`${yyyy}-${mm}-01`);
         endDate = todayStr;
       } else if (periodVal === 'last30') {
         const d30 = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
         const d30y = d30.getFullYear();
         const d30m = String(d30.getMonth() + 1).padStart(2, '0');
         const d30d = String(d30.getDate()).padStart(2, '0');
-        startDate = `${d30y}-${d30m}-${d30d}`;
+        startDate = clampStatsStartDate(`${d30y}-${d30m}-${d30d}`);
         endDate = todayStr;
       } else if (periodVal === 'last7') {
         const d7 = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
         const d7y = d7.getFullYear();
         const d7m = String(d7.getMonth() + 1).padStart(2, '0');
         const d7d = String(d7.getDate()).padStart(2, '0');
-        startDate = `${d7y}-${d7m}-${d7d}`;
+        startDate = clampStatsStartDate(`${d7y}-${d7m}-${d7d}`);
         endDate = todayStr;
       } else if (periodVal === 'all') {
-        startDate = '';
-        endDate = '';
+        startDate = STATS_EPOCH_START_DATE;
+        endDate = todayStr;
       }
 
       try {
@@ -9074,11 +9203,12 @@
 
       if (countEl) countEl.textContent = `${list.length} perfiles evaluados`;
 
-      const maxTotal = Math.max(...list.map(x => x.total), 1);
+      const chartList = sortSpecialistsByVolume(list);
+      const maxTotal = Math.max(...chartList.map(x => x.total), 1);
       const MAX_BAR_H = 80; // Altura máxima estricta para garantizar 0 desbordamiento
 
       // 1. Plot de las Barras (solo números y barras verticales sobre la línea base)
-      const barsPlotHtml = list.map(s => {
+      const barsPlotHtml = chartList.map(s => {
         const isBolsa = (s.name || '').toLowerCase().includes('sin asignar');
         // Altura proporcional calculada con tope estricto de 80px
         const barH = s.total > 0 ? Math.max(Math.round((s.total / maxTotal) * MAX_BAR_H), 16) : 4;
@@ -9107,7 +9237,7 @@
       }).join('');
 
       // 2. Eje X independiente (Nombres, roles y tiempo promedio bajo la línea base)
-      const barsAxisHtml = list.map(s => {
+      const barsAxisHtml = chartList.map(s => {
         const isCoord = (s.role || '').toLowerCase().includes('coordinador');
         const isBolsa = (s.name || '').toLowerCase().includes('sin asignar');
 
@@ -9130,8 +9260,15 @@
         `;
       }).join('');
 
-      // 3. Resumen numérico inferior por especialista
-      const detailsHtml = list.map(s => {
+      // 3. Resumen numérico inferior por especialista (ordenado de menor a mayor tiempo promedio)
+      const detailsList = sortSpecialistsByAvgTime(list);
+      const detailsHeaderHtml = `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:4px;font-size:11px;color:var(--muted)">
+          <span style="font-weight:700;text-transform:uppercase;letter-spacing:0.4px">Rendimiento por Especialista</span>
+          <span>Ordenado: menor a mayor tiempo promedio</span>
+        </div>
+      `;
+      const detailsHtml = detailsHeaderHtml + detailsList.map(s => {
         const isUnassigned = (s.name || '').toLowerCase().includes('sin asignar');
         const displayName = isUnassigned ? 'Sin asignar' : escapeHtml(s.name);
         const displayRole = (isUnassigned || !s.role || s.role.toLowerCase().includes('sin asignar') || s.role.toLowerCase().includes('bolsa')) ? '' : `(${escapeHtml(s.role)})`;
