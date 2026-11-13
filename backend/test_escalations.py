@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.models import Item, EscalationDocument, User, IBP
-from app.main import app, VALID_ESCALATION_CATEGORIES, ensure_db_schema, IBP_INVENTORY, normalize_ibp, hash_password
+from app.main import app, VALID_ESCALATION_CATEGORIES, ensure_db_schema, IBP_INVENTORY, normalize_ibp, hash_password, create_session_token
 
 test_engine = create_engine(
     "sqlite:///:memory:",
@@ -46,7 +46,55 @@ class TestEscalationFeatures(unittest.TestCase):
         try:
             db.query(Item).delete()
             db.query(EscalationDocument).delete()
+            db.query(User).delete()
+            pw = hash_password("Escalation$2026!")
+            db.add_all([
+                User(
+                    full_name="Adonis Lozada",
+                    username="a.lozada",
+                    email="a.lozada@sycom.com.ve",
+                    role="coordinador",
+                    password_hash=pw,
+                    must_change_password=0,
+                    is_active=1,
+                ),
+                User(
+                    full_name="Juan Fernández",
+                    username="j.fernandez",
+                    email="j.fernandez@sycom.com.ve",
+                    role="especialista",
+                    password_hash=pw,
+                    must_change_password=0,
+                    is_active=1,
+                ),
+                User(
+                    full_name="Yoxaide Jiménez",
+                    username="y.jimenez",
+                    email="y.jimenez@sycom.com.ve",
+                    role="especialista",
+                    password_hash=pw,
+                    must_change_password=0,
+                    is_active=1,
+                ),
+                User(
+                    full_name="Luis Acosta",
+                    username="l.acosta",
+                    email="l.acosta@sycom.com.ve",
+                    role="analista",
+                    password_hash=pw,
+                    must_change_password=0,
+                    is_active=1,
+                ),
+            ])
             db.commit()
+        finally:
+            db.close()
+
+    def _auth_headers_for(self, username: str) -> dict[str, str]:
+        db = TestingSessionLocal()
+        try:
+            u = db.query(User).filter(User.username == username).first()
+            return {"Authorization": f"Bearer {create_session_token(u)}"}
         finally:
             db.close()
 
@@ -62,7 +110,7 @@ class TestEscalationFeatures(unittest.TestCase):
                 "doc_url": f"https://docs.google.com/document/d/{cat}",
                 "notes": f"Notas para {cat}",
                 "recommendations": f"Recs iniciales para {cat}"
-            }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+            }, headers=self._auth_headers_for("a.lozada"))
             self.assertEqual(res.status_code, 200)
             data = res.json()["document"]
             self.assertEqual(data["category"], cat)
@@ -73,7 +121,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "title": "Escalamiento Categoria Invalida",
             "category": "CualquierCosa",
             "doc_url": "https://docs.google.com/document/d/xyz"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()["document"]["category"], "Servicios")
 
@@ -82,7 +130,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "title": "Escalamiento Legacy Servicios",
             "category": "Servicios BD",
             "doc_url": "https://docs.google.com/document/d/serv1"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(res_serv.status_code, 200)
         self.assertEqual(res_serv.json()["document"]["category"], "Servicios")
 
@@ -90,7 +138,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "title": "Escalamiento Legacy Disco",
             "category": "Discos",
             "doc_url": "https://docs.google.com/document/d/disc1"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(res_disc.status_code, 200)
         self.assertEqual(res_disc.json()["document"]["category"], "Disco")
 
@@ -102,7 +150,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "doc_url": "https://docs.google.com/document/d/base",
             "notes": "Notas base",
             "recommendations": "Recs base"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         esc_id = res.json()["document"]["id"]
 
         # Update category, title, notes, recommendations, url
@@ -112,7 +160,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "doc_url": "https://docs.google.com/document/d/edited",
             "notes": "Notas actualizadas",
             "recommendations": "Recs actualizadas"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(put_res.status_code, 200)
         updated = put_res.json()["document"]
         self.assertEqual(updated["title"], "Escalamiento Editado")
@@ -121,7 +169,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # Verify through GET
         get_res = self.client.get(
             "/api/escalations",
-            headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+            headers=self._auth_headers_for("a.lozada")
         )
         docs = get_res.json()
         doc = next(d for d in docs if d["id"] == esc_id)
@@ -138,7 +186,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "title": "Escalamiento Para Item",
             "category": "CPU",
             "doc_url": "https://docs.google.com/document/d/item1"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         esc_id = esc_res.json()["document"]["id"]
 
         # Create item linked to escalation with description
@@ -147,7 +195,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "title": "Actividad vinculada a CPU",
             "description": "Detalle técnico de la actividad",
             "escalation_id": esc_id
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(item_res.status_code, 200)
         item_data = item_res.json()["item"]
         self.assertEqual(item_data["escalation_id"], esc_id)
@@ -193,7 +241,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "status": "cerrado",
             "recommendations": "Se liberaron 50GB purgando logs antiguos.",
             "escalation_id": esc_id
-        }, headers={"X-User-Role": "especialista", "X-User-Name": spec_name_encoded})
+        }, headers=self._auth_headers_for("j.fernandez"))
         self.assertEqual(close_res.status_code, 200)
 
         # Check item has recommendations
@@ -213,7 +261,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "status": "cerrado",
             "recommendations": "Se liberaron 50GB purgando logs antiguos.",
             "escalation_id": esc_id
-        }, headers={"X-User-Role": "especialista", "X-User-Name": spec_name_encoded})
+        }, headers=self._auth_headers_for("j.fernandez"))
         self.assertEqual(close_again.status_code, 200)
         db.refresh(esc_db)
         # Verify it occurs only once
@@ -243,7 +291,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "status": "cerrado",
             "recommendations": "Recs para esc2",
             "escalation_id": esc2_id
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(close_res.status_code, 200)
 
         db = TestingSessionLocal()
@@ -279,7 +327,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "status": "cerrado",
             "recommendations": "Recomendacion suelta sin escalamiento",
             "escalation_id": 0
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(close_res.status_code, 200)
 
         db = TestingSessionLocal()
@@ -311,10 +359,7 @@ class TestEscalationFeatures(unittest.TestCase):
         item_id = item.id
         db.close()
 
-        spec_header = {
-            "X-User-Role": "especialista",
-            "X-User-Name": urllib.parse.quote("Yoxaide Jiménez")
-        }
+        spec_header = self._auth_headers_for("y.jimenez")
 
         # Specialist links item to escalation and adds recommendations
         patch_res = self.client.patch(f"/api/items/{item_id}", json={
@@ -331,10 +376,7 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertEqual(denied_res.status_code, 403)
 
         # Non-assigned specialist attempts to edit -> 403 Forbidden
-        other_spec = {
-            "X-User-Role": "especialista",
-            "X-User-Name": "Luis Acosta"
-        }
+        other_spec = self._auth_headers_for("j.fernandez")
         denied_res2 = self.client.patch(f"/api/items/{item_id}", json={
             "recommendations": "Intrusión"
         }, headers=other_spec)
@@ -344,7 +386,7 @@ class TestEscalationFeatures(unittest.TestCase):
         coord_res = self.client.patch(f"/api/items/{item_id}", json={
             "priority": "Alta",
             "description": "Nueva descripcion por coordinador"
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(coord_res.status_code, 200)
         self.assertEqual(coord_res.json()["item"]["priority"], "Alta")
 
@@ -369,7 +411,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 1. GET /api/ibps
         get_ibps_res = self.client.get(
             "/api/ibps",
-            headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(get_ibps_res.status_code, 200)
         ibps = get_ibps_res.json()
@@ -382,7 +424,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "name": "Banco Plaza",
             "code": "PLAZA",
             "description": "Instancia Banco Plaza C.A."
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(create_ibp_res.status_code, 200)
         created_ibp = create_ibp_res.json()["ibp"]
         self.assertEqual(created_ibp["name"], "Banco Plaza")
@@ -392,7 +434,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # Duplicate check -> 400
         dup_res = self.client.post("/api/ibps", json={
             "name": "Banco Plaza"
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(dup_res.status_code, 400)
 
         # 3. Create Escalation linked to IBP
@@ -403,7 +445,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "doc_url": "https://docs.google.com/document/d/plaza8899",
             "notes": "Escalamiento en servidor srvbdplaza",
             "recommendations": "Revisar max_connections"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(esc_res.status_code, 200)
         esc_doc = esc_res.json()["document"]
         self.assertEqual(esc_doc["ibp_id"], plaza_id)
@@ -414,7 +456,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 4. Verify in GET /api/escalations
         list_res = self.client.get(
             "/api/escalations",
-            headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(list_res.status_code, 200)
         found = next(d for d in list_res.json() if d["id"] == esc_id)
@@ -426,7 +468,7 @@ class TestEscalationFeatures(unittest.TestCase):
         put_res = self.client.put(f"/api/escalations/{esc_id}", json={
             "ibp_id": banesco_id,
             "category": "CPU"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(put_res.status_code, 200)
         updated_doc = put_res.json()["document"]
         self.assertEqual(updated_doc["ibp_id"], banesco_id)
@@ -437,7 +479,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 6. Unlink IBP (set ibp_id = 0)
         unlink_res = self.client.put(f"/api/escalations/{esc_id}", json={
             "ibp_id": 0
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(unlink_res.status_code, 200)
         unlinked_doc = unlink_res.json()["document"]
         self.assertIsNone(unlinked_doc["ibp_id"])
@@ -455,7 +497,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "source": "ClickUp",
             "title": "Optimización SIMF motor de pagos",
             "project_name": "SIMF"
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(cu_res1.status_code, 200)
         item1 = cu_res1.json()["item"]
         self.assertEqual(item1["client_name"], "SIMF")
@@ -467,7 +509,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "source": "ClickUp",
             "title": "Ajuste SGLPAR conciliaciones",
             "project_name": "SGLPAR"
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(cu_res2.status_code, 200)
         item2 = cu_res2.json()["item"]
         self.assertEqual(item2["client_name"], "SGLPAR")
@@ -477,7 +519,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "source": "GLPI",
             "title": "Ticket Soporte Servidores Sycom",
             "client_name": "Sycom"
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(glpi_res1.status_code, 200)
         item3 = glpi_res1.json()["item"]
         self.assertEqual(item3["client_name"], "Sycom")
@@ -488,7 +530,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "source": "GLPI",
             "title": "Ticket Escaneo MicroFilms Center",
             "client_name": "MicroFilms Center"
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(glpi_res2.status_code, 200)
         item4 = glpi_res2.json()["item"]
         self.assertEqual(item4["client_name"], "MicroFilms Center")
@@ -496,7 +538,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 5. Coordinator updates project_name via PATCH
         patch_res = self.client.patch(f"/api/items/{item1['id']}", json={
             "project_name": "SIMF-Core"
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(patch_res.status_code, 200)
         self.assertEqual(patch_res.json()["item"]["project_name"], "SIMF-Core")
         self.assertEqual(patch_res.json()["item"]["client_name"], "SIMF-Core")
@@ -504,7 +546,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 6. Verify GET /api/items exposes project_name and client_name
         get_items_res = self.client.get(
             "/api/items",
-            headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(get_items_res.status_code, 200)
         all_it = get_items_res.json()
@@ -525,7 +567,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "category": "Procesos",
             "ibp_id": 999999,
             "doc_url": "https://docs.google.com/document/d/edge1"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(esc_res.status_code, 200)
         self.assertIsNone(esc_res.json()["document"]["ibp_id"])
         esc_id = esc_res.json()["document"]["id"]
@@ -535,7 +577,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "source": "ClickUp",
             "title": "Tarea sin proyecto explícito",
             "escalation_id": esc_id
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(item_def_res.status_code, 200)
         self.assertEqual(item_def_res.json()["item"]["project_name"], "SIMF")
         item_id = item_def_res.json()["item"]["id"]
@@ -545,7 +587,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "status": "cerrado",
             "recommendations": "   \n\t   ",
             "escalation_id": esc_id
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(close_res.status_code, 200)
 
         db = TestingSessionLocal()
@@ -557,7 +599,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "status": "cerrado",
             "recommendations": "Solución técnica aplicada correctamente.",
             "escalation_id": esc_id
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(close_res2.status_code, 200)
 
         db.refresh(esc_db)
@@ -616,7 +658,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "category": "PostgreSQL",
             "ibp": "0134 - BANESCO",
             "doc_url": "https://docs.google.com/document/d/banesco0134"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(res.status_code, 200)
         doc_data = res.json()["document"]
         self.assertEqual(doc_data["ibp"], "0134 - BANESCO")
@@ -635,7 +677,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "category": "CPU",
             "ibp": "0102",
             "doc_url": "https://docs.google.com/document/d/bdv0102"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(res_norm.status_code, 200)
         self.assertEqual(res_norm.json()["document"]["ibp"], "0102 - BDV")
         esc_bdv_id = res_norm.json()["document"]["id"]
@@ -648,7 +690,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 6. Update Escalation changing IBP
         put_res = self.client.put(f"/api/escalations/{esc_id}", json={
             "ibp": "0108 - PROVINCIAL"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(put_res.status_code, 200)
         self.assertEqual(put_res.json()["document"]["ibp"], "0108 - PROVINCIAL")
 
@@ -661,7 +703,7 @@ class TestEscalationFeatures(unittest.TestCase):
         unlink_null_res = self.client.put(f"/api/escalations/{esc_id}", json={
             "ibp": None,
             "ibp_id": None
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(unlink_null_res.status_code, 200)
         self.assertEqual(unlink_null_res.json()["document"]["ibp"], "")
         self.assertIsNone(unlink_null_res.json()["document"]["ibp_id"])
@@ -675,13 +717,13 @@ class TestEscalationFeatures(unittest.TestCase):
         # 8. Re-link and then unlink via empty string
         relink_res = self.client.put(f"/api/escalations/{esc_id}", json={
             "ibp": "0134 - BANESCO"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(relink_res.status_code, 200)
         self.assertEqual(relink_res.json()["document"]["ibp"], "0134 - BANESCO")
 
         unlink_empty_res = self.client.put(f"/api/escalations/{esc_id}", json={
             "ibp": ""
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(unlink_empty_res.status_code, 200)
         self.assertEqual(unlink_empty_res.json()["document"]["ibp"], "")
 
@@ -694,7 +736,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 9. Verify GET /api/escalations contains ibp field in all records
         get_res = self.client.get(
             "/api/escalations",
-            headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(get_res.status_code, 200)
         escalations = get_res.json()
@@ -711,7 +753,7 @@ class TestEscalationFeatures(unittest.TestCase):
 
         get_ibps_res = self.client.get(
             "/api/ibps",
-            headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(get_ibps_res.status_code, 200)
         ibps_list = get_ibps_res.json()
@@ -744,7 +786,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # Link to escalation via PATCH without resending recommendations
         patch_res = self.client.patch(f"/api/items/{item_id}", json={
             "escalation_id": esc_id
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(patch_res.status_code, 200)
 
         # Verify escalation document received the recommendations
@@ -784,7 +826,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # Close without passing recommendations in the body
         close_res = self.client.post(f"/api/items/{item_id}/status", json={
             "status": "cerrado"
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(close_res.status_code, 200)
 
         # Verify escalation document received the recommendations
@@ -816,7 +858,7 @@ class TestEscalationFeatures(unittest.TestCase):
         db.close()
 
         # Delete escalation
-        del_res = self.client.delete(f"/api/escalations/{esc_id}", headers={"X-User-Role": "Coordinador"})
+        del_res = self.client.delete(f"/api/escalations/{esc_id}", headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(del_res.status_code, 200)
 
         # Check item escalation_id is None
@@ -852,7 +894,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "name": "Banco Central de Integración",
             "code": "BCI",
             "description": "Entidad bancaria internacional"
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(res_create.status_code, 200)
         custom_ibp = res_create.json()["ibp"]
         self.assertEqual(custom_ibp["code"], "BCI")
@@ -863,7 +905,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "category": "Infraestructura",
             "ibp_id": custom_ibp["id"],
             "doc_url": "https://docs.google.com/document/d/bci9901"
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(esc_res.status_code, 200)
         doc = esc_res.json()["document"]
         self.assertEqual(doc["ibp_id"], custom_ibp["id"])
@@ -901,7 +943,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # ClickUp task can be set to 'espera' -> 200 OK
         res_cu = self.client.post(f"/api/items/{cu_id}/status", json={
             "status": "espera"
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(res_cu.status_code, 200)
         self.assertEqual(res_cu.json()["item"]["status"], "espera")
         self.assertEqual(res_cu.json()["item"]["status_origin"], "en espera")
@@ -910,7 +952,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # GLPI ticket can be set to 'espera' -> 200 OK
         res_glpi = self.client.post(f"/api/items/{glpi_id}/status", json={
             "status": "espera"
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(res_glpi.status_code, 200)
         self.assertEqual(res_glpi.json()["item"]["status"], "espera")
 
@@ -1024,7 +1066,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "doc_url": "https://docs.google.com/document/d/dualchrono7700",
             "received_at": rec_dt.isoformat() + "Z",
             "escalated_at": esc_dt.isoformat() + "Z",
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(esc_res.status_code, 200)
         esc_doc = esc_res.json()["document"]
         esc_id = esc_doc["id"]
@@ -1048,7 +1090,7 @@ class TestEscalationFeatures(unittest.TestCase):
 
         patch_res = self.client.patch(f"/api/items/{item_id}", json={
             "escalation_id": esc_id
-        }, headers={"X-User-Role": "Coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(patch_res.status_code, 200)
         patched_item = patch_res.json()["item"]
 
@@ -1067,12 +1109,12 @@ class TestEscalationFeatures(unittest.TestCase):
         put_res = self.client.put(f"/api/escalations/{esc_id}", json={
             "received_at": new_rec_dt.isoformat() + "Z",
             "escalated_at": new_esc_dt.isoformat() + "Z",
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(put_res.status_code, 200)
 
         items_res = self.client.get(
             "/api/items",
-            headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(items_res.status_code, 200)
         updated_item = next(x for x in items_res.json() if x["id"] == item_id)
@@ -1112,15 +1154,12 @@ class TestEscalationFeatures(unittest.TestCase):
         # 1. Coordinator assigns t_yox to Yoxaide
         res_assign_yox = self.client.post(f"/api/items/{yox_id}/assign", json={
             "specialist_keys": ["yoxaide"]
-        }, headers={"X-User-Role": "coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(res_assign_yox.status_code, 200)
         self.assertEqual(res_assign_yox.json()["item"]["assignee_name"], "Yoxaide Jiménez")
 
         # 2. Yoxaide logs in and fetches /api/items with URL-encoded header (as frontend sends)
-        res_yox_items = self.client.get("/api/items", headers={
-            "X-User-Role": "especialista",
-            "X-User-Name": "Yoxaide%20Jim%C3%A9nez"
-        })
+        res_yox_items = self.client.get("/api/items", headers=self._auth_headers_for("y.jimenez"))
         self.assertEqual(res_yox_items.status_code, 200)
         yox_ids = [x["id"] for x in res_yox_items.json()]
         self.assertIn(yox_id, yox_ids)
@@ -1128,7 +1167,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 3. Coordinator assigns t_jl to Juan and Luis
         res_assign_jl = self.client.post(f"/api/items/{jl_id}/assign", json={
             "specialist_keys": ["juan", "luis"]
-        }, headers={"X-User-Role": "coordinador"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(res_assign_jl.status_code, 200)
         self.assertEqual(res_assign_jl.json()["item"]["assignee_name"], "Juan Fernández, Luis Acosta")
 
@@ -1155,19 +1194,13 @@ class TestEscalationFeatures(unittest.TestCase):
         db.close()
 
         # 5. Verify Juan, Luis, and Yoxaide were NOT erased by sync_clickup
-        res_juan = self.client.get("/api/items", headers={
-            "X-User-Role": "especialista",
-            "X-User-Name": "Juan%20Fern%C3%A1ndez"
-        })
+        res_juan = self.client.get("/api/items", headers=self._auth_headers_for("j.fernandez"))
         self.assertEqual(res_juan.status_code, 200)
         juan_item = next((x for x in res_juan.json() if x["id"] == jl_id), None)
         self.assertIsNotNone(juan_item)
         self.assertEqual(juan_item["assignee_name"], "Juan Fernández, Luis Acosta")
 
-        res_luis = self.client.get("/api/items", headers={
-            "X-User-Role": "especialista",
-            "X-User-Name": "Luis%20Acosta"
-        })
+        res_luis = self.client.get("/api/items", headers=self._auth_headers_for("l.acosta"))
         self.assertEqual(res_luis.status_code, 200)
         luis_item = next((x for x in res_luis.json() if x["id"] == jl_id), None)
         self.assertIsNotNone(luis_item)
@@ -1182,7 +1215,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "ibp": "0134 - BANESCO",
             "doc_url": "https://docs.google.com/document/d/banesco7701",
             "recommendations": "Incrementar max_connections y ajustar PgBouncer."
-        }, headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"})
+        }, headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(esc_res.status_code, 200)
         esc_id = esc_res.json()["document"]["id"]
 
@@ -1203,7 +1236,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 1. Query /api/reports/data filtered by ibp=0134 and category=PostgreSQL
         rep_res = self.client.get(
             "/api/reports/data?ibp=0134&category=PostgreSQL",
-            headers={"X-User-Role": "Coordinador"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(rep_res.status_code, 200)
         rep_data = rep_res.json()
@@ -1215,7 +1248,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 2. Query /api/reports/print-view filtered by ibp and category
         pdf_res = self.client.get(
             "/api/reports/print-view?ibp=0134%20-%20BANESCO&category=PostgreSQL",
-            headers={"X-User-Role": "Coordinador"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(pdf_res.status_code, 200)
         html = pdf_res.text
@@ -1251,7 +1284,7 @@ class TestEscalationFeatures(unittest.TestCase):
         res = self.client.post(
             f"/api/items/{item_id}/status",
             json={"status": "espera"},
-            headers={"X-User-Role": "coordinador"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(res.status_code, 200)
         self.assertTrue(mock_update_status.called)
@@ -1270,7 +1303,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # Verify serialized item returned by GET /api/items/{item_id}
         res_get = self.client.get(
             f"/api/items/{item_id}",
-            headers={"X-User-Role": "coordinador", "X-User-Name": "Adonis Lozada"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(res_get.status_code, 200)
         data = res_get.json()
@@ -1286,7 +1319,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 1. Check /api/kpis
         res_kpis = self.client.get(
             "/api/kpis",
-            headers={"X-User-Role": "coordinador", "X-User-Name": "Adonis Lozada"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(res_kpis.status_code, 200)
         kpis = res_kpis.json()
@@ -1302,7 +1335,7 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertNotIn("sla_percent", kpis)
 
         # 2. Check /api/reports/data
-        res_rep = self.client.get("/api/reports/data", headers={"X-User-Role": "coordinador"})
+        res_rep = self.client.get("/api/reports/data", headers=self._auth_headers_for("a.lozada"))
         self.assertEqual(res_rep.status_code, 200)
         rep = res_rep.json()
         rep_kpis = rep.get("kpis", {})
@@ -1328,7 +1361,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "title": "Actividad creada por Especialista",
             "priority": "Alta",
             "project_name": "SIMF"
-        }, headers={"X-User-Role": "Especialista", "X-User-Name": "Juan Fernandez"})
+        }, headers=self._auth_headers_for("j.fernandez"))
         self.assertEqual(spec_res.status_code, 200)
         self.assertEqual(spec_res.json()["item"]["external_id"], "cu_spec_1")
 
@@ -1336,7 +1369,7 @@ class TestEscalationFeatures(unittest.TestCase):
         analyst_res = self.client.post("/api/items", json={
             "source": "ClickUp",
             "title": "Intento de creación por Analista"
-        }, headers={"X-User-Role": "Analista"})
+        }, headers=self._auth_headers_for("l.acosta"))
         self.assertEqual(analyst_res.status_code, 403)
 
     def test_user_profile_and_password_management(self):
@@ -1344,25 +1377,18 @@ class TestEscalationFeatures(unittest.TestCase):
         db = TestingSessionLocal()
         try:
             u = db.query(User).filter(User.username == "j.fernandez").first()
-            if not u:
-                u = User(
-                    full_name="Juan Fernandez",
-                    username="j.fernandez",
-                    email="j.fernandez@sycom.com.ve",
-                    telegram_username="@Juuan8",
-                    role="especialista",
-                    password_hash=hash_password("sycom2026"),
-                    is_active=1
-                )
-                db.add(u)
-                db.commit()
+            u.password_hash = hash_password("Sycom$2026!")
+            u.must_change_password = 0
+            db.commit()
         finally:
             db.close()
+
+        spec_headers = self._auth_headers_for("j.fernandez")
 
         # 1. Consulta del perfil actual
         res_me = self.client.get(
             "/api/users/me",
-            headers={"X-User-Role": "especialista", "X-User-Name": "Juan Fernandez"}
+            headers=spec_headers
         )
         self.assertEqual(res_me.status_code, 200)
         u_data = res_me.json()
@@ -1378,7 +1404,7 @@ class TestEscalationFeatures(unittest.TestCase):
             "job_title": "Especialista en Infraestructura & BD",
             "bio": "Administrador de sistemas y bases de datos",
             "avatar_data": new_avatar
-        }, headers={"X-User-Role": "especialista", "X-User-Name": "Juan Fernandez"})
+        }, headers=spec_headers)
         self.assertEqual(update_res.status_code, 200)
         up_data = update_res.json()["user"]
         self.assertEqual(up_data["phone"], "+58 412 9998877")
@@ -1387,18 +1413,19 @@ class TestEscalationFeatures(unittest.TestCase):
 
         # 3. Cambio de contraseña
         pw_res = self.client.post("/api/auth/change-password", json={
-            "username": "j.fernandez",
-            "old_password": "sycom2026",
-            "new_password": "newpassword2026"
-        })
+            "old_password": "Sycom$2026!",
+            "new_password": "NewPassword$2026!"
+        }, headers=spec_headers)
         self.assertEqual(pw_res.status_code, 200)
+        rotated_token = pw_res.json().get("access_token")
+        self.assertTrue(rotated_token)
 
-        # 4. Revertir contraseña para no afectar otros tests
+        # 4. Revertir contraseña usando token rotado (anterior token queda revocado)
+        self.assertEqual(self.client.get("/api/users/me", headers=spec_headers).status_code, 401)
         rev_res = self.client.post("/api/auth/change-password", json={
-            "username": "j.fernandez",
-            "old_password": "newpassword2026",
-            "new_password": "sycom2026"
-        })
+            "old_password": "NewPassword$2026!",
+            "new_password": "Sycom$2026!"
+        }, headers={"Authorization": f"Bearer {rotated_token}"})
         self.assertEqual(rev_res.status_code, 200)
 
     @patch("app.sync.clickup_client.ClickUpClient.delete_task")
@@ -1414,15 +1441,15 @@ class TestEscalationFeatures(unittest.TestCase):
             "title": "Actividad de Juan para eliminar",
             "priority": "Media",
             "project_name": "SIMF"
-        }, headers={"X-User-Role": "Especialista", "X-User-Name": "Juan Fernandez"})
+        }, headers=self._auth_headers_for("j.fernandez"))
         self.assertEqual(create_res.status_code, 200)
         item_id = create_res.json()["item"]["id"]
-        self.assertEqual(create_res.json()["item"]["created_by"], "Juan Fernandez")
+        self.assertIn("Juan Fern", create_res.json()["item"]["created_by"])
 
         # 2. Specialist Yoxaide tries to delete Juan's activity -> 403 Forbidden
         del_by_yox = self.client.delete(
             f"/api/items/{item_id}",
-            headers={"X-User-Role": "Especialista", "X-User-Name": "Yoxaide Jimenez"}
+            headers=self._auth_headers_for("y.jimenez")
         )
         self.assertEqual(del_by_yox.status_code, 403)
         self.assertIn("solo puedes eliminar actividades creadas por ti", del_by_yox.json()["detail"].lower())
@@ -1430,14 +1457,14 @@ class TestEscalationFeatures(unittest.TestCase):
         # 3. Analyst tries to delete Juan's activity -> 403 Forbidden
         del_by_analyst = self.client.delete(
             f"/api/items/{item_id}",
-            headers={"X-User-Role": "Analista", "X-User-Name": "Luis Acosta"}
+            headers=self._auth_headers_for("l.acosta")
         )
         self.assertEqual(del_by_analyst.status_code, 403)
 
         # 4. Specialist Juan deletes his own activity -> 200 OK
         del_by_juan = self.client.delete(
             f"/api/items/{item_id}",
-            headers={"X-User-Role": "Especialista", "X-User-Name": "Juan Fernandez"}
+            headers=self._auth_headers_for("j.fernandez")
         )
         self.assertEqual(del_by_juan.status_code, 200)
         self.assertEqual(del_by_juan.json()["status"], "OK")
@@ -1455,17 +1482,17 @@ class TestEscalationFeatures(unittest.TestCase):
             "title": "Actividad para borrar por coordinador",
             "priority": "Baja",
             "project_name": "SIMF"
-        }, headers={"X-User-Role": "Especialista", "X-User-Name": "Juan Fernandez"})
+        }, headers=self._auth_headers_for("j.fernandez"))
         c_item_id = c_res.json()["item"]["id"]
 
         del_by_coord = self.client.delete(
             f"/api/items/{c_item_id}",
-            headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(del_by_coord.status_code, 200)
 
     def test_user_profile_endpoints(self):
-        """Verifica que /api/users/me y cambio de clave funcionen con tolerancia a acentos y username."""
+        """Verifica que /api/users/me y cambio de clave funcionen con sesión autenticada y política de contraseñas Fase 2."""
         db = TestingSessionLocal()
         try:
             # Asegurar usuario Juan Fernandez con acento en BD
@@ -1475,7 +1502,9 @@ class TestEscalationFeatures(unittest.TestCase):
                 username="j.fernandez",
                 email="j.fernandez@sycom.com.ve",
                 role="especialista",
-                password_hash=hash_password("clave123"),
+                password_hash=hash_password("ClaveSegura$123"),
+                must_change_password=0,
+                is_active=1,
                 phone="+58 412 1112233",
                 job_title="Especialista Linux",
                 bio="Administrador de sistemas"
@@ -1485,10 +1514,12 @@ class TestEscalationFeatures(unittest.TestCase):
         finally:
             db.close()
 
-        # 1. GET /api/users/me con header sin acento y username query
+        juan_headers = self._auth_headers_for("j.fernandez")
+
+        # 1. GET /api/users/me con sesión autenticada
         res = self.client.get(
             "/api/users/me?username=j.fernandez",
-            headers={"X-User-Name": "Juan Fernandez", "X-User-Role": "especialista"}
+            headers=juan_headers
         )
         self.assertEqual(res.status_code, 200)
         data = res.json()
@@ -1498,7 +1529,7 @@ class TestEscalationFeatures(unittest.TestCase):
         # 2. PUT /api/users/me para actualizar bio y foto
         put_res = self.client.put(
             "/api/users/me?username=j.fernandez",
-            headers={"X-User-Name": "Juan Fernandez", "X-User-Role": "especialista"},
+            headers=juan_headers,
             json={
                 "full_name": "Juan Fernández Modificado",
                 "phone": "+58 414 9998877",
@@ -1511,40 +1542,36 @@ class TestEscalationFeatures(unittest.TestCase):
         self.assertEqual(updated["phone"], "+58 414 9998877")
         self.assertEqual(updated["avatar_data"], "data:image/jpeg;base64,samplephoto")
 
-        # 3. POST /api/auth/change-password con validaciones de seguridad (6-15 caracteres y caracter especial)
-        # 3a. Fallo si longitud menor a 6
+        # 3. POST /api/auth/change-password con política Fase 2 (8-128 caracteres, letra, número y símbolo)
+        # 3a. Fallo si longitud menor a 8
         too_short_res = self.client.post("/api/auth/change-password", json={
-            "username": "j.fernandez",
-            "old_password": "clave123",
-            "new_password": "ab$1"
-        })
+            "old_password": "ClaveSegura$123",
+            "new_password": "Ab$12"
+        }, headers=juan_headers)
         self.assertEqual(too_short_res.status_code, 400)
-        self.assertIn("al menos 6", too_short_res.json()["detail"])
+        self.assertIn("al menos 8", too_short_res.json()["detail"])
 
-        # 3b. Fallo si longitud mayor a 15
+        # 3b. Fallo si longitud mayor a 128
         too_long_res = self.client.post("/api/auth/change-password", json={
-            "username": "j.fernandez",
-            "old_password": "clave123",
-            "new_password": "Password123456$Extra"
-        })
+            "old_password": "ClaveSegura$123",
+            "new_password": "Password1$" + ("a" * 125)
+        }, headers=juan_headers)
         self.assertEqual(too_long_res.status_code, 400)
-        self.assertIn("15 caracteres", too_long_res.json()["detail"])
+        self.assertIn("128 caracteres", too_long_res.json()["detail"])
 
         # 3c. Fallo si no tiene caracter especial ($&.*)
         no_special_res = self.client.post("/api/auth/change-password", json={
-            "username": "j.fernandez",
-            "old_password": "clave123",
-            "new_password": "ClaveSegura123"
-        })
+            "old_password": "ClaveSegura$123",
+            "new_password": "ClaveSegura1234"
+        }, headers=juan_headers)
         self.assertEqual(no_special_res.status_code, 400)
         self.assertIn("caracter especial", no_special_res.json()["detail"])
 
-        # 3d. Éxito si cumple los estándares (6-15 caracteres con $, &, ., *)
+        # 3d. Éxito si supera 15 caracteres (ej. passphrase de 20+ caracteres) con letra, número y símbolo
         pw_res = self.client.post("/api/auth/change-password", json={
-            "username": "j.fernandez",
-            "old_password": "clave123",
-            "new_password": "Nueva.Clave$1"
-        })
+            "old_password": "ClaveSegura$123",
+            "new_password": "Password123456$Extra"
+        }, headers=juan_headers)
         self.assertEqual(pw_res.status_code, 200)
         self.assertEqual(pw_res.json()["status"], "ok")
 

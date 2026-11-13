@@ -20,7 +20,7 @@ from app.notifications.telegram_notifier import (
     resolve_assignee_mention,
     send_telegram_message
 )
-from app.main import app
+from app.main import app, create_session_token, hash_password
 
 test_engine = create_engine(
     "sqlite:///:memory:",
@@ -68,6 +68,7 @@ class TestTelegramDeepLinks(unittest.TestCase):
             db.query(Item).delete()
             db.query(User).delete()
 
+            pw = hash_password("Telegram$2026!")
             # Coordinador para menciones
             coord = User(
                 username="a.lozada",
@@ -75,6 +76,8 @@ class TestTelegramDeepLinks(unittest.TestCase):
                 email="a.lozada@sycom.com.ve",
                 telegram_username="@adonislozada",
                 role="coordinador",
+                password_hash=pw,
+                must_change_password=0,
                 is_active=1
             )
             # Especialista
@@ -84,11 +87,21 @@ class TestTelegramDeepLinks(unittest.TestCase):
                 email="j.fernandez@sycom.com.ve",
                 telegram_username="@Juuan8",
                 role="especialista",
+                password_hash=pw,
+                must_change_password=0,
                 is_active=1
             )
             db.add(coord)
             db.add(spec)
             db.commit()
+        finally:
+            db.close()
+
+    def _auth_headers_for(self, username: str) -> dict[str, str]:
+        db = TestingSessionLocal()
+        try:
+            u = db.query(User).filter(User.username == username).first()
+            return {"Authorization": f"Bearer {create_session_token(u)}"}
         finally:
             db.close()
 
@@ -236,10 +249,7 @@ class TestTelegramDeepLinks(unittest.TestCase):
     def test_08_create_item_telegram_notification_link(self, mock_send):
         mock_send.return_value = True
 
-        headers = {
-            "x-user-role": "coordinador",
-            "x-user-name": "Adonis Lozada"
-        }
+        headers = self._auth_headers_for("a.lozada")
         payload = {
             "title": "Actividad de prueba para deep link",
             "source": "ClickUp",
@@ -286,10 +296,7 @@ class TestTelegramDeepLinks(unittest.TestCase):
         finally:
             db.close()
 
-        headers = {
-            "x-user-role": "coordinador",
-            "x-user-name": "Adonis Lozada"
-        }
+        headers = self._auth_headers_for("a.lozada")
         res = self.client.post(f"/api/items/{item_id}/status", json={"status": "curso"}, headers=headers)
         self.assertEqual(res.status_code, 200)
 
@@ -321,10 +328,7 @@ class TestTelegramDeepLinks(unittest.TestCase):
         finally:
             db.close()
 
-        headers = {
-            "x-user-role": "coordinador",
-            "x-user-name": "Adonis Lozada"
-        }
+        headers = self._auth_headers_for("a.lozada")
         res = self.client.post(
             f"/api/items/{item_id}/assign",
             json={"specialist_keys": ["juan"]},
@@ -357,7 +361,7 @@ class TestTelegramDeepLinks(unittest.TestCase):
         finally:
             db.close()
 
-        coord_headers = {"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+        coord_headers = self._auth_headers_for("a.lozada")
         # Fetch by PK
         res_pk = self.client.get(f"/api/items/{item_id}", headers=coord_headers)
         self.assertEqual(res_pk.status_code, 200)
@@ -393,7 +397,7 @@ class TestTelegramDeepLinks(unittest.TestCase):
         finally:
             db.close()
 
-        coord_headers = {"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+        coord_headers = self._auth_headers_for("a.lozada")
         # Verify it IS retained in GET /api/items (desacoplado para histórico de Resumen)
         list_res = self.client.get("/api/items", headers=coord_headers)
         self.assertEqual(list_res.status_code, 200)
@@ -408,7 +412,7 @@ class TestTelegramDeepLinks(unittest.TestCase):
     def test_13_get_single_item_not_found(self):
         res = self.client.get(
             "/api/items/99999999",
-            headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+            headers=self._auth_headers_for("a.lozada")
         )
         self.assertEqual(res.status_code, 404)
 
@@ -432,19 +436,12 @@ class TestTelegramDeepLinks(unittest.TestCase):
             db.close()
 
         # Juan Fernández requests Pedro's item -> 403 Forbidden
-        import urllib.parse
-        headers_juan = {
-            "x-user-role": "especialista",
-            "x-user-name": urllib.parse.quote("Juan Fernández")
-        }
+        headers_juan = self._auth_headers_for("j.fernandez")
         res_denied = self.client.get(f"/api/items/{priv_id}", headers=headers_juan)
         self.assertEqual(res_denied.status_code, 403)
 
         # Coordinator requests Pedro's item -> 200 OK
-        headers_coord = {
-            "x-user-role": "coordinador",
-            "x-user-name": urllib.parse.quote("Adonis Lozada")
-        }
+        headers_coord = self._auth_headers_for("a.lozada")
         res_allowed = self.client.get(f"/api/items/{priv_id}", headers=headers_coord)
         self.assertEqual(res_allowed.status_code, 200)
 

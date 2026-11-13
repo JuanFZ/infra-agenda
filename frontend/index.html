@@ -2673,9 +2673,90 @@
             <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
             <polyline points="17 2 12 7 7 2" />
           </svg>
-          <span>Acceder en Modo TV Público (Informativo)</span>
+          <span>Acceder en Modo TV Público (Kiosco)</span>
         </button>
+
+        <div id="kioskLoginBox" style="display:none;margin-top:12px;text-align:left;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.09);border-radius:10px;padding:12px">
+          <form onsubmit="submitKioskLogin(event)">
+            <label for="kioskSecretInput" style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">
+              Clave de Kiosco Modo TV
+            </label>
+            <div style="position:relative">
+              <input type="password" id="kioskSecretInput" class="form-input" autocomplete="off" required
+                placeholder="Ingresa la clave de Kiosco" style="padding-right:40px">
+              <button type="button" onclick="togglePassInputSibling(this)"
+                style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px"
+                title="Mostrar/ocultar clave">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+            <div id="kioskLoginAlert" class="login-alert" style="display:none;margin-top:8px"></div>
+            <button type="submit" id="btnKioskSubmit" class="btn primary"
+              style="width:100%;margin-top:10px;padding:9px;font-size:13px;font-weight:700;justify-content:center">
+              <span id="btnKioskText">Activar Modo TV</span>
+            </button>
+          </form>
+        </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal Bloqueante de Cambio Obligatorio de Contraseña -->
+  <div class="login-overlay" id="forcePwOverlay" style="display:none;z-index:100000" role="dialog" aria-modal="true" aria-labelledby="forcePwTitle">
+    <div class="login-card" style="max-width:440px">
+      <div class="login-header" style="margin-bottom:16px">
+        <div id="forcePwTitle" class="login-title">Actualización Obligatoria de Contraseña</div>
+        <div class="login-sub">Por seguridad debes definir una contraseña personal antes de acceder a la Agenda.</div>
+      </div>
+
+      <form id="forcePwForm" onsubmit="submitForcedPasswordChange(event)" style="display:flex;flex-direction:column;gap:12px">
+        <div style="background:rgba(79,140,255,0.06);border:1px solid rgba(79,140,255,0.18);border-radius:10px;padding:10px 12px;font-size:11.5px;color:var(--muted);line-height:1.45">
+          <strong style="color:var(--accent);display:block;margin-bottom:2px">Requisitos de la nueva clave:</strong>
+          Entre 8 y 128 caracteres, incluyendo al menos una letra, un número y un carácter especial (ej: $, &, ., *, @, #, !).
+        </div>
+
+        <div class="login-field" style="margin-bottom:0">
+          <label for="forceOldPw">Contraseña Actual</label>
+          <div style="position:relative">
+            <input type="password" id="forceOldPw" class="form-input" required placeholder="Ingresa tu contraseña actual" style="padding-right:40px">
+            <button type="button" onclick="togglePassInputSibling(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="login-field" style="margin-bottom:0">
+          <label for="forceNewPw">Nueva Contraseña</label>
+          <div style="position:relative">
+            <input type="password" id="forceNewPw" class="form-input" required minlength="8" maxlength="128" placeholder="8 a 128 caracteres con letra, número y símbolo" style="padding-right:40px">
+            <button type="button" onclick="togglePassInputSibling(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="login-field" style="margin-bottom:0">
+          <label for="forceConfirmPw">Confirmar Nueva Contraseña</label>
+          <div style="position:relative">
+            <input type="password" id="forceConfirmPw" class="form-input" required minlength="8" maxlength="128" placeholder="Repite la nueva contraseña" style="padding-right:40px">
+            <button type="button" onclick="togglePassInputSibling(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div id="forcePwAlert" class="login-alert" style="display:none"></div>
+
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <button type="button" class="btn" onclick="handleLogout(true)" style="justify-content:center">Cerrar Sesión</button>
+          <button type="submit" id="btnForcePwSubmit" class="btn primary" style="flex:1;justify-content:center;font-weight:700">
+            <span id="btnForcePwText">Guardar y Continuar</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -3767,15 +3848,74 @@
       return role;
     }
 
-    function getAuthHeaders() {
-      const headers = { 'Content-Type': 'application/json' };
-      if (CURRENT_USER) {
-        if (CURRENT_USER.role) headers['X-User-Role'] = encodeURIComponent(CURRENT_USER.role);
-        if (CURRENT_USER.full_name) headers['X-User-Name'] = encodeURIComponent(CURRENT_USER.full_name);
-        else if (CURRENT_USER.username) headers['X-User-Name'] = encodeURIComponent(CURRENT_USER.username);
-        if (CURRENT_USER.username) headers['X-User-Username'] = encodeURIComponent(CURRENT_USER.username);
+    let MUST_CHANGE_PASSWORD_ACTIVE = false;
+
+    function getAuthHeaders(includeJsonContentType = true) {
+      const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+      if (includeJsonContentType) {
+        headers['Content-Type'] = 'application/json';
       }
       return headers;
+    }
+
+    function validatePasswordPolicy(pw) {
+      const val = String(pw || '');
+      if (val.length < 8) {
+        return 'La nueva contraseña debe tener como mínimo 8 caracteres.';
+      }
+      if (val.length > 128) {
+        return 'La nueva contraseña no debe exceder los 128 caracteres.';
+      }
+      if (!/[A-Za-z]/.test(val)) {
+        return 'La nueva contraseña debe contener al menos una letra.';
+      }
+      if (!/\d/.test(val)) {
+        return 'La nueva contraseña debe contener al menos un número.';
+      }
+      const specialCharRegex = /[\$\&\.\*\@\#\%\^\!\?\_\-\+\=\(\)\[\]\{\}\<\>\,\:\;\|\\\/~`'"]/;
+      if (!specialCharRegex.test(val)) {
+        return 'La nueva contraseña debe contener al menos un carácter especial ($&.*@#!...).';
+      }
+      return '';
+    }
+
+    function getSafeToken(val, fallback = 'unknown') {
+      const s = String(val || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      return s || fallback;
+    }
+
+    function getSafeExternalUrl(rawUrl, allowRelativeEscalation = false) {
+      const s = String(rawUrl || '').trim();
+      if (!s || s === '#') return '';
+      if (allowRelativeEscalation && /^\/api\/escalations\/\d+\/(view|download)(?:\?.*)?$/.test(s)) {
+        return s;
+      }
+      try {
+        const parsed = new URL(s, window.location.origin);
+        if (allowRelativeEscalation) {
+          return parsed.protocol === 'https:' ? parsed.href : '';
+        }
+        return (parsed.protocol === 'https:' || parsed.protocol === 'http:') ? parsed.href : '';
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function getSafeAvatarUrl(rawUrl) {
+      const s = String(rawUrl || '').trim();
+      if (!s) return '';
+      if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(s)) {
+        return s;
+      }
+      if (s.startsWith('/') && !s.startsWith('//')) {
+        return s;
+      }
+      try {
+        const parsed = new URL(s);
+        return parsed.protocol === 'https:' ? parsed.href : '';
+      } catch (e) {
+        return '';
+      }
     }
 
     function stripAccentsText(str) {
@@ -3896,8 +4036,8 @@
       toast.innerHTML = `
         ${iconSvg}
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:13.5px;line-height:1.3">${title}</div>
-          ${message ? `<div style="font-size:12px;color:rgba(240,246,252,.8);margin-top:3px;line-height:1.4">${message}</div>` : ''}
+          <div style="font-weight:700;font-size:13.5px;line-height:1.3">${escapeHtml(title)}</div>
+          ${message ? `<div style="font-size:12px;color:rgba(240,246,252,.8);margin-top:3px;line-height:1.4">${escapeHtml(message)}</div>` : ''}
         </div>
         <button type="button" onclick="this.parentElement.remove()" style="background:transparent;border:none;color:rgba(240,246,252,.5);cursor:pointer;padding:0;font-size:16px;line-height:1" title="Cerrar">&times;</button>
       `;
@@ -3966,7 +4106,7 @@
     }
 
     async function loadData() {
-      if (!CURRENT_USER) {
+      if (!CURRENT_USER || MUST_CHANGE_PASSWORD_ACTIVE) {
         return;
       }
       // 1. Renderizado instantáneo desde caché de sesión si existe (stale-while-revalidate)
@@ -3986,6 +4126,25 @@
           fetch(`${API_URL}/kpis`, { headers: getAuthHeaders() }),
           fetch(`${API_URL}/items`, { headers: getAuthHeaders() })
         ]);
+
+        if (resKpi.status === 401 || resItems.status === 401) {
+          CURRENT_USER = null;
+          MUST_CHANGE_PASSWORD_ACTIVE = false;
+          try { sessionStorage.removeItem('sycom_cached_items'); } catch (e) {}
+          const loginOv = document.getElementById('loginOverlay');
+          const forceOv = document.getElementById('forcePwOverlay');
+          if (forceOv) forceOv.style.display = 'none';
+          if (loginOv) loginOv.style.display = 'flex';
+          return;
+        }
+
+        if (resKpi.status === 403 || resItems.status === 403) {
+          if (CURRENT_USER && !CURRENT_USER.is_kiosk) {
+            MUST_CHANGE_PASSWORD_ACTIVE = true;
+            openForcedPasswordModal();
+          }
+          return;
+        }
 
         if (!resKpi.ok || !resItems.ok) {
           throw new Error('Error en respuesta de la API');
@@ -4212,26 +4371,26 @@
         tbody.innerHTML = pageItems.map(it => `
       <tr class="click ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new-row' : ''}" onclick="openModal(${it.id})">
         <td><span class="badge" style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;padding:0"></span></td>
-        <td><span class="badge src-${it.source}">${it.source}</span> #${it.external_id}</td>
+        <td><span class="badge src-${getSafeToken(it.source)}">${escapeHtml(it.source)}</span> #${escapeHtml(it.external_id)}</td>
         <td><b>${escapeHtml(it.title)}</b></td>
         <td>${escapeHtml(it.client_name || it.project_name || 'Interno')}</td>
         <td>
           ${it.status === 'cerrado'
-            ? `<span style="font-weight:600;opacity:.85">${it.assignee_name || 'Sin asignar'}</span>`
+            ? `<span style="font-weight:600;opacity:.85">${escapeHtml(it.assignee_name || 'Sin asignar')}</span>`
             : (it.assignee_name && !it.assignee_name.toLowerCase().includes('sin asignar')
-              ? `<div style="display:inline-flex;align-items:center;gap:6px;cursor:${isCoordinator() ? 'pointer' : 'default'}" ${isCoordinator() ? `onclick="event.stopPropagation();openModal(${it.id})" title="Click para reasignar o sumar especialistas"` : ''}>
-                   <span style="font-weight:600">${it.assignee_name}</span>
+              ? `<div style="display:inline-flex;align-items:center;gap:6px;cursor:${isCoordinator() ? 'pointer' : 'default'}" ${isCoordinator() ? `onclick="event.stopPropagation();openModal(${Number(it.id)})" title="Click para reasignar o sumar especialistas"` : ''}>
+                   <span style="font-weight:600">${escapeHtml(it.assignee_name)}</span>
                    ${isCoordinator() ? `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5;color:var(--accent)"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>` : ''}
                  </div>`
               : (isCoordinator()
-                ? `<button type="button" class="badge" style="background:rgba(243,156,18,.15);color:#f39c12;border:1px solid rgba(243,156,18,.35);cursor:pointer;padding:3px 8px;font-weight:600;border-radius:6px;font-size:11px;transition:all .15s" onclick="event.stopPropagation();openModal(${it.id})" title="Click para asignar responsable">+ Asignar</button>`
+                ? `<button type="button" class="badge" style="background:rgba(243,156,18,.15);color:#f39c12;border:1px solid rgba(243,156,18,.35);cursor:pointer;padding:3px 8px;font-weight:600;border-radius:6px;font-size:11px;transition:all .15s" onclick="event.stopPropagation();openModal(${Number(it.id)})" title="Click para asignar responsable">+ Asignar</button>`
                 : `<span class="muted" style="font-size:11px">Sin asignar</span>`
               )
             )
           }
         </td>
-        <td><span class="prio prio-${it.priority}">${it.priority}</span></td>
-        <td>${it.status_origin || it.status}</td>
+        <td><span class="prio prio-${getSafeToken(it.priority)}">${escapeHtml(it.priority)}</span></td>
+        <td>${escapeHtml(it.status_origin || it.status)}</td>
         <td>
           <div style="font-weight:600;font-size:12px;color:var(--text)">${getItemAttentionTime(it)}</div>
           <div class="muted" style="font-size:11px">Recibido: ${formatDate(it.received_at || it.created_at)}</div>
@@ -4271,11 +4430,11 @@
           const pageEspera = esperaList.slice(esperaStart, esperaStart + PAGE_SIZE_DEFAULT);
 
           tblEsperaTbody.innerHTML = pageEspera.map(it => `
-          <tr class="click" onclick="openModal(${it.id})">
-            <td><span class="badge src-${it.source}">${it.source}</span> #${it.external_id}</td>
+          <tr class="click" onclick="openModal(${Number(it.id)})">
+            <td><span class="badge src-${getSafeToken(it.source)}">${escapeHtml(it.source)}</span> #${escapeHtml(it.external_id)}</td>
             <td><b>${escapeHtml(it.title)}</b></td>
             <td>${escapeHtml(it.assignee_name || 'Sin asignar')}</td>
-            <td><span class="prio prio-${it.priority}">${it.priority}</span></td>
+            <td><span class="prio prio-${getSafeToken(it.priority)}">${escapeHtml(it.priority)}</span></td>
             <td><div style="font-weight:600;font-size:12px">${getItemAttentionTime(it)}</div></td>
             <td class="muted">${formatDate(it.escalated_at || it.received_at || it.created_at)}</td>
             <td style="text-align:center" onclick="event.stopPropagation()">
@@ -4481,8 +4640,8 @@
           return `
           <div class="tcard ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-${it.id}" draggable="${canDrag ? 'true' : 'false'}" ${canDrag ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!canDrag ? 'cursor:pointer;' : ''}">
             <div class="top">
-              <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
-              <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
+              <span class="badge src-${getSafeToken(it.source)}">${escapeHtml(it.source)}</span> #${escapeHtml(it.external_id)}
+              <span class="prio prio-${getSafeToken(it.priority)}" style="margin-left:auto">${escapeHtml(it.priority)}</span>
             </div>
             <div class="title">${escapeHtml(it.title)}</div>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:2px;flex-wrap:wrap">
@@ -5197,14 +5356,14 @@
       document.getElementById('modalContent').innerHTML = `
     ${roleBanner}
     <div style="margin-bottom:10px">
-      <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
+      <span class="badge src-${getSafeToken(it.source)}">${escapeHtml(it.source)}</span> #${escapeHtml(it.external_id)}
     </div>
     <h2 style="font-size:18px;line-height:1.3;margin-bottom:8px">${escapeHtml(it.title)}</h2>
     <dl>
       <dt>Estado:</dt>
       <dd>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <b>${it.status_origin || it.status}</b>
+          <b>${escapeHtml(it.status_origin || it.status)}</b>
           ${(isCoordinator() || canUserEditItem(it)) ? `
           <div style="display:inline-flex;align-items:center;gap:6px;margin-left:auto">
             <select onchange="changeStatusFromModal(${it.id}, this.value)" style="background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:11.5px;outline:none;cursor:pointer">
@@ -5300,7 +5459,7 @@
           `}
           ${(() => {
             const esc = ESCALATIONS_LIST.find(e => e.id === it.escalation_id);
-            const docUrl = esc ? (esc.doc_url || '') : '';
+            const docUrl = esc ? getSafeExternalUrl(esc.doc_url || '', true) : '';
             return docUrl ? `<a href="${escapeHtml(docUrl)}" target="_blank" rel="noopener noreferrer" class="btn" style="padding:3px 7px;font-size:11px;background:rgba(79,140,255,0.15);color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:4px"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg><span>Abrir Doc</span></a>` : '';
           })()}
         </div>
@@ -5335,10 +5494,14 @@
       </button>` : ''}
       <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
         <button class="btn" onclick="closeModal()">Cerrar</button>
-        <a href="${it.url}" target="_blank" class="btn primary" style="text-decoration:none">
-          <span>Abrir en ${it.source}</span>
+        ${(() => {
+          const safeUrl = getSafeExternalUrl(it.url, false);
+          return safeUrl ? `
+        <a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="btn primary" style="text-decoration:none">
+          <span>Abrir en ${escapeHtml(it.source)}</span>
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </a>
+        </a>` : '';
+        })()}
       </div>
     </div>
   `;
@@ -6292,8 +6455,6 @@
       TV_ANALYTICS_LOADING = true;
       try {
         const params = new URLSearchParams();
-        params.set('role', 'tv');
-        params.set('user', 'Pantalla Modo TV');
         params.set('start_date', STATS_EPOCH_START_DATE);
         const res = await fetch(`${API_URL}/reports/data?${params.toString()}`, {
           headers: { ...getAuthHeaders(), 'X-TV-Mode': 'true' }
@@ -6461,13 +6622,8 @@
           document.exitFullscreen().catch(() => { });
         }
         const tvRole = (CURRENT_USER?.role || '').toLowerCase();
-        if (tvRole === 'tv' || tvRole === 'modo.tv') {
-          CURRENT_USER = null;
-          ALL_ITEMS = [];
-          TV_ITEMS = [];
-          localStorage.removeItem('sycom_user');
-          try { sessionStorage.removeItem('sycom_cached_items'); } catch (e) {}
-          checkAuthAndInit();
+        if (tvRole === 'tv' || tvRole === 'modo.tv' || CURRENT_USER?.is_kiosk) {
+          await handleLogout(true);
         }
       }
     }
@@ -6566,8 +6722,8 @@
         ${active.slice(0, 6).map(it => `
           <div class="tv-item-card ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}">
             <div style="display:flex;align-items:center;gap:8px;font-size:12px">
-              <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
-              <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
+              <span class="badge src-${getSafeToken(it.source)}">${escapeHtml(it.source)}</span> #${escapeHtml(it.external_id)}
+              <span class="prio prio-${getSafeToken(it.priority)}" style="margin-left:auto">${escapeHtml(it.priority)}</span>
             </div>
             <div style="font-size:15px;font-weight:700">${escapeHtml(it.title)}</div>
             <div class="muted" style="font-size:12px">Cliente: ${escapeHtml(it.client_name || it.project_name || 'Interno')} · Responsable: <b>${escapeHtml(it.assignee_name || 'Sin asignar')}</b></div>
@@ -6595,7 +6751,7 @@
         ${closed.slice(0, 6).map(it => `
           <div class="tv-item-card" style="border-left-color:#10b981">
             <div style="display:flex;align-items:center;gap:8px;font-size:12px">
-              <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
+              <span class="badge src-${getSafeToken(it.source)}">${escapeHtml(it.source)}</span> #${escapeHtml(it.external_id)}
               <span class="badge" style="margin-left:auto;background:rgba(16,185,129,.15);color:#34d399;font-size:10.5px">Resuelto</span>
             </div>
             <div style="font-size:15px;font-weight:700">${escapeHtml(it.title)}</div>
@@ -6668,8 +6824,8 @@
             return `
                   <div class="tv-kanban-card ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" id="kcard-tv-${it.id}" draggable="${canDrag ? 'true' : 'false'}" ${canDrag ? `ondragstart="handleDragStart(event, ${it.id})" ondragend="handleDragEnd(event)"` : ''} onclick="if(!IS_DRAGGING) openModal(${it.id})" style="${!canDrag ? 'cursor:pointer;' : ''}">
                     <div style="display:flex;align-items:center;gap:6px;font-size:11px">
-                      <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
-                      <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
+                      <span class="badge src-${getSafeToken(it.source)}">${escapeHtml(it.source)}</span> #${escapeHtml(it.external_id)}
+                      <span class="prio prio-${getSafeToken(it.priority)}" style="margin-left:auto">${escapeHtml(it.priority)}</span>
                     </div>
                     <div style="font-size:13.5px;font-weight:700;line-height:1.3;margin:6px 0 4px 0">${escapeHtml(it.title)}</div>
                     <div class="muted" style="font-size:11px;display:flex;align-items:center;justify-content:space-between">
@@ -6711,18 +6867,22 @@
           ${unassigned.map(it => `
             <div class="tv-item-card ${it.semaphore} ${it.id === HIGHLIGHT_ITEM_ID ? 'highlight-new' : ''}" style="border-left-color:#f39c12">
               <div style="display:flex;align-items:center;gap:8px;font-size:12px">
-                <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
-                <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
+                <span class="badge src-${getSafeToken(it.source)}">${escapeHtml(it.source)}</span> #${escapeHtml(it.external_id)}
+                <span class="prio prio-${getSafeToken(it.priority)}" style="margin-left:auto">${escapeHtml(it.priority)}</span>
               </div>
               <div style="font-size:15px;font-weight:700">${escapeHtml(it.title)}</div>
               <div class="muted" style="font-size:12px">Cliente: ${escapeHtml(it.client_name || 'Interno')}</div>
               <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:10px;display:flex;flex-direction:column;gap:8px">
                 <div style="display:flex;align-items:center;justify-content:space-between">
                   <span style="font-size:12px;font-weight:600;color:#f39c12">${getItemAttentionTime(it)}</span>
-                  <a href="${it.url}" target="_blank" class="tv-action-btn" style="padding:4px 10px;font-size:11px" title="Abrir en plataforma nativa">
+                  ${(() => {
+                    const safeUrl = getSafeExternalUrl(it.url, false);
+                    return safeUrl ? `
+                  <a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="tv-action-btn" style="padding:4px 10px;font-size:11px" title="Abrir en plataforma nativa">
                     <span>Abrir</span>
                     <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                  </a>
+                  </a>` : '';
+                  })()}
                 </div>
                 ${isCoordinator() ? `
                 <div style="display:flex;align-items:center;gap:6px;width:100%">
@@ -7136,22 +7296,24 @@
         </div>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-        <h3 style="font-size:16px">Actividades de ${spec.name} <span class="muted" style="font-weight:400">(${spec.tag})</span></h3>
+        <h3 style="font-size:16px">Actividades de ${escapeHtml(spec.name)} <span class="muted" style="font-weight:400">(${escapeHtml(spec.tag)})</span></h3>
         <span class="badge" style="background:rgba(255,255,255,.08);color:#fff">${items.length} tarea(s)</span>
       </div>
       ${items.length === 0 ? `
         <div style="background:rgba(20,28,40,.65);border:1px dashed rgba(255,255,255,.15);border-radius:12px;padding:40px;text-align:center">
           <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          <div style="font-size:16px;font-weight:600">${spec.name} tiene todas sus tareas al día.</div>
+          <div style="font-size:16px;font-weight:600">${escapeHtml(spec.name)} tiene todas sus tareas al día.</div>
           <div class="muted" style="margin-top:4px;font-size:13px">Sin actividades pendientes actualmente.</div>
         </div>
       ` : `
         <div class="tv-card-grid">
-          ${items.map(it => `
+          ${items.map(it => {
+            const safeItemUrl = getSafeExternalUrl(it.url, false);
+            return `
             <div class="tv-item-card">
               <div style="display:flex;align-items:center;gap:8px;font-size:12px">
-                <span class="badge src-${it.source}">${it.source}</span> #${it.external_id}
-                <span class="prio prio-${it.priority}" style="margin-left:auto">${it.priority}</span>
+                <span class="badge src-${getSafeToken(it.source)}">${escapeHtml(it.source)}</span> #${escapeHtml(it.external_id)}
+                <span class="prio prio-${getSafeToken(it.priority)}" style="margin-left:auto">${escapeHtml(it.priority)}</span>
               </div>
               <div style="font-size:15px;font-weight:700">${escapeHtml(it.title)}</div>
               <div class="muted" style="font-size:12px">Cliente: ${escapeHtml(it.client_name || 'Interno')} · Estado: <b>${escapeHtml(it.status_origin || it.status)}</b></div>
@@ -7160,17 +7322,19 @@
                 <span class="muted">Recibido: ${formatDate(it.received_at || it.created_at, true)}</span>
                 <div style="display:inline-flex;align-items:center;gap:6px">
                   ${isCoordinator() ? `
-                  <button type="button" onclick="openModal(${it.id})" class="tv-action-btn" style="cursor:pointer;padding:4px 8px;font-size:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)" title="Reasignar o sumar especialistas">
+                  <button type="button" onclick="openModal(${Number(it.id)})" class="tv-action-btn" style="cursor:pointer;padding:4px 8px;font-size:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)" title="Reasignar o sumar especialistas">
                     <span>Reasignar</span>
                   </button>` : ''}
-                  <a href="${it.url}" target="_blank" class="tv-action-btn" style="padding:4px 8px;font-size:11px">
+                  ${safeItemUrl ? `
+                  <a href="${escapeHtml(safeItemUrl)}" target="_blank" rel="noopener noreferrer" class="tv-action-btn" style="padding:4px 8px;font-size:11px">
                     <span>Abrir</span>
                     <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                  </a>
+                  </a>` : ''}
                 </div>
               </div>
             </div>
-          `).join('')}
+          `;
+          }).join('')}
         </div>
       `}
     `;
@@ -7227,7 +7391,8 @@
       try {
         const res = await fetch(`${API_URL}/auth/login`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
+          credentials: 'same-origin',
           body: JSON.stringify({ username, password })
         });
         const data = await res.json();
@@ -7237,22 +7402,31 @@
           btnText.textContent = origText;
           if (alertBox) {
             alertBox.style.display = 'flex';
-            alertBox.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${data.detail || 'Credenciales inválidas.'}</span>`;
+            alertBox.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${escapeHtml(data.detail || 'Credenciales inválidas.')}</span>`;
           }
           return;
         }
 
         CURRENT_USER = data.user;
-        localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
+        try { localStorage.removeItem('sycom_user'); } catch (e) {}
 
         document.getElementById('loginOverlay').style.display = 'none';
         btn.disabled = false;
         btnText.textContent = origText;
 
+        const mustChange = Boolean(data.must_change_password || CURRENT_USER?.must_change_password);
+        if (mustChange) {
+          MUST_CHANGE_PASSWORD_ACTIVE = true;
+          openForcedPasswordModal();
+          return;
+        }
+
+        MUST_CHANGE_PASSWORD_ACTIVE = false;
         applyRolePermissions();
+        updateUserAvatarDisplay();
         await loadData();
         await handleDeepLink(true);
-        showToast('Bienvenido', `Sesión iniciada como ${CURRENT_USER.full_name} (${formatRoleName(CURRENT_USER.role)})`, 'success', 4000);
+        showToast('Bienvenido', `Sesión iniciada como ${CURRENT_USER.full_name || CURRENT_USER.username} (${formatRoleName(CURRENT_USER.role)})`, 'success', 4000);
       } catch (err) {
         console.error('Error logging in:', err);
         btn.disabled = false;
@@ -7264,28 +7438,203 @@
       }
     }
 
-    async function enterGuestTvMode() {
+    function enterGuestTvMode() {
+      const box = document.getElementById('kioskLoginBox');
+      if (!box) return;
+      const isHidden = box.style.display === 'none' || !box.style.display;
+      box.style.display = isHidden ? 'block' : 'none';
+      const alertEl = document.getElementById('kioskLoginAlert');
+      if (alertEl) alertEl.style.display = 'none';
+      if (isHidden) {
+        const input = document.getElementById('kioskSecretInput');
+        if (input) {
+          input.value = '';
+          setTimeout(() => input.focus(), 50);
+        }
+      }
+    }
+
+    async function activateKioskSession(userObj, loadImmediately = true) {
       CURRENT_USER = {
         id: 0,
         full_name: 'Pantalla Modo TV',
-        username: 'modo.tv',
-        role: 'tv'
+        username: 'kiosk_tv',
+        role: 'tv',
+        is_kiosk: true,
+        ...(userObj || {})
       };
-      localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
-      document.getElementById('loginOverlay').style.display = 'none';
+      MUST_CHANGE_PASSWORD_ACTIVE = false;
+      try { localStorage.removeItem('sycom_user'); } catch (e) {}
+      const loginOv = document.getElementById('loginOverlay');
+      const forceOv = document.getElementById('forcePwOverlay');
+      if (loginOv) loginOv.style.display = 'none';
+      if (forceOv) forceOv.style.display = 'none';
       applyRolePermissions();
-      await loadData();
-      await handleDeepLink(true);
+      if (loadImmediately) {
+        await loadData();
+        await handleDeepLink(true);
+      }
       if (!TV_MODE_ACTIVE) {
         await toggleTvMode();
       }
     }
 
-    function handleLogout() {
-      if (!confirm('¿Deseas cerrar tu sesión actual en la Agenda?')) return;
-      localStorage.removeItem('sycom_user');
+    async function submitKioskLogin(e) {
+      e.preventDefault();
+      const input = document.getElementById('kioskSecretInput');
+      const alertBox = document.getElementById('kioskLoginAlert');
+      const btn = document.getElementById('btnKioskSubmit');
+      const btnText = document.getElementById('btnKioskText');
+      const secret = (input?.value || '').trim();
+      if (!secret) return;
+
+      if (alertBox) alertBox.style.display = 'none';
+      const origText = btnText ? btnText.textContent : 'Activar Modo TV';
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.textContent = 'Verificando...';
+
+      try {
+        const res = await fetch(`${API_URL}/auth/kiosk`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          credentials: 'same-origin',
+          body: JSON.stringify({ secret })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (alertBox) {
+            alertBox.style.display = 'flex';
+            alertBox.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${escapeHtml(data.detail || 'Clave de Kiosco inválida.')}</span>`;
+          }
+          return;
+        }
+        if (input) input.value = '';
+        await activateKioskSession(data.user, true);
+      } catch (err) {
+        if (alertBox) {
+          alertBox.style.display = 'flex';
+          alertBox.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Error al conectar con el servidor de Kiosco.</span>';
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.textContent = origText;
+      }
+    }
+
+    function openForcedPasswordModal() {
+      const loginOv = document.getElementById('loginOverlay');
+      const forceOv = document.getElementById('forcePwOverlay');
+      const form = document.getElementById('forcePwForm');
+      const alertBox = document.getElementById('forcePwAlert');
+      if (loginOv) loginOv.style.display = 'none';
+      if (form) form.reset();
+      if (alertBox) alertBox.style.display = 'none';
+      if (forceOv) forceOv.style.display = 'flex';
+      setTimeout(() => document.getElementById('forceOldPw')?.focus(), 50);
+    }
+
+    async function submitForcedPasswordChange(e) {
+      e.preventDefault();
+      const oldPass = document.getElementById('forceOldPw')?.value || '';
+      const newPass = document.getElementById('forceNewPw')?.value || '';
+      const confirmPass = document.getElementById('forceConfirmPw')?.value || '';
+      const alertBox = document.getElementById('forcePwAlert');
+      const btn = document.getElementById('btnForcePwSubmit');
+      const btnText = document.getElementById('btnForcePwText');
+
+      const showErr = (msg) => {
+        if (alertBox) {
+          alertBox.style.display = 'flex';
+          alertBox.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${escapeHtml(msg)}</span>`;
+        }
+      };
+
+      if (alertBox) alertBox.style.display = 'none';
+      if (newPass !== confirmPass) {
+        showErr('Las nuevas contraseñas no coinciden.');
+        return;
+      }
+      const policyErr = validatePasswordPolicy(newPass);
+      if (policyErr) {
+        showErr(policyErr);
+        return;
+      }
+
+      const origText = btnText ? btnText.textContent : 'Guardar y Continuar';
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.textContent = 'Guardando...';
+
+      try {
+        const res = await fetch(`${API_URL}/auth/change-password`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            old_password: oldPass,
+            new_password: newPass
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showErr(data.detail || 'No se pudo actualizar la contraseña.');
+          return;
+        }
+        MUST_CHANGE_PASSWORD_ACTIVE = false;
+        if (CURRENT_USER) CURRENT_USER.must_change_password = false;
+        const forceOv = document.getElementById('forcePwOverlay');
+        const form = document.getElementById('forcePwForm');
+        if (form) form.reset();
+        if (forceOv) forceOv.style.display = 'none';
+
+        applyRolePermissions();
+        updateUserAvatarDisplay();
+        await loadData();
+        await handleDeepLink(true);
+        showToast('Contraseña Actualizada', 'Tu nueva contraseña se guardó correctamente.', 'success', 4000);
+      } catch (err) {
+        showErr('Error al conectar con el servidor.');
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.textContent = origText;
+      }
+    }
+
+    async function handleLogout(skipConfirm = false) {
+      if (!skipConfirm && !confirm('¿Deseas cerrar tu sesión actual en la Agenda?')) return;
+      try {
+        await fetch(`${API_URL}/auth/logout`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          credentials: 'same-origin'
+        });
+      } catch (e) {}
+
       CURRENT_USER = null;
-      checkAuthAndInit();
+      ALL_ITEMS = [];
+      TV_ITEMS = [];
+      MUST_CHANGE_PASSWORD_ACTIVE = false;
+      try { localStorage.removeItem('sycom_user'); } catch (e) {}
+      try { sessionStorage.removeItem('sycom_cached_items'); } catch (e) {}
+
+      if (TV_MODE_ACTIVE) {
+        TV_MODE_ACTIVE = false;
+        TV_PAUSED_BY_MODAL = false;
+        clearInterval(TV_TIMER);
+        const tvOv = document.getElementById('tvOverlay');
+        if (tvOv) tvOv.style.display = 'none';
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+
+      const forceOv = document.getElementById('forcePwOverlay');
+      const loginOv = document.getElementById('loginOverlay');
+      const kioskInput = document.getElementById('kioskSecretInput');
+      const kioskBox = document.getElementById('kioskLoginBox');
+      if (forceOv) forceOv.style.display = 'none';
+      if (kioskInput) kioskInput.value = '';
+      if (kioskBox) kioskBox.style.display = 'none';
+      if (loginOv) loginOv.style.display = 'flex';
     }
     window.handleLogout = handleLogout;
 
@@ -7333,7 +7682,7 @@
           rolePill.innerHTML = `
             <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(59,130,246,0.14);border:1px solid rgba(59,130,246,0.35);border-radius:20px;font-size:12px;color:#93c5fd;font-weight:600">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              <span>Especialista · ${CURRENT_USER.full_name || CURRENT_USER.username}</span>
+              <span>Especialista · ${escapeHtml(CURRENT_USER.full_name || CURRENT_USER.username)}</span>
             </div>
           `;
         } else if (isTvGuest) {
@@ -7398,7 +7747,7 @@
           const uFirst = (CURRENT_USER.full_name || '').split(' ')[0] || (CURRENT_USER.username || '').split('.')[0];
           respSelect.innerHTML = `
             <option value="">Mis asignadas y sin asignar</option>
-            <option value="${uFirst.toLowerCase()}">Solo mis actividades (${uFirst})</option>
+            <option value="${escapeHtml(uFirst.toLowerCase())}">Solo mis actividades (${escapeHtml(uFirst)})</option>
             <option value="sin asignar">Solo disponibles (Sin asignar)</option>
           `;
           respSelect.value = '';
@@ -7412,28 +7761,80 @@
       }
     }
 
-    function checkAuthAndInit() {
+    async function checkAuthAndInit() {
+      try { localStorage.removeItem('sycom_user'); } catch (e) {}
+      const overlay = document.getElementById('loginOverlay');
+      const forceOv = document.getElementById('forcePwOverlay');
+
+      // 1. Soporte de arranque rápido para pantallas TV con ?kiosk=SECRETO (se limpia de la URL al instante)
       try {
-        CURRENT_USER = JSON.parse(localStorage.getItem('sycom_user') || 'null');
+        const urlParams = new URLSearchParams(window.location.search);
+        const kioskSecret = urlParams.get('kiosk');
+        if (kioskSecret) {
+          urlParams.delete('kiosk');
+          const cleanQs = urlParams.toString();
+          const cleanUrl = window.location.pathname + (cleanQs ? '?' + cleanQs : '') + window.location.hash;
+          window.history.replaceState({}, document.title, cleanUrl);
+
+          const kioskRes = await fetch(`${API_URL}/auth/kiosk`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            credentials: 'same-origin',
+            body: JSON.stringify({ secret: kioskSecret })
+          });
+          if (kioskRes.ok) {
+            const kioskData = await kioskRes.json();
+            await activateKioskSession(kioskData.user, true);
+            return { authenticated: true, loaded: true };
+          }
+        }
       } catch (e) {
-        CURRENT_USER = null;
+        console.warn('No se pudo inicializar sesión kiosk desde URL:', e);
       }
 
-      const overlay = document.getElementById('loginOverlay');
-      if (!CURRENT_USER) {
-        if (overlay) overlay.style.display = 'flex';
-      } else {
-        if (overlay) overlay.style.display = 'none';
-        applyRolePermissions();
-        const roleLower = (CURRENT_USER.role || '').toLowerCase();
-        if (roleLower === 'tv' || roleLower === 'modo.tv') {
-          if (!TV_MODE_ACTIVE) {
-            toggleTvMode();
+      // 2. Validar cookie de sesión HttpOnly vigente en el servidor
+      try {
+        const res = await fetch(`${API_URL}/auth/session`, {
+          headers: getAuthHeaders(false),
+          credentials: 'same-origin'
+        });
+        if (res.ok) {
+          const sess = await res.json();
+          if (sess && sess.authenticated && sess.user) {
+            CURRENT_USER = sess.user;
+            if (sess.is_kiosk) CURRENT_USER.is_kiosk = true;
+            MUST_CHANGE_PASSWORD_ACTIVE = Boolean(sess.must_change_password || CURRENT_USER.must_change_password);
+            if (overlay) overlay.style.display = 'none';
+
+            if (MUST_CHANGE_PASSWORD_ACTIVE) {
+              openForcedPasswordModal();
+              return { authenticated: true, loaded: false, pendingPasswordChange: true };
+            }
+
+            if (forceOv) forceOv.style.display = 'none';
+            applyRolePermissions();
+            const roleLower = (CURRENT_USER.role || '').toLowerCase();
+            if (roleLower === 'tv' || roleLower === 'modo.tv' || CURRENT_USER.is_kiosk) {
+              if (!TV_MODE_ACTIVE) {
+                await toggleTvMode();
+              }
+            } else {
+              updateUserAvatarDisplay();
+              fetchCurrentUserProfile();
+            }
+            return { authenticated: true, loaded: false };
           }
-        } else {
-          fetchCurrentUserProfile();
         }
+      } catch (e) {
+        console.warn('Error verificando sesión:', e);
       }
+
+      CURRENT_USER = null;
+      MUST_CHANGE_PASSWORD_ACTIVE = false;
+      try { sessionStorage.removeItem('sycom_cached_items'); } catch (e) {}
+      if (forceOv) forceOv.style.display = 'none';
+      if (overlay) overlay.style.display = 'flex';
+      return { authenticated: false, loaded: false };
     }
 
     function updateUserAvatarDisplay() {
@@ -7445,11 +7846,12 @@
         ? 'linear-gradient(135deg, #10b981, #059669)'
         : (isAnal ? 'linear-gradient(135deg, #a855f7, #7e22ce)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)');
       const initial = (CURRENT_USER.full_name || 'U').charAt(0).toUpperCase();
+      const safeAvatar = getSafeAvatarUrl(CURRENT_USER.avatar_data);
 
       const av = document.getElementById('sidebarAvatar');
       if (av) {
-        if (CURRENT_USER.avatar_data) {
-          av.innerHTML = `<img src="${CURRENT_USER.avatar_data}" alt="Foto" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">`;
+        if (safeAvatar) {
+          av.innerHTML = `<img src="${escapeHtml(safeAvatar)}" alt="Foto" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">`;
           av.style.background = 'transparent';
           av.style.padding = '0';
         } else {
@@ -7461,8 +7863,8 @@
 
       const hAv = document.getElementById('headerAvatarMini');
       if (hAv) {
-        if (CURRENT_USER.avatar_data) {
-          hAv.innerHTML = `<img src="${CURRENT_USER.avatar_data}" alt="Foto" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">`;
+        if (safeAvatar) {
+          hAv.innerHTML = `<img src="${escapeHtml(safeAvatar)}" alt="Foto" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">`;
           hAv.style.background = 'transparent';
         } else {
           hAv.textContent = initial;
@@ -7481,14 +7883,15 @@
     }
 
     async function fetchCurrentUserProfile() {
-      if (!CURRENT_USER) return;
+      if (!CURRENT_USER || CURRENT_USER.is_kiosk) return;
       try {
-        const userParam = CURRENT_USER.username ? `?username=${encodeURIComponent(CURRENT_USER.username)}` : '';
-        const res = await fetch(`${API_URL}/users/me${userParam}`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_URL}/users/me`, {
+          headers: getAuthHeaders(false),
+          credentials: 'same-origin'
+        });
         if (res.ok) {
           const user = await res.json();
           CURRENT_USER = { ...CURRENT_USER, ...user };
-          localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
           updateUserAvatarDisplay();
         }
       } catch (err) {
@@ -7538,7 +7941,8 @@
       const roleName = formatRoleName(CURRENT_USER.role);
       const roleColor = isCoord ? '#10b981' : (isAnal ? '#c084fc' : '#60a5fa');
       const initial = (CURRENT_USER.full_name || 'U').charAt(0).toUpperCase();
-      const previewAvatar = PENDING_AVATAR_DATA !== null ? PENDING_AVATAR_DATA : CURRENT_USER.avatar_data;
+      const rawPreviewAvatar = PENDING_AVATAR_DATA !== null ? PENDING_AVATAR_DATA : CURRENT_USER.avatar_data;
+      const previewAvatar = getSafeAvatarUrl(rawPreviewAvatar);
 
       modalContent.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:14px;margin-bottom:16px">
@@ -7601,7 +8005,8 @@
       const roleName = formatRoleName(CURRENT_USER.role);
       const roleColor = isCoord ? '#10b981' : (isAnal ? '#c084fc' : '#60a5fa');
       const initial = (CURRENT_USER.full_name || 'U').charAt(0).toUpperCase();
-      const previewAvatar = PENDING_AVATAR_DATA !== null ? PENDING_AVATAR_DATA : CURRENT_USER.avatar_data;
+      const rawPreviewAvatar = PENDING_AVATAR_DATA !== null ? PENDING_AVATAR_DATA : CURRENT_USER.avatar_data;
+      const previewAvatar = getSafeAvatarUrl(rawPreviewAvatar);
       const bgGrad = isCoord
         ? 'linear-gradient(135deg, #10b981, #059669)'
         : (isAnal ? 'linear-gradient(135deg, #a855f7, #7e22ce)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)');
@@ -7612,7 +8017,7 @@
           <div style="display:flex;align-items:center;gap:18px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:20px;margin-bottom:20px;flex-wrap:wrap">
             <div style="position:relative;width:68px;height:68px;border-radius:50%;overflow:hidden;border:2.5px solid var(--accent);background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 14px rgba(79,140,255,0.25)">
               ${previewAvatar ? `
-                <img src="${previewAvatar}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover;display:block">
+                <img src="${escapeHtml(previewAvatar)}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover;display:block">
               ` : `
                 <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#fff;background:${bgGrad}">
                   ${initial}
@@ -7727,7 +8132,7 @@
           <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px;padding:10px 0">
             <div style="position:relative;width:125px;height:125px;border-radius:50%;overflow:hidden;border:3px solid var(--accent);box-shadow:0 0 28px rgba(79,140,255,0.25);background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center">
               ${previewAvatar ? `
-                <img src="${previewAvatar}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover;display:block">
+                <img src="${escapeHtml(previewAvatar)}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover;display:block">
               ` : `
                 <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:46px;font-weight:800;color:#fff;background:${bgGrad}">
                   ${initial}
@@ -7779,8 +8184,8 @@
               <strong style="color:var(--accent);display:block;margin-bottom:3px">Estándares de Seguridad de la Contraseña</strong>
               Ingresa tu contraseña actual y define una nueva clave que cumpla:
               <ul style="margin:5px 0 0 16px;padding:0;font-size:11.5px;color:var(--muted);line-height:1.5">
-                <li>Longitud: mínimo 6 y máximo 15 caracteres.</li>
-                <li>Al menos un carácter especial (ej: $, &, ., *, @, #, !, ?, _, -).</li>
+                <li>Longitud: mínimo 8 y máximo 128 caracteres.</li>
+                <li>Al menos una letra, un número y un carácter especial (ej: $, &, ., *, @, #, !, ?, _, -).</li>
               </ul>
             </div>
 
@@ -7797,7 +8202,7 @@
             <div>
               <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Nueva Contraseña</label>
               <div style="position:relative">
-                <input type="password" name="new_password" class="form-input" required minlength="6" maxlength="15" placeholder="6 a 15 caracteres con caracter especial ($&.*)" style="padding-right:42px">
+                <input type="password" name="new_password" class="form-input" required minlength="8" maxlength="128" placeholder="8 a 128 caracteres con letra, número y símbolo" style="padding-right:42px">
                 <button type="button" onclick="togglePassInputSibling(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:6px">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
@@ -7807,7 +8212,7 @@
             <div>
               <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--text)">Confirmar Nueva Contraseña</label>
               <div style="position:relative">
-                <input type="password" name="confirm_password" class="form-input" required minlength="6" maxlength="15" placeholder="Repite la nueva contraseña" style="padding-right:42px">
+                <input type="password" name="confirm_password" class="form-input" required minlength="8" maxlength="128" placeholder="Repite la nueva contraseña" style="padding-right:42px">
                 <button type="button" onclick="togglePassInputSibling(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:6px">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
@@ -7914,10 +8319,10 @@
       btns.forEach(b => { b.disabled = true; b.textContent = 'Guardando...'; });
 
       try {
-        const userParam = CURRENT_USER?.username ? `?username=${encodeURIComponent(CURRENT_USER.username)}` : '';
-        const res = await fetch(`${API_URL}/users/me${userParam}`, {
+        const res = await fetch(`${API_URL}/users/me`, {
           method: 'PUT',
           headers: getAuthHeaders(),
+          credentials: 'same-origin',
           body: JSON.stringify({
             avatar_data: PENDING_AVATAR_DATA || ''
           })
@@ -7927,7 +8332,6 @@
           throw new Error(data.detail || 'Error al guardar foto de perfil');
         }
         CURRENT_USER = { ...CURRENT_USER, ...data.user };
-        localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
         updateUserAvatarDisplay();
         showToast('Foto Actualizada', 'Tu foto de perfil se ha guardado exitosamente.', 'success');
         if (document.getElementById('modalBg')?.classList.contains('show')) {
@@ -7960,10 +8364,10 @@
       }
 
       try {
-        const userParam = CURRENT_USER?.username ? `?username=${encodeURIComponent(CURRENT_USER.username)}` : '';
-        const res = await fetch(`${API_URL}/users/me${userParam}`, {
+        const res = await fetch(`${API_URL}/users/me`, {
           method: 'PUT',
           headers: getAuthHeaders(),
+          credentials: 'same-origin',
           body: JSON.stringify({
             full_name: fullName,
             email: email,
@@ -7978,7 +8382,6 @@
           throw new Error(data.detail || 'Error al guardar datos personales');
         }
         CURRENT_USER = { ...CURRENT_USER, ...data.user };
-        localStorage.setItem('sycom_user', JSON.stringify(CURRENT_USER));
         updateUserAvatarDisplay();
         showToast('Perfil Actualizado', 'Tus datos personales se han guardado con éxito.', 'success');
         if (isModal && document.getElementById('modalBg')?.classList.contains('show')) {
@@ -8008,17 +8411,9 @@
         showScopedProfileAlert(form, 'profile-pass-alert', 'Las nuevas contraseñas no coinciden.', 'error');
         return;
       }
-      if (newPass.length < 6) {
-        showScopedProfileAlert(form, 'profile-pass-alert', 'La nueva contraseña debe tener como mínimo 6 caracteres.', 'error');
-        return;
-      }
-      if (newPass.length > 15) {
-        showScopedProfileAlert(form, 'profile-pass-alert', 'La nueva contraseña no debe exceder los 15 caracteres.', 'error');
-        return;
-      }
-      const specialCharRegex = /[\$\&\.\*\@\#\%\^\!\?\_\-\+\=\(\)\[\]\{\}\<\>\,\:\;\|\\\/]/;
-      if (!specialCharRegex.test(newPass)) {
-        showScopedProfileAlert(form, 'profile-pass-alert', 'La nueva contraseña debe contener al menos un caracter especial ($&.*).', 'error');
+      const policyErr = validatePasswordPolicy(newPass);
+      if (policyErr) {
+        showScopedProfileAlert(form, 'profile-pass-alert', policyErr, 'error');
         return;
       }
 
@@ -8032,8 +8427,8 @@
         const res = await fetch(`${API_URL}/auth/change-password`, {
           method: 'POST',
           headers: getAuthHeaders(),
+          credentials: 'same-origin',
           body: JSON.stringify({
-            username: CURRENT_USER.username,
             old_password: oldPass,
             new_password: newPass
           })
@@ -8042,6 +8437,8 @@
         if (!res.ok) {
           throw new Error(data.detail || 'Error al actualizar contraseña');
         }
+        if (CURRENT_USER) CURRENT_USER.must_change_password = false;
+        MUST_CHANGE_PASSWORD_ACTIVE = false;
         showToast('Contraseña Actualizada', 'Tu contraseña se ha cambiado correctamente.', 'success');
         if (isModal && document.getElementById('modalBg')?.classList.contains('show')) {
           closeModal();
@@ -8328,14 +8725,9 @@
         if (REPORT_FILTER_STATE.ibp) params.set('ibp', REPORT_FILTER_STATE.ibp);
         if (REPORT_FILTER_STATE.category) params.set('category', REPORT_FILTER_STATE.category);
 
-        if (CURRENT_USER) {
-          if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
-          if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
-          else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
-        }
-
         const res = await fetch(`${API_URL}/reports/data?${params.toString()}`, {
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
+          credentials: 'same-origin'
         });
 
         if (!res.ok) {
@@ -8446,14 +8838,9 @@
         if (REPORT_FILTER_STATE.ibp) params.set('ibp', REPORT_FILTER_STATE.ibp);
         if (REPORT_FILTER_STATE.category) params.set('category', REPORT_FILTER_STATE.category);
 
-        if (CURRENT_USER) {
-          if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
-          if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
-          else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
-        }
-
         const res = await fetch(`${API_URL}/reports/excel?${params.toString()}`, {
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
+          credentials: 'same-origin'
         });
 
         if (!res.ok) {
@@ -8533,15 +8920,9 @@
       if (REPORT_FILTER_STATE.ibp) params.set('ibp', REPORT_FILTER_STATE.ibp);
       if (REPORT_FILTER_STATE.category) params.set('category', REPORT_FILTER_STATE.category);
 
-      if (CURRENT_USER) {
-        if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
-        if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
-        else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
-      }
-
       recordCurrentReportInHistory();
       const printUrl = `${API_URL}/reports/print-view?${params.toString()}`;
-      window.open(printUrl, '_blank');
+      window.open(printUrl, '_blank', 'noopener,noreferrer');
     }
 
     // =========================================================================
@@ -8772,12 +9153,6 @@
       if (r.end_date) params.set('end_date', r.end_date);
       if (r.specialist_filter && r.specialist_filter !== 'Todo el equipo') params.set('specialist', r.specialist_filter);
 
-      if (CURRENT_USER) {
-        if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
-        if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
-        else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
-      }
-
       const a = document.createElement('a');
       a.href = `${API_URL}/reports/excel?${params.toString()}`;
       a.download = `Informe_Ejecutivo_REP_${String(r.id).padStart(4, '0')}.xlsx`;
@@ -8796,14 +9171,8 @@
       if (r.end_date) params.set('end_date', r.end_date);
       if (r.specialist_filter && r.specialist_filter !== 'Todo el equipo') params.set('specialist', r.specialist_filter);
 
-      if (CURRENT_USER) {
-        if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
-        if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
-        else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
-      }
-
       const printUrl = `${API_URL}/reports/print-view?${params.toString()}`;
-      window.open(printUrl, '_blank');
+      window.open(printUrl, '_blank', 'noopener,noreferrer');
     }
 
     async function deleteReportHistory(id) {
@@ -8997,14 +9366,9 @@
         if (ibpVal) params.set('ibp', ibpVal);
         if (catVal) params.set('category', catVal);
 
-        if (CURRENT_USER) {
-          if (CURRENT_USER.role) params.set('role', CURRENT_USER.role);
-          if (CURRENT_USER.full_name) params.set('user', CURRENT_USER.full_name);
-          else if (CURRENT_USER.username) params.set('user', CURRENT_USER.username);
-        }
-
         const res = await fetch(`${API_URL}/reports/data?${params.toString()}`, {
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
+          credentials: 'same-origin'
         });
 
         if (!res.ok) {
@@ -10129,9 +10493,8 @@
       tbody.innerHTML = list.map(d => {
         const numId = Number(d.id);
         const isExpanded = EXPANDED_ESCALATION_IDS.has(numId);
-        const targetUrl = d.doc_url || '#';
-        const hasValidUrl = targetUrl && targetUrl !== '#';
-        const safeJsUrl = escapeHtml(targetUrl).replace(/\\/g, '\\\\').replace(/&#039;/g, "\\'");
+        const safeTargetUrl = getSafeExternalUrl(d.doc_url, true);
+        const hasValidUrl = Boolean(safeTargetUrl);
         const hasNotes = Boolean(d.notes && String(d.notes).trim());
         const hasRecs = Boolean(d.recommendations && String(d.recommendations).trim());
 
@@ -10146,11 +10509,11 @@
         `;
 
         const typeBadge = hasValidUrl ? `
-          <a href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
+          <a href="${escapeHtml(safeTargetUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
             style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:rgba(66,133,244,0.12);border:1px solid rgba(66,133,244,0.3);color:#60a5fa;text-decoration:none;font-size:11px;font-weight:600"
-            title="Abrir enlace de Google Docs en pestaña nueva">
+            title="Abrir documento de escalamiento en pestaña nueva">
             <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-            <span>Google Docs</span>
+            <span>Documento</span>
           </a>
         ` : `
           <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--muted);font-size:11px">
@@ -10207,13 +10570,13 @@
             </td>
             <td style="text-align:center">
               <div style="display:inline-flex;align-items:center;gap:5px">
-                <button type="button" class="btn" onclick="event.stopPropagation(); openEscalationLink('${safeJsUrl}')"
+                <button type="button" class="btn" data-url="${escapeHtml(safeTargetUrl)}" onclick="event.stopPropagation(); openEscalationLink(this.dataset.url)"
                   style="padding:5px 8px;font-size:11px;background:rgba(79,140,255,0.15);color:var(--accent);border-color:rgba(79,140,255,0.3);display:inline-flex;align-items:center;gap:4px"
                   title="Abrir documento en una nueva pestaña">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                   <span>Abrir</span>
                 </button>
-                <button type="button" class="btn" onclick="event.stopPropagation(); copyEscalationLink('${safeJsUrl}')"
+                <button type="button" class="btn" data-url="${escapeHtml(safeTargetUrl)}" onclick="event.stopPropagation(); copyEscalationLink(this.dataset.url)"
                   style="padding:5px 7px;font-size:11px;background:rgba(255,255,255,0.05);color:var(--text);border-color:rgba(255,255,255,0.14);display:inline-flex;align-items:center;justify-content:center"
                   title="Copiar enlace directo al portapapeles">
                   <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -10264,18 +10627,21 @@
     }
 
     function openEscalationLink(url) {
-      if (!url || url === '#') return;
-      window.open(url, '_blank', 'noopener,noreferrer');
+      const safeUrl = getSafeExternalUrl(url, true);
+      if (!safeUrl) return;
+      window.open(safeUrl, '_blank', 'noopener,noreferrer');
     }
 
     function copyEscalationLink(url) {
-      if (!url || url === '#') return;
+      const safeUrl = getSafeExternalUrl(url, true);
+      if (!safeUrl) return;
+      const absoluteUrl = safeUrl.startsWith('/') ? (window.location.origin + safeUrl) : safeUrl;
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(() => {
+        navigator.clipboard.writeText(absoluteUrl).then(() => {
           showToast('¡Enlace Copiado!', 'El enlace del documento fue copiado al portapapeles.');
-        }).catch(() => fallbackCopy(url));
+        }).catch(() => fallbackCopy(absoluteUrl));
       } else {
-        fallbackCopy(url);
+        fallbackCopy(absoluteUrl);
       }
     }
 
@@ -11184,7 +11550,7 @@
 
       const thStyle = 'padding:6px 8px;font-size:11px;font-weight:700;color:var(--muted);text-align:center;white-space:nowrap';
       const headHtml = categories.map(cat => `
-        <th style="${thStyle};cursor:pointer" onclick="drilldownOvertime('', '${escapeHtml(cat)}')" title="Filtrar por ${escapeHtml(cat)}">
+        <th style="${thStyle};cursor:pointer" data-cat="${escapeHtml(cat)}" onclick="drilldownOvertime('', this.dataset.cat)" title="Filtrar por ${escapeHtml(cat)}">
           <span style="display:inline-flex;align-items:center;gap:5px">
             <span style="width:8px;height:8px;border-radius:2px;background:${RPT_CAT_COLORS[cat] || '#38bdf8'}"></span>${escapeHtml(cat)}
           </span>
@@ -11201,7 +11567,7 @@
           const strong = alpha > 0.45;
           const tip = `${spec} · ${cat}: ${h}h extras`;
           return `
-            <td onclick="drilldownOvertime('${escapeHtml(spec)}', '${escapeHtml(cat)}')" title="${escapeHtml(tip)}"
+            <td data-spec="${escapeHtml(spec)}" data-cat="${escapeHtml(cat)}" onclick="drilldownOvertime(this.dataset.spec, this.dataset.cat)" title="${escapeHtml(tip)}"
               style="cursor:pointer;text-align:center;padding:0;height:34px;min-width:62px;border-radius:6px;background:rgba(56,189,248,${alpha.toFixed(2)});color:${strong ? '#ffffff' : 'var(--text)'};font-size:12px;font-weight:800;position:relative;transition:transform .12s"
               onmouseover="this.style.transform='scale(1.06)'" onmouseout="this.style.transform='none'">
               ${h}h
@@ -11212,7 +11578,7 @@
         const specTotal = rowTotals[spec] || 0;
         return `
           <tr>
-            <th onclick="drilldownOvertime('${escapeHtml(spec)}', '')" title="Filtrar horas de ${escapeHtml(spec)}"
+            <th data-spec="${escapeHtml(spec)}" onclick="drilldownOvertime(this.dataset.spec, '')" title="Filtrar horas de ${escapeHtml(spec)}"
               style="cursor:pointer;text-align:left;padding:6px 10px 6px 4px;font-size:12px;font-weight:700;white-space:nowrap;color:#38bdf8;position:sticky;left:0;background:var(--bg);z-index:1">
               ${escapeHtml(spec)}
             </th>
@@ -11276,10 +11642,18 @@
       }
     });
 
-    // Carga inicial y refresco cada 30 segundos
-    checkAuthAndInit();
-    loadData();
-    setInterval(loadData, 30000);
+    // Carga inicial y refresco cada 30 segundos (solo cuando hay sesión activa)
+    (async function initApp() {
+      const authState = await checkAuthAndInit();
+      if (authState && authState.authenticated && !authState.loaded && !MUST_CHANGE_PASSWORD_ACTIVE) {
+        await loadData();
+      }
+      setInterval(() => {
+        if (CURRENT_USER && !MUST_CHANGE_PASSWORD_ACTIVE) {
+          loadData();
+        }
+      }, 30000);
+    })();
   </script>
 
 </body>

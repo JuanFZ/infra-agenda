@@ -1120,18 +1120,18 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
     """
     kpis = data["kpis"]
     filters = data.get("filters", {})
-    ibp_filter_lbl = filters.get("ibp", "Todas las IBPs")
-    cat_filter_lbl = filters.get("category", "Todas las Categorías")
-    spec_filter_lbl = filters.get("specialist", "Todo el equipo")
+    ibp_filter_lbl = str(filters.get("ibp", "Todas las IBPs") or "Todas las IBPs")
+    cat_filter_lbl = str(filters.get("category", "Todas las Categorías") or "Todas las Categorías")
+    spec_filter_lbl = str(filters.get("specialist", "Todo el equipo") or "Todo el equipo")
 
     # Subtítulo dinámico si el reporte está filtrado por IBP o por Categoría
     scope_title_parts = []
     if ibp_filter_lbl and ibp_filter_lbl != "Todas las IBPs":
-        scope_title_parts.append(f"IBP: {ibp_filter_lbl}")
+        scope_title_parts.append(f"IBP: {html_escape(ibp_filter_lbl)}")
     if cat_filter_lbl and cat_filter_lbl != "Todas las Categorías":
-        scope_title_parts.append(f"CATEGORÍA: {cat_filter_lbl}")
+        scope_title_parts.append(f"CATEGORÍA: {html_escape(cat_filter_lbl)}")
     if spec_filter_lbl and spec_filter_lbl != "Todo el equipo":
-        scope_title_parts.append(f"ESPECIALISTA: {spec_filter_lbl}")
+        scope_title_parts.append(f"ESPECIALISTA: {html_escape(spec_filter_lbl)}")
     dynamic_report_heading = " · ".join(scope_title_parts) if scope_title_parts else "MESA DE CONTROL INTEGRADA (GLOBAL)"
 
     # 1. Gráfico Donut de Distribución de Estados Operativos
@@ -1147,11 +1147,11 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
         spec_chart_bars += f"""
         <div style="margin-bottom:7px">
             <div style="display:flex;justify-content:space-between;font-size:10.5px;margin-bottom:2px">
-                <span style="font-weight:700;color:#1e293b">{short_name}</span>
+                <span style="font-weight:700;color:#1e293b">{html_escape(str(short_name))}</span>
                 <span>
                     <strong>{s['total']}</strong> casos
                     (<span style="color:#10b981">{s['cerrados']} c.</span> / <span style="color:#0ea5e9">{s['en_curso']} act.</span> / <span style="color:#f59e0b">{s.get('en_espera', 0)} esp.</span>)
-                    · <span style="color:#64748b">{s['avg_time_str']}</span>
+                    · <span style="color:#64748b">{html_escape(str(s['avg_time_str']))}</span>
                 </span>
             </div>
             <div style="background:#e2e8f0;height:7px;border-radius:4px;overflow:hidden">
@@ -1197,7 +1197,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
     for c in cat_list:
         cat_table_rows += f"""
         <tr>
-            <td><strong>{c['category']}</strong></td>
+            <td><strong>{html_escape(str(c['category']))}</strong></td>
             <td style="text-align:center;font-weight:700">{c['total']}</td>
             <td style="text-align:center">{c['total_items']}</td>
             <td style="text-align:center;color:#2563eb;font-weight:600">{c['total_escalamientos']}</td>
@@ -1248,7 +1248,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
         for ibp_item in ibp_list:
             ibp_table_rows += f"""
             <tr>
-                <td><strong>{ibp_item['ibp']}</strong></td>
+                <td><strong>{html_escape(str(ibp_item['ibp']))}</strong></td>
                 <td style="text-align:center;font-weight:700">{ibp_item['total']}</td>
                 <td style="text-align:center">{ibp_item['total_items']}</td>
                 <td style="text-align:center;color:#2563eb;font-weight:600">{ibp_item['total_escalamientos']}</td>
@@ -1293,15 +1293,15 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
         spec_rows += f"""
         <tr>
             <td>
-                <strong>{s['name']}</strong><br>
-                <small style="color:#64748b">{s['role']}</small>
+                <strong>{html_escape(str(s['name']))}</strong><br>
+                <small style="color:#64748b">{html_escape(str(s['role']))}</small>
             </td>
             <td style="text-align:center;font-weight:700">{s['total']}</td>
             <td style="text-align:center;color:#10b981;font-weight:600">{s['cerrados']}</td>
             <td style="text-align:center;color:#0ea5e9;font-weight:600">{s['en_curso']}</td>
             <td style="text-align:center;color:#f59e0b;font-weight:600">{s.get('en_espera', 0)}</td>
             <td style="text-align:center">{s['pendientes']}</td>
-            <td style="text-align:center">{s['avg_time_str']}</td>
+            <td style="text-align:center">{html_escape(str(s['avg_time_str']))}</td>
         </tr>
         """
 
@@ -1309,8 +1309,8 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
     for c in data["por_cliente"][:10]:
         client_rows += f"""
         <tr>
-            <td><strong>{c['client_name']}</strong></td>
-            <td style="text-align:center">{c['client_type']}</td>
+            <td><strong>{html_escape(str(c['client_name']))}</strong></td>
+            <td style="text-align:center">{html_escape(str(c['client_type']))}</td>
             <td style="text-align:center;font-weight:700">{c['total']}</td>
             <td style="text-align:center;color:#10b981">{c['cerrados']}</td>
             <td style="text-align:center;color:#0ea5e9">{c['activos']}</td>
@@ -1320,14 +1320,15 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
 
     esc_rows = ""
     for esc in data.get("escalations", [])[:25]:
-        rec_text = (esc.get("recommendations") or esc.get("notes") or "Sin recomendaciones registradas").replace("\n", "<br>")
+        raw_rec = str(esc.get("recommendations") or esc.get("notes") or "Sin recomendaciones registradas")
+        rec_text = html_escape(raw_rec).replace("\n", "<br>")
         esc_rows += f"""
         <tr>
-            <td><strong>#{esc['id']} - {esc['title']}</strong></td>
-            <td style="text-align:center"><span style="background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;font-weight:700;font-size:9.5px">{esc['ibp']}</span></td>
-            <td style="text-align:center"><span style="background:#f1f5f9;color:#0f172a;padding:2px 6px;border-radius:4px;font-weight:700;font-size:9.5px">{esc['category']}</span></td>
-            <td style="text-align:center;font-size:10px">{esc['received_at_str']}</td>
-            <td style="text-align:center;font-size:10px">{esc['escalated_at_str']}</td>
+            <td><strong>#{esc['id']} - {html_escape(str(esc['title']))}</strong></td>
+            <td style="text-align:center"><span style="background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;font-weight:700;font-size:9.5px">{html_escape(str(esc['ibp']))}</span></td>
+            <td style="text-align:center"><span style="background:#f1f5f9;color:#0f172a;padding:2px 6px;border-radius:4px;font-weight:700;font-size:9.5px">{html_escape(str(esc['category']))}</span></td>
+            <td style="text-align:center;font-size:10px">{html_escape(str(esc['received_at_str']))}</td>
+            <td style="text-align:center;font-size:10px">{html_escape(str(esc['escalated_at_str']))}</td>
             <td style="font-size:10px;color:#334155">{rec_text}</td>
         </tr>
         """
@@ -1575,16 +1576,16 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
                 <div class="company-title">Soluciones SYCOM</div>
                 <div class="company-sub">Coordinación de Infraestructura y Base de Datos</div>
                 <div>
-                    <span class="badge-period">Período: {data['period_label']}</span>
-                    <span class="badge-period">IBP: {ibp_filter_lbl}</span>
-                    <span class="badge-period">Categoría: {cat_filter_lbl}</span>
-                    <span class="badge-period">Especialista: {spec_filter_lbl}</span>
+                    <span class="badge-period">Período: {html_escape(str(data['period_label']))}</span>
+                    <span class="badge-period">IBP: {html_escape(ibp_filter_lbl)}</span>
+                    <span class="badge-period">Categoría: {html_escape(cat_filter_lbl)}</span>
+                    <span class="badge-period">Especialista: {html_escape(spec_filter_lbl)}</span>
                 </div>
             </div>
             <div style="text-align:right">
                 <div style="font-size:10px;color:#64748b">INFORME EJECUTIVO DE GESTIÓN OPERATIVA</div>
                 <div style="font-weight:700;font-size:11.5px;color:#1b365d;margin-top:2px">{dynamic_report_heading}</div>
-                <div style="font-size:9.5px;color:#94a3b8;margin-top:4px">Emisión: {data['generated_at']}</div>
+                <div style="font-size:9.5px;color:#94a3b8;margin-top:4px">Emisión: {html_escape(str(data['generated_at']))}</div>
             </div>
         </div>
 
@@ -1616,7 +1617,7 @@ def generate_executive_html(data: Dict[str, Any]) -> str:
         </div>
 
         <div style="font-size:11px;color:#475569;margin-bottom:14px;background:#f1f5f9;padding:7px 12px;border-radius:6px;display:flex;justify-content:space-between">
-            <span><strong>Tiempo Promedio de Resolución:</strong> {kpis['avg_resolution_str']}</span>
+            <span><strong>Tiempo Promedio de Resolución:</strong> {html_escape(str(kpis['avg_resolution_str']))}</span>
             <span><strong>Total Gestionadas:</strong> {kpis['total_items']} · <strong>Cerradas:</strong> {kpis['total_cerrados']} · <strong>En Espera:</strong> {kpis.get('total_en_espera', 0)}</span>
         </div>
 

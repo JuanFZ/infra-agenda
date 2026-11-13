@@ -29,6 +29,45 @@ AGENDA_BASE_URL = (os.getenv("AGENDA_BASE_URL") or os.getenv("APP_URL") or "http
 ENABLE_API_DOCS = os.getenv("ENABLE_API_DOCS", "false").strip().lower() in ("1", "true", "yes")
 DEFAULT_INIT_PASSWORD = os.getenv("DEFAULT_INIT_PASSWORD", "").strip()
 
+import secrets
+import tempfile
+from pathlib import Path
+
+
+def _load_or_create_auth_secret() -> str:
+    env_secret = os.getenv("AUTH_SECRET_KEY", "").strip()
+    if env_secret:
+        if len(env_secret) < 32:
+            print("[Security Warning] AUTH_SECRET_KEY tiene menos de 32 caracteres; se recomienda >= 32 bytes aleatorios.")
+        return env_secret
+    secret_file = Path(tempfile.gettempdir()) / ".tasks_infra_session_secret"
+    try:
+        if secret_file.exists():
+            stored = secret_file.read_text(encoding="utf-8").strip()
+            if len(stored) >= 32:
+                return stored
+        generated = secrets.token_urlsafe(48)
+        secret_file.write_text(generated, encoding="utf-8")
+        try:
+            os.chmod(secret_file, 0o600)
+        except Exception:
+            pass
+        return generated
+    except Exception:
+        return secrets.token_urlsafe(48)
+
+
+# Seguridad Fase 2: Sesiones firmadas, compatibilidad HTTP (:7070) y TV Kiosko
+AUTH_SECRET_KEY = _load_or_create_auth_secret()
+SESSION_COOKIE_NAME = "session_token"
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").strip().lower() in ("1", "true", "yes")
+try:
+    SESSION_TTL_SECONDS = max(900, int(os.getenv("SESSION_TTL_SECONDS", "43200")))
+except ValueError:
+    SESSION_TTL_SECONDS = 43200
+KIOSK_SECRET = os.getenv("KIOSK_SECRET", "").strip()
+KIOSK_ALLOWED_IPS = [ip.strip() for ip in os.getenv("KIOSK_ALLOWED_IPS", "").split(",") if ip.strip()]
+
 
 def _build_cors_origins() -> list[str]:
     origins: list[str] = []

@@ -248,10 +248,11 @@ function simulateDeepLink(opts) {
 
   // Extract escalation table functions and test DOM rendering + accordion toggle
   const escHtmlFnMatch = content.match(/function escapeHtml\(str\)[\s\S]*?\n    \}/);
+  const safeExtFnMatch = content.match(/function getSafeExternalUrl\(rawUrl[\s\S]*?\n    \}/);
   const catBadgeFnMatch = content.match(/function getCategoryBadge\(cat\)[\s\S]*?\n    \}/);
   const toggleFnMatch = content.match(/function toggleEscalationRow\(id, event\)[\s\S]*?\n    \}/);
   const renderFnMatch = content.match(/function renderEscalationsTable\(list\)[\s\S]*?\n    \}/);
-  assert(escHtmlFnMatch && catBadgeFnMatch && toggleFnMatch && renderFnMatch, 'Escalation functions missing in index.html');
+  assert(escHtmlFnMatch && safeExtFnMatch && catBadgeFnMatch && toggleFnMatch && renderFnMatch, 'Escalation functions missing in index.html');
 
   const elementsById = {};
   const mockTbody = { innerHTML: '' };
@@ -259,9 +260,11 @@ function simulateDeepLink(opts) {
 
   const escRunner = new Function(
     'document',
+    'window',
     `
     const EXPANDED_ESCALATION_IDS = new Set();
     ${escHtmlFnMatch[0]}
+    ${safeExtFnMatch[0]}
     ${catBadgeFnMatch[0]}
     ${toggleFnMatch[0]}
     ${renderFnMatch[0]}
@@ -272,7 +275,7 @@ function simulateDeepLink(opts) {
   const mockDoc = {
     getElementById: (id) => elementsById[id] || null
   };
-  const escModule = escRunner(mockDoc);
+  const escModule = escRunner(mockDoc, { location: { origin: 'http://localhost' } });
 
   // Empty state check
   escModule.renderEscalationsTable([]);
@@ -417,6 +420,7 @@ function simulateDeepLink(opts) {
   const renderKanbanFn = (content.match(/function renderKanban\(list\)[\s\S]*?\n    \}/) || [])[0];
   const parseUtcFn = (content.match(/function parseUtcDate\(dateStr\)[\s\S]*?\n    \}/) || [])[0];
   const isItemRecentClosedFn = (content.match(/function isItemRecentClosed\(i\)[\s\S]*?\n    \}/) || [])[0];
+  const safeTokenFn = (content.match(/function getSafeToken\(val[\s\S]*?\n    \}/) || [])[0];
 
   assert(setOriginFn, 'setOriginFilter function not found');
   assert(syncOriginFn, 'syncKanbanOriginUI function not found');
@@ -425,6 +429,7 @@ function simulateDeepLink(opts) {
   assert(renderKanbanFn, 'renderKanban function not found');
   assert(parseUtcFn, 'parseUtcDate function not found');
   assert(isItemRecentClosedFn, 'isItemRecentClosed function not found');
+  assert(safeTokenFn, 'getSafeToken function not found');
 
   const pillButtons = ['', 'ClickUp', 'GLPI'].map(origin => {
     const classes = new Set(origin === '' ? ['kanban-origin-pill', 'active'] : ['kanban-origin-pill']);
@@ -502,6 +507,7 @@ function simulateDeepLink(opts) {
     const onDrop = handleDrop;
     ${parseUtcFn}
     ${isItemRecentClosedFn}
+    ${safeTokenFn}
     ${renderKanbanFn}
     return {
       setOriginFilter,

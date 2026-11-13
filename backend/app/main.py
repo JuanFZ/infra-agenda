@@ -3,14 +3,20 @@ import json
 import uuid
 import re
 import hmac
+import time
 import secrets
 import base64
 import datetime
 import hashlib
+import ipaddress
+import threading
 import unicodedata
 import urllib.parse
+from pathlib import Path
 from urllib.parse import urlparse
-from fastapi import FastAPI, Depends, Query, HTTPException, Header, Response, Request
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError, InvalidHashError
+from fastapi import FastAPI, Depends, Query, HTTPException, Header, Cookie, Response, Request
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -20,7 +26,19 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from .database import engine, Base, get_db, SessionLocal
 from .models import Item, SyncLog, AlertLog, User, GeneratedReport, EscalationDocument, IBP, OvertimeRecord, AuditLog
-from .config import SYNC_INTERVAL_MINUTES, ENABLE_API_DOCS, CORS_ALLOWED_ORIGINS, DEFAULT_INIT_PASSWORD
+from . import config as app_config
+from .config import (
+    SYNC_INTERVAL_MINUTES,
+    ENABLE_API_DOCS,
+    CORS_ALLOWED_ORIGINS,
+    DEFAULT_INIT_PASSWORD,
+    AUTH_SECRET_KEY,
+    SESSION_COOKIE_NAME,
+    SESSION_COOKIE_SECURE,
+    SESSION_TTL_SECONDS,
+    KIOSK_SECRET,
+    KIOSK_ALLOWED_IPS,
+)
 from .sync.synchronizer import sync_all, purge_old_closed_items, get_yesterday_start
 from .sync.glpi_client import GLPIClient
 from .sync.clickup_client import ClickUpClient
@@ -36,14 +54,222 @@ os.makedirs(UPLOAD_ESCALATIONS_DIR, exist_ok=True)
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
 
+LEGACY_SHA256_SALT = "sycom_infra_salt_2026"
+PASSWORD_HASHER = PasswordHasher()
+SPECIAL_PASSWORD_CHARS = set("$&.*@#%!_?+-=()[]{}<>,:;|/\\^~`")
+MAX_LOGIN_USER_FAILURES = 5
+MAX_LOGIN_IP_FAILURES = 15
+LOGIN_LOCKOUT_SECONDS = 900
+_LOGIN_IP_FAILURES: dict[str, list[float]] = {}
+_LOGIN_RATE_LOCK = threading.Lock()
+
+
+def _legacy_sha256_hash(password: str) -> str:
+    return hashlib.sha256(f"{LEGACY_SHA256_SALT}{password}".encode("utf-8")).hexdigest()
+
+
 def hash_password(password: str) -> str:
-    salt = "sycom_infra_salt_2026"
-    return hashlib.sha256(f"{salt}{password}".encode("utf-8")).hexdigest()
+    return PASSWORD_HASHER.hash(password)
+
+
+def verify_and_rehash_password(plain_password: str, hashed_password: str | None) -> tuple[bool, str | None]:
+    """Verifica contraseñas Argon2id o SHA-256 heredadas; devuelve (válido, nuevo_hash_argon2_si_requiere_actualización)."""
+    if not hashed_password or not plain_password:
+        return False, None
+    if hashed_password.startswith("$argon2"):
+        try:
+            PASSWORD_HASHER.verify(hashed_password, plain_password)
+            if PASSWORD_HASHER.check_needs_rehash(hashed_password):
+                return True, hash_password(plain_password)
+            return True, None
+        except (VerifyMismatchError, InvalidHashError, Exception):
+            return False, None
+    expected = _legacy_sha256_hash(plain_password)
+    if hmac.compare_digest(expected, hashed_password):
+        return True, hash_password(plain_password)
+    return False, None
+
 
 def verify_password(plain_password: str, hashed_password: str | None) -> bool:
-    if not hashed_password:
+    ok, _ = verify_and_rehash_password(plain_password, hashed_password)
+    return ok
+
+
+def validate_password_strength(password: str) -> None:
+    if not isinstance(password, str) or len(password) < 8:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres.")
+    if len(password) > 128:
+        raise HTTPException(status_code=400, detail="La nueva contraseña no debe exceder los 128 caracteres.")
+    if not any(c.isalpha() for c in password) or not any(c.isdigit() for c in password):
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe incluir letras y números.")
+    if not any(c in SPECIAL_PASSWORD_CHARS for c in password):
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe contener al menos un caracter especial ($&.*@#%!).")
+
+
+def _clear_rate_limiters() -> None:
+    with _LOGIN_RATE_LOCK:
+        _LOGIN_IP_FAILURES.clear()
+
+
+def _is_trusted_proxy_ip(raw_host: str | None) -> bool:
+    if not raw_host:
         return False
-    return hmac.compare_digest(hash_password(plain_password), hashed_password)
+    if raw_host == "testclient":
+        return True
+    try:
+        ip_obj = ipaddress.ip_address(raw_host)
+        return ip_obj.is_loopback or ip_obj.is_private
+    except ValueError:
+        return False
+
+
+def _get_client_ip(request: Request | None) -> str:
+    if not request:
+        return "127.0.0.1"
+    direct_host = request.client.host if request.client else ""
+    if _is_trusted_proxy_ip(direct_host):
+        real_ip = (request.headers.get("x-real-ip") or "").strip()
+        if real_ip:
+            try:
+                ipaddress.ip_address(real_ip)
+                return real_ip
+            except ValueError:
+                pass
+        xff = (request.headers.get("x-forwarded-for") or "").strip()
+        if xff:
+            candidate = xff.split(",")[-1].strip()
+            try:
+                ipaddress.ip_address(candidate)
+                return candidate
+            except ValueError:
+                pass
+    if direct_host == "testclient":
+        return "127.0.0.1"
+    return direct_host or "unknown"
+
+
+def _prune_ip_failures_locked(ip: str, now_ts: float) -> list[float]:
+    cutoff = now_ts - LOGIN_LOCKOUT_SECONDS
+    recent = [ts for ts in _LOGIN_IP_FAILURES.get(ip, []) if ts >= cutoff]
+    if recent:
+        _LOGIN_IP_FAILURES[ip] = recent
+    else:
+        _LOGIN_IP_FAILURES.pop(ip, None)
+    return recent
+
+
+def _is_ip_rate_limited(ip: str) -> bool:
+    now_ts = time.time()
+    with _LOGIN_RATE_LOCK:
+        recent = _prune_ip_failures_locked(ip, now_ts)
+        return len(recent) >= MAX_LOGIN_IP_FAILURES
+
+
+def _record_ip_failure(ip: str) -> int:
+    now_ts = time.time()
+    with _LOGIN_RATE_LOCK:
+        recent = _prune_ip_failures_locked(ip, now_ts)
+        recent.append(now_ts)
+        _LOGIN_IP_FAILURES[ip] = recent
+        return len(recent)
+
+
+def _get_auth_secret() -> str:
+    return (AUTH_SECRET_KEY or getattr(app_config, "AUTH_SECRET_KEY", "") or "").strip()
+
+
+def _b64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def _b64url_decode(val: str) -> bytes:
+    pad = "=" * (-len(val) % 4)
+    return base64.urlsafe_b64decode((val + pad).encode("ascii"))
+
+
+def _sign_token_payload(payload: dict) -> str:
+    secret = _get_auth_secret()
+    if not secret:
+        raise RuntimeError("AUTH_SECRET_KEY no configurado.")
+    payload_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    payload_b64 = _b64url_encode(payload_bytes)
+    sig = hmac.new(secret.encode("utf-8"), payload_b64.encode("ascii"), hashlib.sha256).digest()
+    return f"{payload_b64}.{_b64url_encode(sig)}"
+
+
+def create_session_token(user: User, ttl_seconds: int | None = None) -> str:
+    now_ts = int(time.time())
+    ttl = ttl_seconds or SESSION_TTL_SECONDS
+    payload = {
+        "typ": "user",
+        "uid": int(user.id),
+        "ver": int(getattr(user, "token_version", 1) or 1),
+        "role": (user.role or "especialista").strip().lower(),
+        "iat": now_ts,
+        "exp": now_ts + int(ttl),
+    }
+    return _sign_token_payload(payload)
+
+
+def create_kiosk_token(ttl_seconds: int | None = None) -> str:
+    now_ts = int(time.time())
+    ttl = ttl_seconds or SESSION_TTL_SECONDS
+    payload = {
+        "typ": "kiosk",
+        "sub": "tv_kiosk",
+        "role": "tv",
+        "iat": now_ts,
+        "exp": now_ts + int(ttl),
+    }
+    return _sign_token_payload(payload)
+
+
+def verify_signed_token(token: str | None) -> dict | None:
+    if not token or not isinstance(token, str) or "." not in token:
+        return None
+    parts = token.strip().split(".")
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        return None
+    secret = _get_auth_secret()
+    if not secret:
+        return None
+    try:
+        expected_sig = hmac.new(secret.encode("utf-8"), parts[0].encode("ascii"), hashlib.sha256).digest()
+        provided_sig = _b64url_decode(parts[1])
+        if not hmac.compare_digest(expected_sig, provided_sig):
+            return None
+        payload = json.loads(_b64url_decode(parts[0]).decode("utf-8"))
+        if not isinstance(payload, dict):
+            return None
+        exp = int(payload.get("exp", 0))
+        if exp <= int(time.time()):
+            return None
+        return payload
+    except Exception:
+        return None
+
+
+def _set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        max_age=SESSION_TTL_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=bool(SESSION_COOKIE_SECURE),
+        path="/",
+    )
+
+
+def _clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=bool(SESSION_COOKIE_SECURE),
+    )
+
 
 def _clean_header_user(val: str | None) -> str:
     if not val:
@@ -73,20 +299,20 @@ def log_audit(
         ua = user_agent
         if request:
             if not client_ip:
-                client_ip = request.headers.get("x-forwarded-for")
-                if client_ip and "," in client_ip:
-                    client_ip = client_ip.split(",")[0].strip()
-                if not client_ip and request.client:
-                    client_ip = request.client.host
+                client_ip = _get_client_ip(request)
             if not ua:
                 ua = request.headers.get("user-agent")
 
-            if not username:
-                username = _clean_header_user(request.headers.get("x-user-username") or request.headers.get("x-user-name"))
-            if not user_role:
-                user_role = _clean_header_user(request.headers.get("x-user-role"))
-            if not user_fullname and username:
-                user_fullname = _clean_header_user(request.headers.get("x-user-name")) or username
+            principal = getattr(getattr(request, "state", None), "principal", None)
+            if principal is not None:
+                if not user_id and getattr(principal, "user_id", None):
+                    user_id = principal.user_id
+                if not username and getattr(principal, "username", None):
+                    username = principal.username
+                if not user_fullname and getattr(principal, "full_name", None):
+                    user_fullname = principal.full_name
+                if not user_role and getattr(principal, "raw_role", None):
+                    user_role = principal.raw_role
 
         if isinstance(details, (dict, list)):
             details_str = json.dumps(details, ensure_ascii=False)
@@ -100,7 +326,7 @@ def log_audit(
             user_id=user_id,
             username=username or "anónimo",
             user_fullname=user_fullname or username,
-            user_role=user_role or "Especialista",
+            user_role=user_role or "Sistema",
             action=action,
             entity_type=entity_type,
             entity_id=str(entity_id) if entity_id is not None else None,
@@ -344,6 +570,22 @@ def ensure_db_schema():
                     conn.execute(text("ALTER TABLE users ADD COLUMN job_title VARCHAR(100)"))
                 if "bio" not in u_cols:
                     conn.execute(text("ALTER TABLE users ADD COLUMN bio VARCHAR(255)"))
+                if "must_change_password" not in u_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0"))
+                if "token_version" not in u_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1"))
+                if "failed_login_attempts" not in u_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0"))
+                if "locked_until" not in u_cols:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN locked_until {dt_type}"))
+                conn.execute(text("UPDATE users SET token_version = 1 WHERE token_version IS NULL"))
+                conn.execute(text("UPDATE users SET must_change_password = 0 WHERE must_change_password IS NULL"))
+                conn.execute(text("UPDATE users SET failed_login_attempts = 0 WHERE failed_login_attempts IS NULL"))
+                legacy_default_hash = _legacy_sha256_hash("sycom2026")
+                conn.execute(
+                    text("UPDATE users SET must_change_password = 1 WHERE password_hash = :lh"),
+                    {"lh": legacy_default_hash},
+                )
 
             # 3. escalation_documents
             if "escalation_documents" in table_names:
@@ -587,32 +829,221 @@ AUTHENTICATED_ROLES = ("coordinador", "admin", "administrador", "especialista", 
 TV_ROLES = ("tv", "modo.tv")
 
 
-def _extract_role_and_user(
-    x_user_role: str | None,
-    x_user_name: str | None,
-    role_param: str | None = None,
-    user_param: str | None = None
-) -> tuple[str, str]:
-    raw_role = x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")
-    raw_name = x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")
-    return decode_header_val(raw_role).lower(), decode_header_val(raw_name)
+class AuthPrincipal:
+    """Identidad autenticada y verificada criptográficamente (usuario o kiosko TV)."""
+
+    def __init__(
+        self,
+        kind: str,
+        role: str,
+        raw_role: str,
+        username: str,
+        full_name: str,
+        user_id: int | None = None,
+        user: User | None = None,
+        must_change_password: bool = False,
+        token_version: int = 1,
+    ):
+        self.kind = kind
+        self.role = role
+        self.raw_role = raw_role
+        self.username = username
+        self.full_name = full_name
+        self.user_id = user_id
+        self.user = user
+        self.must_change_password = must_change_password
+        self.token_version = token_version
+
+    @property
+    def is_kiosk(self) -> bool:
+        return self.kind == "kiosk"
+
+    @property
+    def is_coordinator(self) -> bool:
+        return (not self.is_kiosk) and self.role in COORDINATOR_ROLES
+
+    @property
+    def is_specialist(self) -> bool:
+        return (not self.is_kiosk) and self.role in ("especialista", "specialist")
 
 
-def _require_valid_caller(
-    x_user_role: str | None,
-    x_user_name: str | None,
+def _get_kiosk_secret() -> str:
+    val = KIOSK_SECRET if KIOSK_SECRET != getattr(app_config, "KIOSK_SECRET", "") else getattr(app_config, "KIOSK_SECRET", "")
+    return (val or os.getenv("KIOSK_SECRET", "")).strip()
+
+
+def _get_kiosk_allowed_ips() -> list[str]:
+    if KIOSK_ALLOWED_IPS:
+        return KIOSK_ALLOWED_IPS
+    cfg_val = getattr(app_config, "KIOSK_ALLOWED_IPS", None)
+    if cfg_val:
+        return list(cfg_val)
+    raw = os.getenv("KIOSK_ALLOWED_IPS", "")
+    return [ip.strip() for ip in raw.split(",") if ip.strip()]
+
+
+def _is_kiosk_ip_allowed(client_ip: str) -> bool:
+    allowlist = _get_kiosk_allowed_ips()
+    if not allowlist:
+        return True
+    try:
+        ip_obj = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return False
+    for entry in allowlist:
+        try:
+            if "/" in entry:
+                if ip_obj in ipaddress.ip_network(entry, strict=False):
+                    return True
+            else:
+                if ip_obj == ipaddress.ip_address(entry):
+                    return True
+        except ValueError:
+            continue
+    return False
+
+
+def _extract_raw_token(request: Request, session_cookie: str | None = None) -> tuple[str | None, str | None]:
+    auth_header = (request.headers.get("authorization") or "").strip()
+    if auth_header.lower().startswith("bearer "):
+        tok = auth_header[7:].strip()
+        if tok:
+            return tok, "bearer"
+    cookie_val = session_cookie or request.cookies.get(SESSION_COOKIE_NAME)
+    if cookie_val and cookie_val.strip():
+        return cookie_val.strip(), "cookie"
+    return None, None
+
+
+def _enforce_cookie_csrf(request: Request) -> None:
+    if request.method.upper() not in ("POST", "PUT", "PATCH", "DELETE"):
+        return
+    x_rw = (request.headers.get("x-requested-with") or "").strip().lower()
+    if x_rw != "xmlhttprequest":
+        raise HTTPException(status_code=403, detail="Validación CSRF fallida: cabecera X-Requested-With requerida.")
+    origin = (request.headers.get("origin") or "").strip()
+    referer = (request.headers.get("referer") or "").strip()
+    check_url = origin or referer
+    if check_url:
+        parsed_u = urlparse(check_url)
+        origin_base = f"{parsed_u.scheme}://{parsed_u.netloc}".lower()
+        allowed_low = {o.strip().lower().rstrip("/") for o in CORS_ALLOWED_ORIGINS if o}
+        host_hdr = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").strip().lower()
+        host_only = host_hdr.split(":")[0]
+        req_host_only = (parsed_u.hostname or "").lower()
+        same_host = bool(
+            host_only
+            and req_host_only == host_only
+            and parsed_u.scheme in ("http", "https")
+        )
+        if origin_base not in allowed_low and not same_host:
+            raise HTTPException(status_code=403, detail="Validación CSRF fallida: origen no autorizado.")
+
+
+def _authenticate_request(
+    request: Request,
+    db: Session,
+    session_cookie: str | None = None,
+    allow_kiosk: bool = True,
+    allow_pw_change_pending: bool = False,
+) -> AuthPrincipal:
+    raw_token, auth_source = _extract_raw_token(request, session_cookie)
+    if not raw_token:
+        raise HTTPException(status_code=401, detail="Sesión no iniciada o credenciales ausentes.")
+
+    payload = verify_signed_token(raw_token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Sesión inválida o expirada. Inicie sesión nuevamente.")
+
+    if auth_source == "cookie":
+        _enforce_cookie_csrf(request)
+
+    typ = payload.get("typ")
+    if typ == "kiosk":
+        if not allow_kiosk:
+            raise HTTPException(status_code=403, detail="Acceso restringido: acción no permitida en Modo TV Kiosko.")
+        client_ip = _get_client_ip(request)
+        if not _is_kiosk_ip_allowed(client_ip):
+            raise HTTPException(status_code=403, detail="Acceso Kiosko denegado desde esta dirección IP.")
+        principal = AuthPrincipal(
+            kind="kiosk",
+            role="tv",
+            raw_role="TV",
+            username="kiosk_tv",
+            full_name="Pantalla Modo TV",
+        )
+        request.state.principal = principal
+        return principal
+
+    if typ == "user":
+        uid = payload.get("uid")
+        ver = payload.get("ver")
+        user = db.query(User).filter(User.id == uid).first() if uid is not None else None
+        if not user or not user.is_active:
+            raise HTTPException(status_code=401, detail="Sesión inválida o usuario inactivo.")
+        if int(getattr(user, "token_version", 1) or 1) != int(ver if ver is not None else -1):
+            raise HTTPException(status_code=401, detail="Sesión revocada. Inicie sesión nuevamente.")
+        if bool(getattr(user, "must_change_password", 0)) and not allow_pw_change_pending:
+            raise HTTPException(status_code=403, detail="Debe cambiar su contraseña antes de acceder al sistema.")
+        role_norm = (user.role or "especialista").strip().lower()
+        principal = AuthPrincipal(
+            kind="user",
+            role=role_norm,
+            raw_role=user.role or "especialista",
+            username=user.username or user.full_name,
+            full_name=user.full_name or user.username,
+            user_id=user.id,
+            user=user,
+            must_change_password=bool(getattr(user, "must_change_password", 0)),
+            token_version=int(getattr(user, "token_version", 1) or 1),
+        )
+        request.state.principal = principal
+        return principal
+
+    raise HTTPException(status_code=401, detail="Tipo de sesión no reconocido.")
+
+
+def get_current_principal(
+    request: Request,
+    db: Session = Depends(get_db),
+    session_token: str | None = Cookie(None, alias=SESSION_COOKIE_NAME),
+) -> AuthPrincipal:
+    return _authenticate_request(request, db, session_token, allow_kiosk=True, allow_pw_change_pending=False)
+
+
+def get_current_principal_allow_pw_change(
+    request: Request,
+    db: Session = Depends(get_db),
+    session_token: str | None = Cookie(None, alias=SESSION_COOKIE_NAME),
+) -> AuthPrincipal:
+    return _authenticate_request(request, db, session_token, allow_kiosk=True, allow_pw_change_pending=True)
+
+
+def get_current_user(
+    request: Request,
+    db: Session = Depends(get_db),
+    session_token: str | None = Cookie(None, alias=SESSION_COOKIE_NAME),
+) -> AuthPrincipal:
+    return _authenticate_request(request, db, session_token, allow_kiosk=False, allow_pw_change_pending=False)
+
+
+def get_current_user_allow_pw_change(
+    request: Request,
+    db: Session = Depends(get_db),
+    session_token: str | None = Cookie(None, alias=SESSION_COOKIE_NAME),
+) -> AuthPrincipal:
+    return _authenticate_request(request, db, session_token, allow_kiosk=False, allow_pw_change_pending=True)
+
+
+def require_roles(
     allowed_roles: tuple[str, ...],
-    require_name: bool = False,
-    detail: str = "Acceso restringido: sesión o rol no autorizado.",
-    role_param: str | None = None,
-    user_param: str | None = None
-) -> tuple[str, str]:
-    role_clean, user_clean = _extract_role_and_user(x_user_role, x_user_name, role_param, user_param)
-    if not role_clean or role_clean not in allowed_roles:
-        raise HTTPException(status_code=403, detail=detail)
-    if require_name and not user_clean:
-        raise HTTPException(status_code=403, detail="Acceso restringido: identidad de usuario requerida.")
-    return role_clean, user_clean
+    detail: str = "Acceso restringido: permisos insuficientes para realizar esta operación.",
+):
+    def _dep(principal: AuthPrincipal = Depends(get_current_user)) -> AuthPrincipal:
+        if principal.role not in allowed_roles:
+            raise HTTPException(status_code=403, detail=detail)
+        return principal
+    return _dep
 
 
 def is_item_visible_to_user(item: Item, role_raw: str | None, user_name_raw: str | None) -> bool:
@@ -630,50 +1061,6 @@ def is_item_visible_to_user(item: Item, role_raw: str | None, user_name_raw: str
     if not assignee_raw or "sin asignar" in assignee_lower or "técnico glpi" in assignee_lower or "tecnico glpi" in assignee_lower:
         return True
     return is_item_assigned_to_user_name(assignee_raw, user_clean)
-
-
-def verify_authenticated_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
-    """Valida que la solicitud provenga de un rol reconocido (operativo, analista o Modo TV)."""
-    role_clean = decode_header_val(x_user_role).lower()
-    if not role_clean or role_clean not in (*AUTHENTICATED_ROLES, *TV_ROLES):
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Debe iniciar sesión o acceder mediante un perfil autorizado."
-        )
-    return role_clean
-
-
-def verify_operational_user_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
-    """Valida que la solicitud provenga de un usuario operativo autenticado (excluye modo TV e invitados)."""
-    role_clean = decode_header_val(x_user_role).lower()
-    if not role_clean or role_clean not in AUTHENTICATED_ROLES:
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Requiere perfil autenticado (Coordinador, Especialista o Analista)."
-        )
-    return role_clean
-
-
-def verify_coordinator_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
-    """Valida que la solicitud provenga de un usuario con rol Coordinador o Administrador."""
-    role_clean = decode_header_val(x_user_role).lower()
-    if not role_clean or role_clean not in COORDINATOR_ROLES:
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Solo el rol Coordinador / Administrador tiene permisos para crear, asignar, mover estados o eliminar actividades."
-        )
-    return role_clean
-
-
-def verify_coordinator_or_specialist_role(x_user_role: str | None = Header(None, alias="X-User-Role")):
-    """Valida que la solicitud provenga de un usuario con rol Coordinador, Administrador o Especialista."""
-    role_clean = decode_header_val(x_user_role).lower()
-    if not role_clean or role_clean not in OPERATIONAL_ROLES:
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Solo Coordinadores y Especialistas tienen permisos para crear actividades."
-        )
-    return role_clean
 
 SPECIALISTS_MAP = {
     "adonis": {
@@ -765,8 +1152,11 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class KioskAuthRequest(BaseModel):
+    secret: str
+
 class ChangePasswordRequest(BaseModel):
-    username: str
+    username: str | None = None
     old_password: str
     new_password: str
 
@@ -818,6 +1208,7 @@ def init_users():
         db.commit()
 
         generated_notice = False
+        legacy_default_hash = _legacy_sha256_hash("sycom2026")
         seed_pw_hash = hash_password(DEFAULT_INIT_PASSWORD) if DEFAULT_INIT_PASSWORD else None
         for u in DEFAULT_USERS:
             exists = db.query(User).filter(
@@ -831,7 +1222,7 @@ def init_users():
                 if not seed_pw_hash:
                     seed_pw_hash = hash_password(secrets.token_urlsafe(12))
                     generated_notice = True
-                db.add(User(**u, password_hash=seed_pw_hash))
+                db.add(User(**u, password_hash=seed_pw_hash, must_change_password=1, token_version=1))
             else:
                 exists.telegram_username = u["telegram_username"]
                 exists.role = u["role"]
@@ -842,6 +1233,11 @@ def init_users():
                         seed_pw_hash = hash_password(secrets.token_urlsafe(12))
                         generated_notice = True
                     exists.password_hash = seed_pw_hash
+                    exists.must_change_password = 1
+                elif exists.password_hash == legacy_default_hash:
+                    exists.must_change_password = 1
+                if not getattr(exists, "token_version", None):
+                    exists.token_version = 1
         if generated_notice:
             print("[Init Users] AVISO: Se generó contraseña inicial aleatoria para cuentas nuevas sin hash previo (defina DEFAULT_INIT_PASSWORD si desea inicializar con una clave específica).")
         db.commit()
@@ -863,7 +1259,7 @@ app.add_middleware(
     allow_origins=CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-User-Role", "X-User-Name", "X-User-Username", "X-TV-Mode"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-TV-Mode"],
 )
 
 # Planificador en segundo plano (cada 2 minutos según requerimiento)
@@ -907,7 +1303,7 @@ def health_check():
     return {"status": "ok", "timestamp": datetime.datetime.utcnow().isoformat()}
 
 @app.post("/api/sync")
-def trigger_sync(_role: str = Depends(verify_operational_user_role)):
+def trigger_sync(_principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES))):
     """Permite forzar una sincronización inmediata desde el dashboard autenticado."""
     sync_all()
     return {"message": "Sincronización completada con éxito"}
@@ -972,8 +1368,7 @@ def get_items(
     q: str = Query(None, description="Búsqueda por texto en título"),
     tv_mode: bool = Query(False, description="Modo TV: retorna todas las actividades del equipo"),
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    principal: AuthPrincipal = Depends(get_current_principal),
     x_tv_mode: str | None = Header(None, alias="X-TV-Mode")
 ):
     query = db.query(Item)
@@ -987,7 +1382,7 @@ def get_items(
         query = query.filter(Item.assignee_name.ilike(f"%{resp_clean}%"))
     if prio and isinstance(prio, str):
         query = query.filter(Item.priority == prio)
-    
+
     # Desacoplado: el Resumen conserva todo el histórico de actividades cerradas.
     # El filtro de 24 horas solo aplica visualmente a la columna 'Cerrados' del Kanban en frontend.
     if status and isinstance(status, str):
@@ -998,42 +1393,25 @@ def get_items(
 
     items = query.order_by(Item.updated_at.desc()).all()
 
-    # Requiere un rol autenticado o perfil TV reconocido (sin fallback abierto)
-    role_clean = decode_header_val(x_user_role).lower()
-    if not role_clean or role_clean not in (*AUTHENTICATED_ROLES, *TV_ROLES):
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Debe iniciar sesión o acceder mediante un perfil autorizado."
-        )
-
     is_tv_req = (
-        role_clean in TV_ROLES
-        or ((tv_mode or (x_tv_mode and x_tv_mode.lower() in ("true", "1"))) and role_clean in AUTHENTICATED_ROLES)
+        principal.is_kiosk
+        or ((tv_mode or (x_tv_mode and x_tv_mode.lower() in ("true", "1"))) and principal.role in AUTHENTICATED_ROLES)
     )
     if is_tv_req:
         return [serialize_item(item) for item in items]
 
-    # Control de visibilidad por perfil (con decodificación URL y normalización de acentos):
+    # Control de visibilidad por perfil autenticado:
     # El usuario regular solo ve las asignadas a él y las que están sin asignar (NO las de los demás)
-    visible_items = [item for item in items if is_item_visible_to_user(item, x_user_role, x_user_name)]
+    visible_items = [item for item in items if is_item_visible_to_user(item, principal.role, principal.full_name)]
     return [serialize_item(item) for item in visible_items]
 
 @app.get("/api/items/{item_id}")
 def get_item_by_id(
     item_id: str,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    role_param: str = Query(None, alias="role"),
-    user_param: str = Query(None, alias="user")
+    principal: AuthPrincipal = Depends(get_current_principal),
 ):
     """Obtiene una actividad individual por su ID de BD o ID externo (deep linking)."""
-    role_raw = x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")
-    user_name_raw = x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")
-    role_clean = decode_header_val(role_raw).lower()
-    if not role_clean or role_clean not in (*AUTHENTICATED_ROLES, *TV_ROLES):
-        raise HTTPException(status_code=403, detail="Acceso restringido: Debe iniciar sesión o acceder mediante un perfil autorizado.")
-
     item = None
     if item_id.isdigit():
         item = db.query(Item).filter(Item.id == int(item_id)).first()
@@ -1043,14 +1421,15 @@ def get_item_by_id(
         raise HTTPException(status_code=404, detail=f"Actividad #{item_id} no encontrada.")
 
     # Control de visibilidad por perfil
-    if not is_item_visible_to_user(item, role_raw, user_name_raw):
+    effective_role = "tv" if principal.is_kiosk else principal.role
+    if not is_item_visible_to_user(item, effective_role, principal.full_name):
         raise HTTPException(status_code=403, detail="No tienes permisos para visualizar esta actividad.")
 
     return serialize_item(item)
 
 
 @app.get("/api/kpis")
-def get_kpis(db: Session = Depends(get_db), _role: str = Depends(verify_authenticated_role)):
+def get_kpis(db: Session = Depends(get_db), _principal: AuthPrincipal = Depends(get_current_principal)):
     all_items = db.query(Item).all()
     now = datetime.datetime.utcnow()
     today_start = datetime.datetime(now.year, now.month, now.day, 0, 0, 0)
@@ -1079,7 +1458,7 @@ def get_kpis(db: Session = Depends(get_db), _role: str = Depends(verify_authenti
     }
 
 @app.get("/api/team")
-def get_team_workload(db: Session = Depends(get_db), _role: str = Depends(verify_authenticated_role)):
+def get_team_workload(db: Session = Depends(get_db), _principal: AuthPrincipal = Depends(get_current_principal)):
     active_items = db.query(Item).filter(Item.status != "cerrado").all()
     workload = {}
     for item in active_items:
@@ -1098,7 +1477,7 @@ def get_team_workload(db: Session = Depends(get_db), _role: str = Depends(verify
     return list(workload.values())
 
 @app.get("/api/users")
-def get_users(db: Session = Depends(get_db), _role: str = Depends(verify_operational_user_role)):
+def get_users(db: Session = Depends(get_db), _principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES))):
     users = db.query(User).filter(User.is_active == 1).all()
     return [{
         "id": u.id,
@@ -1121,11 +1500,21 @@ def _serialize_user(user: User) -> dict:
         "job_title": getattr(user, "job_title", None),
         "bio": getattr(user, "bio", None),
         "avatar_data": getattr(user, "avatar_data", None),
+        "must_change_password": bool(getattr(user, "must_change_password", 0)),
         "last_login": user.last_login.isoformat() if user.last_login else None
     }
 
 @app.post("/api/auth/login")
-def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
+def login(req: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    client_ip = _get_client_ip(request)
+    if _is_ip_rate_limited(client_ip):
+        log_audit(db, action="LOGIN_RATE_LIMITED", entity_type="auth", username=req.username.strip(),
+                  details={"ip": client_ip, "razon": "Límite de intentos por IP excedido"}, request=request)
+        raise HTTPException(
+            status_code=429,
+            detail="Demasiados intentos fallidos desde esta dirección IP. Espere 15 minutos e intente nuevamente."
+        )
+
     u_str = req.username.strip()
     user = db.query(User).filter(
         or_(
@@ -1135,36 +1524,168 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
         )
     ).first()
     if not user:
+        _record_ip_failure(client_ip)
         log_audit(db, action="LOGIN_FAILED", entity_type="auth", username=u_str,
                   details={"razon": "Usuario no encontrado o no registrado"}, request=request)
         raise HTTPException(status_code=401, detail="Usuario no encontrado o no registrado.")
-    
+
     if not user.is_active:
         log_audit(db, action="LOGIN_BLOCKED", entity_type="auth", user_id=user.id,
                   username=user.username, user_fullname=user.full_name, user_role=user.role,
                   details={"razon": "Usuario inactivo en plataforma"}, request=request)
         raise HTTPException(status_code=403, detail="Usuario inactivo en la plataforma.")
-        
-    if not verify_password(req.password, user.password_hash):
+
+    now_utc = datetime.datetime.utcnow()
+    if user.locked_until and user.locked_until > now_utc:
+        log_audit(db, action="LOGIN_LOCKED", entity_type="auth", user_id=user.id,
+                  username=user.username, user_fullname=user.full_name, user_role=user.role,
+                  details={"bloqueado_hasta": user.locked_until.isoformat()}, request=request)
+        raise HTTPException(
+            status_code=429,
+            detail="Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intente nuevamente en 15 minutos."
+        )
+    if user.locked_until and user.locked_until <= now_utc:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+
+    ok, upgrade_hash = verify_and_rehash_password(req.password, user.password_hash)
+    if not ok:
+        _record_ip_failure(client_ip)
+        fails = int(getattr(user, "failed_login_attempts", 0) or 0) + 1
+        user.failed_login_attempts = fails
+        if fails >= MAX_LOGIN_USER_FAILURES:
+            user.locked_until = now_utc + datetime.timedelta(seconds=LOGIN_LOCKOUT_SECONDS)
+        db.commit()
         log_audit(db, action="LOGIN_FAILED", entity_type="auth", user_id=user.id,
                   username=user.username, user_fullname=user.full_name, user_role=user.role,
-                  details={"razon": "Contraseña incorrecta"}, request=request)
+                  details={"razon": "Contraseña incorrecta", "intentos_fallidos": fails}, request=request)
+        if fails >= MAX_LOGIN_USER_FAILURES:
+            raise HTTPException(
+                status_code=429,
+                detail="Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intente nuevamente en 15 minutos."
+            )
         raise HTTPException(status_code=401, detail="Contraseña incorrecta.")
-        
-    user.last_login = datetime.datetime.utcnow()
+
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.last_login = now_utc
+    if upgrade_hash:
+        user.password_hash = upgrade_hash
+    if not getattr(user, "token_version", None):
+        user.token_version = 1
     db.commit()
+    db.refresh(user)
+
+    token = create_session_token(user)
+    _set_session_cookie(response, token)
 
     log_audit(db, action="LOGIN_SUCCESS", entity_type="auth", user_id=user.id,
               username=user.username, user_fullname=user.full_name, user_role=user.role,
-              details={"metodo": "formulario_acceso"}, request=request)
-    
+              details={"metodo": "formulario_acceso", "rehash_argon2": bool(upgrade_hash)}, request=request)
+
     return {
         "status": "ok",
+        "access_token": token,
+        "token_type": "bearer",
+        "must_change_password": bool(getattr(user, "must_change_password", 0)),
         "user": _serialize_user(user)
     }
 
+
+@app.post("/api/auth/kiosk")
+def kiosk_login(req: KioskAuthRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    """Autentica una pantalla TV en modo estrictamente solo lectura mediante KIOSK_SECRET."""
+    client_ip = _get_client_ip(request)
+    if _is_ip_rate_limited(client_ip):
+        raise HTTPException(status_code=429, detail="Demasiados intentos de acceso Kiosko inválidos. Espere 15 minutos.")
+
+    configured = _get_kiosk_secret()
+    if not configured:
+        raise HTTPException(status_code=403, detail="Modo Kiosko TV no configurado en el servidor.")
+
+    if not _is_kiosk_ip_allowed(client_ip):
+        log_audit(db, action="KIOSK_LOGIN_DENIED", entity_type="auth", username="kiosk_tv", user_role="tv",
+                  details={"ip": client_ip, "razon": "IP fuera de KIOSK_ALLOWED_IPS"}, request=request)
+        raise HTTPException(status_code=403, detail="Acceso Modo TV Kiosko denegado desde esta IP.")
+
+    provided = (req.secret or "").strip()
+    if not provided or not hmac.compare_digest(provided, configured):
+        _record_ip_failure(client_ip)
+        log_audit(db, action="KIOSK_LOGIN_FAILED", entity_type="auth", username="kiosk_tv", user_role="tv",
+                  details={"ip": client_ip}, request=request)
+        raise HTTPException(status_code=401, detail="Secreto de Modo TV Kiosko incorrecto.")
+
+    token = create_kiosk_token()
+    _set_session_cookie(response, token)
+    log_audit(db, action="KIOSK_LOGIN", entity_type="auth", username="kiosk_tv",
+              user_fullname="Pantalla Modo TV", user_role="tv", details={"ip": client_ip}, request=request)
+    return {
+        "status": "ok",
+        "access_token": token,
+        "token_type": "bearer",
+        "must_change_password": False,
+        "user": {
+            "full_name": "Pantalla Modo TV",
+            "username": "kiosk_tv",
+            "role": "tv",
+        },
+    }
+
+
+@app.get("/api/auth/session")
+def get_auth_session(principal: AuthPrincipal = Depends(get_current_principal_allow_pw_change)):
+    """Retorna la identidad de la sesión activa validada en servidor."""
+    if principal.is_kiosk:
+        return {
+            "authenticated": True,
+            "is_kiosk": True,
+            "must_change_password": False,
+            "user": {
+                "full_name": "Pantalla Modo TV",
+                "username": "kiosk_tv",
+                "role": "tv",
+            },
+        }
+    return {
+        "authenticated": True,
+        "is_kiosk": False,
+        "must_change_password": principal.must_change_password,
+        "user": _serialize_user(principal.user),
+    }
+
+
+@app.post("/api/auth/logout")
+def logout(
+    request: Request,
+    response: Response,
+    revoke_all: bool = Query(False),
+    db: Session = Depends(get_db),
+    session_token: str | None = Cookie(None, alias=SESSION_COOKIE_NAME),
+):
+    """Cierra la sesión eliminando la cookie HttpOnly (y opcionalmente revocando tokens previos)."""
+    raw_tok, auth_src = _extract_raw_token(request, session_token)
+    if auth_src == "cookie":
+        _enforce_cookie_csrf(request)
+    if raw_tok:
+        payload = verify_signed_token(raw_tok)
+        if payload and payload.get("typ") == "user":
+            user = db.query(User).filter(User.id == payload.get("uid")).first()
+            if user:
+                if revoke_all:
+                    user.token_version = int(getattr(user, "token_version", 1) or 1) + 1
+                    db.commit()
+                log_audit(db, action="LOGOUT", entity_type="auth", user_id=user.id,
+                          username=user.username, user_fullname=user.full_name, user_role=user.role,
+                          details={"revoke_all": revoke_all}, request=request)
+    _clear_session_cookie(response)
+    return {"status": "ok", "message": "Sesión cerrada correctamente."}
+
+
 @app.get("/api/auth/users")
-def get_auth_users(db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
+def get_auth_users(
+    db: Session = Depends(get_db),
+    _principal: AuthPrincipal = Depends(require_roles(COORDINATOR_ROLES, detail="Acceso restringido: Solo el Coordinador puede consultar usuarios."))
+):
     """Retorna los usuarios activos (solo Coordinador)."""
     users = db.query(User).filter(User.is_active == 1).all()
     return [_serialize_user(u) for u in users]
@@ -1228,46 +1749,31 @@ def find_user_by_identifier(
 
 def _resolve_profile_user(
     db: Session,
-    x_user_role: str | None,
-    x_user_name: str | None,
-    x_user_username: str | None,
-    username_param: str | None
+    principal: AuthPrincipal,
+    username_param: str | None,
 ) -> User:
-    role_clean = decode_header_val(x_user_role).lower()
-    if role_clean in TV_ROLES:
-        raise HTTPException(status_code=403, detail="Acceso restringido en Modo TV.")
-    if not role_clean or role_clean not in AUTHENTICATED_ROLES:
-        raise HTTPException(status_code=403, detail="Acceso restringido: perfil autorizado requerido.")
-
-    has_header_id = bool(decode_header_val(x_user_username) or decode_header_val(x_user_name))
-    if not has_header_id:
-        raise HTTPException(status_code=403, detail="Acceso restringido: identidad de usuario requerida en cabecera.")
-
-    caller_user = find_user_by_identifier(db, target_raw=x_user_name, x_user_username=x_user_username)
-    if not caller_user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    if not principal.user:
+        raise HTTPException(status_code=403, detail="Acceso restringido: perfil de usuario requerido.")
 
     if username_param and username_param.strip():
         target_user = find_user_by_identifier(db, username_param=username_param)
         if not target_user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado.")
-        if target_user.id != caller_user.id and role_clean not in COORDINATOR_ROLES:
+        if target_user.id != principal.user_id and not principal.is_coordinator:
             raise HTTPException(status_code=403, detail="Permiso denegado: solo puedes acceder a tu propio perfil.")
         return target_user
 
-    return caller_user
+    return principal.user
 
 
 @app.get("/api/users/me")
 def get_current_user_profile(
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    x_user_username: str | None = Header(None, alias="X-User-Username"),
+    principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES)),
     username: str | None = Query(None)
 ):
     """Consulta el perfil completo del usuario autenticado."""
-    user = _resolve_profile_user(db, x_user_role, x_user_name, x_user_username, username)
+    user = _resolve_profile_user(db, principal, username)
     return _serialize_user(user)
 
 
@@ -1276,13 +1782,11 @@ def update_current_user_profile(
     req: UpdateUserProfileRequest,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    x_user_username: str | None = Header(None, alias="X-User-Username"),
+    principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES)),
     username: str | None = Query(None)
 ):
     """Actualiza los datos personales y foto de perfil del usuario autenticado."""
-    user = _resolve_profile_user(db, x_user_role, x_user_name, x_user_username, username)
+    user = _resolve_profile_user(db, principal, username)
 
     if req.full_name is not None and req.full_name.strip():
         user.full_name = req.full_name.strip()
@@ -1297,7 +1801,15 @@ def update_current_user_profile(
     if req.bio is not None:
         user.bio = req.bio.strip()
     if req.avatar_data is not None:
-        user.avatar_data = req.avatar_data
+        av = req.avatar_data.strip()
+        if av:
+            low_av = av.lower()
+            is_safe_data = bool(re.match(r"^data:image/(png|jpeg|jpg|webp|gif);base64,[a-zA-Z0-9+/=\s]+$", av))
+            if not is_safe_data and not (low_av.startswith("https://") or low_av.startswith("/")):
+                raise HTTPException(status_code=400, detail="Formato de imagen de avatar no permitido.")
+            if len(av) > 3 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail="La imagen de avatar excede el límite de 3 MB.")
+        user.avatar_data = av
 
     db.commit()
     db.refresh(user)
@@ -1314,38 +1826,66 @@ def update_current_user_profile(
 
 
 @app.post("/api/auth/change-password")
-def change_password(req: ChangePasswordRequest, request: Request, db: Session = Depends(get_db)):
-    u_str = req.username.strip()
-    user = find_user_by_identifier(db, target_raw=u_str, username_param=u_str, x_user_username=u_str)
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+def change_password(
+    req: ChangePasswordRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    principal: AuthPrincipal = Depends(get_current_user_allow_pw_change),
+):
+    if req.username and req.username.strip():
+        u_str = req.username.strip()
+        user = find_user_by_identifier(db, target_raw=u_str, username_param=u_str, x_user_username=u_str)
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+        if user.id != principal.user_id and not principal.is_coordinator:
+            raise HTTPException(status_code=403, detail="Permiso denegado: solo puedes cambiar tu propia contraseña.")
+    else:
+        user = principal.user
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
     if not verify_password(req.old_password, user.password_hash):
         log_audit(db, action="PASSWORD_CHANGE_FAILED", entity_type="user", entity_id=user.id,
                   username=user.username, user_fullname=user.full_name, user_role=user.role,
                   details={"razon": "Contraseña actual incorrecta"}, request=request)
         raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta.")
-    
+
     new_pw = req.new_password
-    if len(new_pw) < 6:
-        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 6 caracteres.")
-    if len(new_pw) > 15:
-        raise HTTPException(status_code=400, detail="La nueva contraseña no debe exceder los 15 caracteres.")
-    
-    special_chars = set("$&.*@#%!_?+-=()[]{}<>,:;|/\\^~`")
-    if not any(c in special_chars for c in new_pw):
-        raise HTTPException(status_code=400, detail="La nueva contraseña debe contener al menos un caracter especial ($&.*).")
-    
+    validate_password_strength(new_pw)
+    if verify_password(new_pw, user.password_hash):
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe ser diferente a la contraseña actual.")
+
     user.password_hash = hash_password(new_pw)
+    user.must_change_password = 0
+    user.token_version = int(getattr(user, "token_version", 1) or 1) + 1
+    user.failed_login_attempts = 0
+    user.locked_until = None
     db.commit()
+    db.refresh(user)
 
     log_audit(db, action="PASSWORD_CHANGE", entity_type="user", entity_id=user.id,
               username=user.username, user_fullname=user.full_name, user_role=user.role,
               details={"metodo": "cambio_clave_usuario"}, request=request)
 
-    return {"status": "ok", "message": "Contraseña actualizada con éxito"}
+    new_token = None
+    if user.id == principal.user_id:
+        new_token = create_session_token(user)
+        _set_session_cookie(response, new_token)
+
+    resp_body = {
+        "status": "ok",
+        "message": "Contraseña actualizada con éxito",
+        "must_change_password": False,
+        "user": _serialize_user(user),
+    }
+    if new_token:
+        resp_body["access_token"] = new_token
+        resp_body["token_type"] = "bearer"
+    return resp_body
 
 @app.get("/api/clients")
-def get_clients_summary(db: Session = Depends(get_db), _role: str = Depends(verify_authenticated_role)):
+def get_clients_summary(db: Session = Depends(get_db), _principal: AuthPrincipal = Depends(get_current_principal)):
     items = db.query(Item).all()
     clients = {}
     for item in items:
@@ -1379,7 +1919,13 @@ def get_clients_summary(db: Session = Depends(get_db), _role: str = Depends(veri
     return list(clients.values())
 
 @app.post("/api/items/{item_id}/assign")
-def assign_item(item_id: int, req: AssignRequest, request: Request, db: Session = Depends(get_db), _role: str = Depends(verify_coordinator_role)):
+def assign_item(
+    item_id: int,
+    req: AssignRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: AuthPrincipal = Depends(require_roles(COORDINATOR_ROLES, detail="Acceso restringido: Solo el rol Coordinador / Administrador puede asignar actividades.")),
+):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item no encontrado")
@@ -1492,12 +2038,11 @@ def assign_item(item_id: int, req: AssignRequest, request: Request, db: Session 
 
 @app.post("/api/items/{item_id}/status")
 def update_item_status(
-    item_id: int, 
-    req: StatusUpdateRequest, 
+    item_id: int,
+    req: StatusUpdateRequest,
     request: Request,
-    db: Session = Depends(get_db), 
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name")
+    db: Session = Depends(get_db),
+    principal: AuthPrincipal = Depends(require_roles(OPERATIONAL_ROLES, detail="Permiso denegado: Solo Coordinadores y Especialistas pueden cambiar estados.")),
 ):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
@@ -1505,12 +2050,11 @@ def update_item_status(
 
     old_st = item.status
 
-    role = decode_header_val(x_user_role).lower()
-    if role in ("coordinador", "admin", "administrador"):
+    if principal.is_coordinator:
         pass  # Coordinador / Administrador tiene autorización total sobre cualquier actividad
-    elif role == "especialista":
+    elif principal.is_specialist:
         # Especialista solo puede cambiar de estado sus propias actividades asignadas
-        if not is_item_assigned_to_user_name(item.assignee_name, x_user_name):
+        if not is_item_assigned_to_user_name(item.assignee_name, principal.full_name):
             raise HTTPException(
                 status_code=403,
                 detail="Permiso denegado: Como Especialista, solo puedes actualizar el estado de tus propias actividades asignadas."
@@ -1610,7 +2154,7 @@ def update_item_status(
         safe_status_orig = html.escape(item.status_origin or "")
         safe_assignee = html.escape(item.assignee_name or "Sin asignar")
         now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
-        user_clean = decode_header_val(x_user_name)
+        user_clean = principal.full_name
         user_info = f" por {html.escape(user_clean)}" if user_clean else ""
         rec_info = f"\n💡 <b>Recomendaciones:</b>\n{html.escape(req.recommendations.strip())}\n" if (new_st == "cerrado" and req.recommendations and req.recommendations.strip()) else ""
         agenda_url = get_agenda_deep_link(item.id, view="kanban")
@@ -1655,12 +2199,9 @@ def create_item(
     req: CreateItemRequest,
     request: Request,
     db: Session = Depends(get_db),
-    _role: str = Depends(verify_coordinator_or_specialist_role),
-    x_user_name: str | None = Header(None, alias="X-User-Name")
+    principal: AuthPrincipal = Depends(require_roles(OPERATIONAL_ROLES, detail="Acceso restringido: Solo Coordinadores y Especialistas tienen permisos para crear actividades.")),
 ):
-    creator_clean = decode_header_val(x_user_name)
-    if not creator_clean:
-        creator_clean = "Coordinador" if _role in ("coordinador", "admin", "administrador") else "Especialista"
+    creator_clean = principal.full_name or ("Coordinador" if principal.is_coordinator else "Especialista")
 
     src = req.source.strip()
     if src.lower() in ["clickup", "click_up"]:
@@ -1846,20 +2387,14 @@ def update_item_details(
     req: UpdateItemRequest,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    role_param: str = Query(None, alias="role"),
-    user_param: str = Query(None, alias="user")
+    principal: AuthPrincipal = Depends(require_roles(OPERATIONAL_ROLES, detail="Permiso denegado: Se requiere rol de Coordinador o Especialista asignado.")),
 ):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Actividad no encontrada")
 
-    role = decode_header_val(x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).lower()
-    user_name_raw = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")) or ""
-
     recalc_due = False
-    if role in ("coordinador", "admin", "administrador"):
+    if principal.is_coordinator:
         if req.title is not None and req.title.strip():
             item.title = req.title.strip()
         if req.priority is not None and req.priority.strip():
@@ -1882,8 +2417,8 @@ def update_item_details(
             parsed_esc = parse_iso_utc(req.escalated_at)
             if parsed_esc:
                 item.escalated_at = parsed_esc
-    elif role == "especialista":
-        if not is_item_assigned_to_user_name(item.assignee_name, user_name_raw):
+    elif principal.is_specialist:
+        if not is_item_assigned_to_user_name(item.assignee_name, principal.full_name):
             raise HTTPException(
                 status_code=403,
                 detail="Permiso denegado: Como Especialista, solo puedes actualizar actividades asignadas a ti."
@@ -1949,28 +2484,20 @@ def delete_item(
     item_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    role_param: str = Query(None, alias="role"),
-    user_param: str = Query(None, alias="user")
+    principal: AuthPrincipal = Depends(require_roles(OPERATIONAL_ROLES, detail="Acceso restringido: Solo el Coordinador o el Especialista creador pueden eliminar actividades.")),
 ):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Actividad no encontrada")
 
-    role = decode_header_val(x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).lower()
-    user_name_raw = (x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")) or ""
-
-    is_coord = role in ("coordinador", "admin", "administrador")
-    is_spec = role in ("especialista", "specialist")
-
+    is_coord = principal.is_coordinator
     if not is_coord:
-        if not is_spec:
+        if not principal.is_specialist:
             raise HTTPException(
                 status_code=403,
                 detail="Acceso restringido: Solo el rol Coordinador o el Especialista que creó la actividad tienen permisos para eliminarla."
             )
-        if not is_user_creator_of_item(item.created_by, user_name_raw):
+        if not is_user_creator_of_item(item.created_by, principal.full_name):
             raise HTTPException(
                 status_code=403,
                 detail="Permiso denegado: Como Especialista, solo puedes eliminar actividades creadas por ti."
@@ -2000,7 +2527,7 @@ def delete_item(
         import html
         from .notifications.telegram_notifier import send_telegram_message
         now_str = now_caracas_str('%d-%m-%Y %I:%M %p')
-        deleter_name = decode_header_val(user_name_raw) or ("Coordinador" if is_coord else "Especialista")
+        deleter_name = principal.full_name or ("Coordinador" if is_coord else "Especialista")
         msg = (
             f"🗑 <b>Actividad Eliminada</b>\n\n"
             f"📌 <b>Asunto:</b> {html.escape(title)}\n"
@@ -2025,7 +2552,7 @@ def delete_item(
 # ==============================================================================
 
 @app.get("/api/notifications/telegram-status")
-def api_telegram_status(_role: str = Depends(verify_coordinator_role)):
+def api_telegram_status(_principal: AuthPrincipal = Depends(require_roles(COORDINATOR_ROLES))):
     """Verifica si las credenciales del bot de Telegram están cargadas en el entorno (solo Coordinador)."""
     from . import config
     token = (config.TELEGRAM_BOT_TOKEN or "").strip()
@@ -2040,7 +2567,7 @@ def api_telegram_status(_role: str = Depends(verify_coordinator_role)):
 
 
 @app.post("/api/notifications/test-telegram")
-def api_test_telegram(_role: str = Depends(verify_coordinator_role)):
+def api_test_telegram(_principal: AuthPrincipal = Depends(require_roles(COORDINATOR_ROLES))):
     """Envía un mensaje de prueba al chat de Telegram configurado."""
     res = test_telegram_connection()
     return res
@@ -2050,18 +2577,7 @@ def api_test_telegram(_role: str = Depends(verify_coordinator_role)):
 # REPORTES EJECUTIVOS (M9) - EXCEL & PDF
 # ==============================================================================
 
-def _resolve_report_filters(start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param, ibp=None, category=None):
-    role = decode_header_val(x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
-    user = decode_header_val(x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")).strip().lower()
-
-    # Permitir Coordinador/Admin, Modo TV, y roles operativos para lectura de métricas
-    is_tv = role in ("tv", "modo.tv", "publico") or user in ("pantalla modo tv", "modo.tv", "tv")
-    if not is_tv and role not in ("coordinador", "admin", "administrador", "especialista", "analista"):
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: La generación de reportes ejecutivos está reservada exclusivamente para el rol Coordinador."
-        )
-
+def _clean_report_filters(start_date, end_date, specialist, ibp=None, category=None):
     spec = specialist.strip() if isinstance(specialist, str) and specialist.strip() else None
     s_date = start_date.strip() if isinstance(start_date, str) and start_date.strip() else None
     e_date = end_date.strip() if isinstance(end_date, str) and end_date.strip() else None
@@ -2078,14 +2594,11 @@ def api_report_data(
     ibp: str = Query(None, description="Filtrar por IBP / Banco Participante"),
     category: str = Query(None, description="Filtrar por Categoría Técnica"),
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    role_param: str = Query(None, alias="role"),
-    user_param: str = Query(None, alias="user"),
+    _principal: AuthPrincipal = Depends(get_current_principal),
 ):
     """Retorna los datos consolidados para reportes ejecutivos en formato JSON."""
-    s_date, e_date, spec, ibp_val, cat_val = _resolve_report_filters(
-        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param, ibp, category
+    s_date, e_date, spec, ibp_val, cat_val = _clean_report_filters(
+        start_date, end_date, specialist, ibp, category
     )
     data = get_report_data(
         db=db,
@@ -2106,14 +2619,11 @@ def api_report_excel(
     ibp: str = Query(None, description="Filtrar por IBP / Banco Participante"),
     category: str = Query(None, description="Filtrar por Categoría Técnica"),
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    role_param: str = Query(None, alias="role"),
-    user_param: str = Query(None, alias="user"),
+    _principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES, detail="Acceso restringido: sesión autenticada requerida para exportar Excel.")),
 ):
     """Genera y descarga el archivo Excel (.xlsx) corporativo con KPIs y métricas."""
-    s_date, e_date, spec, ibp_val, cat_val = _resolve_report_filters(
-        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param, ibp, category
+    s_date, e_date, spec, ibp_val, cat_val = _clean_report_filters(
+        start_date, end_date, specialist, ibp, category
     )
     data = get_report_data(
         db=db,
@@ -2145,14 +2655,11 @@ def api_report_print_view(
     ibp: str = Query(None, description="Filtrar por IBP / Banco Participante"),
     category: str = Query(None, description="Filtrar por Categoría Técnica"),
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    role_param: str = Query(None, alias="role"),
-    user_param: str = Query(None, alias="user"),
+    _principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES, detail="Acceso restringido: sesión autenticada requerida para imprimir reporte.")),
 ):
     """Genera la vista ejecutiva HTML lista para imprimir o guardar como PDF en alta resolución."""
-    s_date, e_date, spec, ibp_val, cat_val = _resolve_report_filters(
-        start_date, end_date, specialist, x_user_role, x_user_name, role_param, user_param, ibp, category
+    s_date, e_date, spec, ibp_val, cat_val = _clean_report_filters(
+        start_date, end_date, specialist, ibp, category
     )
     data = get_report_data(
         db=db,
@@ -2180,16 +2687,9 @@ class SaveReportRequest(BaseModel):
 @app.get("/api/reports/history")
 def api_reports_history(
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    role_param: str = Query(None, alias="role")
+    _principal: AuthPrincipal = Depends(require_roles(COORDINATOR_ROLES, detail="Acceso restringido: Solo el Coordinador puede consultar el historial de reportes.")),
 ):
     """Lista el historial de reportes ejecutivos generados (solo Coordinador)."""
-    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
-    if role not in ("coordinador", "admin", "administrador"):
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Solo el Coordinador puede consultar el historial de reportes."
-        )
 
     reports = db.query(GeneratedReport).order_by(GeneratedReport.created_at.desc()).all()
 
@@ -2241,23 +2741,13 @@ def api_reports_generate_and_save(
     req: SaveReportRequest,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    role_param: str = Query(None, alias="role"),
-    user_param: str = Query(None, alias="user")
+    principal: AuthPrincipal = Depends(require_roles(COORDINATOR_ROLES, detail="Acceso restringido: Solo el Coordinador puede generar reportes ejecutivos.")),
 ):
     """Genera métricas de un reporte ejecutivo y lo registra en el historial persistente."""
-    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
-    if role not in ("coordinador", "admin", "administrador"):
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Solo el Coordinador puede generar reportes ejecutivos."
-        )
+    user_name = principal.full_name or "Coordinador"
 
-    user_name = decode_header_val(x_user_name if isinstance(x_user_name, str) else (user_param if isinstance(user_param, str) else "")).strip() or "Coordinador"
-
-    s_date, e_date, spec, ibp_val, cat_val = _resolve_report_filters(
-        req.start_date, req.end_date, req.specialist, x_user_role, x_user_name, role_param, user_param, req.ibp, req.category
+    s_date, e_date, spec, ibp_val, cat_val = _clean_report_filters(
+        req.start_date, req.end_date, req.specialist, req.ibp, req.category
     )
 
     data = get_report_data(
@@ -2328,16 +2818,9 @@ def api_reports_delete_history(
     report_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    role_param: str = Query(None, alias="role")
+    _principal: AuthPrincipal = Depends(require_roles(COORDINATOR_ROLES, detail="Acceso restringido: Solo el Coordinador puede eliminar reportes del historial.")),
 ):
     """Elimina una entrada del historial de reportes (solo Coordinador)."""
-    role = (x_user_role if isinstance(x_user_role, str) else (role_param if isinstance(role_param, str) else "")).strip().lower()
-    if role not in ("coordinador", "admin", "administrador"):
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Solo el Coordinador puede eliminar reportes del historial."
-        )
 
     entry = db.query(GeneratedReport).filter(GeneratedReport.id == report_id).first()
     if not entry:
@@ -2411,7 +2894,7 @@ class UploadEscalationRequest(BaseModel):
 
 
 @app.get("/api/ibps")
-def api_get_ibps(db: Session = Depends(get_db), _role: str = Depends(verify_authenticated_role)):
+def api_get_ibps(db: Session = Depends(get_db), _principal: AuthPrincipal = Depends(get_current_principal)):
     """Lista el catálogo oficial de Identificación Bancaria del Participante (IBP) de la plataforma SIMF."""
     db_ibps = db.query(IBP).filter(IBP.is_active == 1).order_by(IBP.code.asc()).all()
     if db_ibps:
@@ -2435,7 +2918,7 @@ def api_get_ibps(db: Session = Depends(get_db), _role: str = Depends(verify_auth
 def api_create_ibp(
     req: CreateIBPRequest,
     db: Session = Depends(get_db),
-    _role: str = Depends(verify_coordinator_role)
+    _principal: AuthPrincipal = Depends(require_roles(COORDINATOR_ROLES))
 ):
     """Crea una nueva Instancia de Base de Datos / Plataforma (IBP) en la BD interna."""
     name = (req.name or "").strip()
@@ -2474,18 +2957,55 @@ def _normalize_http_url(url_raw: str) -> str:
     cleaned = (url_raw or "").strip()
     if not cleaned:
         raise HTTPException(status_code=400, detail="Debe indicar el enlace (URL) de Google Docs.")
-    if not (cleaned.startswith("http://") or cleaned.startswith("https://")):
-        if "://" in cleaned or cleaned.lower().startswith("javascript:") or cleaned.lower().startswith("data:"):
-            raise HTTPException(status_code=400, detail="Esquema de URL no permitido; use http:// o https://.")
+    if len(cleaned) > 2000 or any(ord(c) < 32 or ord(c) == 127 for c in cleaned):
+        raise HTTPException(status_code=400, detail="El enlace (URL) contiene caracteres inválidos o excede la longitud máxima.")
+    low = cleaned.lower()
+    if low.startswith("http://"):
+        raise HTTPException(status_code=400, detail="Solo se permiten enlaces seguros https://.")
+    if not low.startswith("https://"):
+        if "://" in cleaned or low.startswith(("javascript:", "data:", "vbscript:", "file:")):
+            raise HTTPException(status_code=400, detail="Esquema de URL no permitido; use exclusivamente https://.")
         cleaned = "https://" + cleaned
     parsed = urlparse(cleaned)
-    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+    if parsed.scheme != "https" or not parsed.netloc or not parsed.hostname:
         raise HTTPException(status_code=400, detail="El enlace (URL) indicado no es válido.")
+    if parsed.username or parsed.password:
+        raise HTTPException(status_code=400, detail="No se permiten credenciales embebidas en el enlace.")
+    host_low = parsed.hostname.strip().lower()
+    if host_low == "localhost" or host_low.endswith((".localhost", ".local", ".internal")):
+        raise HTTPException(status_code=400, detail="El destino del enlace apunta a un host interno no permitido.")
+    try:
+        ip_obj = ipaddress.ip_address(host_low)
+        if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved or ip_obj.is_multicast or ip_obj.is_unspecified:
+            raise HTTPException(status_code=400, detail="El destino del enlace apunta a una dirección IP privada o reservada no permitida.")
+    except ValueError:
+        pass
+    return cleaned
+
+
+def _resolve_safe_escalation_path(stored_filename: str | None) -> Path:
+    if not stored_filename or "/" in stored_filename or "\\" in stored_filename or ".." in stored_filename:
+        raise HTTPException(status_code=400, detail="Nombre de archivo almacenado inválido.")
+    base_dir = Path(UPLOAD_ESCALATIONS_DIR).resolve()
+    candidate = (base_dir / stored_filename).resolve()
+    if candidate == base_dir or not candidate.is_relative_to(base_dir):
+        raise HTTPException(status_code=400, detail="Ruta de archivo fuera del directorio permitido.")
+    return candidate
+
+
+def _safe_download_filename(name: str | None) -> str:
+    base = Path((name or "documento.pdf").strip()).name
+    cleaned = re.sub(r'[^A-Za-z0-9._\-\s]', '_', base).strip() or "documento.pdf"
+    if not cleaned.lower().endswith(".pdf"):
+        cleaned += ".pdf"
     return cleaned
 
 
 @app.get("/api/escalations")
-def api_get_escalations(db: Session = Depends(get_db), _role: str = Depends(verify_authenticated_role)):
+def api_get_escalations(
+    db: Session = Depends(get_db),
+    _principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES, detail="Acceso restringido: sesión autenticada requerida para consultar escalamientos.")),
+):
     """Lista todos los documentos de escalamiento registrados (con fecha de recibimiento, escalada, autor e IBP asociada)."""
     docs = db.query(EscalationDocument).order_by(EscalationDocument.created_at.desc()).all()
     ibp_map = {i.id: i for i in db.query(IBP).all()}
@@ -2531,22 +3051,11 @@ def api_create_escalation(
     req: CreateEscalationRequest,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    role_param: str = Query(None, alias="role"),
-    user_param: str = Query(None, alias="user")
+    principal: AuthPrincipal = Depends(require_roles(OPERATIONAL_ROLES, detail="Acceso restringido: Solo Coordinadores y Especialistas pueden registrar escalamientos.")),
 ):
     """Registra un nuevo documento de escalamiento mediante enlace oficial a Google Docs o Drive."""
-    role_clean, user_name = _require_valid_caller(
-        x_user_role,
-        x_user_name,
-        allowed_roles=OPERATIONAL_ROLES,
-        require_name=True,
-        detail="Acceso restringido: Solo Coordinadores y Especialistas pueden registrar escalamientos.",
-        role_param=role_param,
-        user_param=user_param
-    )
-    role = role_clean.capitalize()
+    user_name = principal.full_name or principal.username
+    role = principal.role.capitalize()
 
     title = (req.title or "").strip()
     if not title:
@@ -2663,22 +3172,11 @@ def api_update_escalation(
     req: UpdateEscalationRequest,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    role_param: str = Query(None, alias="role"),
-    user_param: str = Query(None, alias="user")
+    principal: AuthPrincipal = Depends(require_roles(OPERATIONAL_ROLES, detail="Acceso restringido: Solo Coordinadores y Especialistas pueden modificar escalamientos.")),
 ):
     """Actualiza los datos, fechas cronológicas, categoría o recomendaciones de un escalamiento."""
-    role_clean, user_name = _require_valid_caller(
-        x_user_role,
-        x_user_name,
-        allowed_roles=OPERATIONAL_ROLES,
-        require_name=True,
-        detail="Acceso restringido: Solo Coordinadores y Especialistas pueden modificar escalamientos.",
-        role_param=role_param,
-        user_param=user_param
-    )
-    role = role_clean.capitalize()
+    user_name = principal.full_name or principal.username
+    role = principal.role.capitalize()
 
     doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
     if not doc:
@@ -2805,41 +3303,36 @@ def api_upload_escalation(
     req: UploadEscalationRequest,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name")
+    principal: AuthPrincipal = Depends(require_roles(OPERATIONAL_ROLES, detail="Acceso restringido: Solo Coordinadores y Especialistas pueden cargar documentos de escalamiento.")),
 ):
     """Carga y registra un documento de escalamiento en formato PDF."""
-    role_clean, user_name = _require_valid_caller(
-        x_user_role,
-        x_user_name,
-        allowed_roles=OPERATIONAL_ROLES,
-        require_name=True,
-        detail="Acceso restringido: Solo Coordinadores y Especialistas pueden cargar documentos de escalamiento."
-    )
-    user_role = role_clean.capitalize()
+    user_name = principal.full_name or principal.username
+    user_role = principal.role.capitalize()
 
     if not req.filename or not req.file_base64:
         raise HTTPException(status_code=400, detail="Debe suministrar un archivo PDF válido.")
 
-    clean_filename = req.filename.strip()
-    if not clean_filename.lower().endswith(".pdf"):
+    clean_filename = Path(req.filename.strip()).name
+    if not clean_filename or not clean_filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Solo se admiten documentos en formato PDF (.pdf).")
 
     # Decodificar Base64
-    raw_b64 = req.file_base64
+    raw_b64 = req.file_base64.strip()
     if "," in raw_b64:
-        raw_b64 = raw_b64.split(",", 1)[1]
+        raw_b64 = raw_b64.split(",", 1)[1].strip()
+    if len(raw_b64) > 70_000_000:
+        raise HTTPException(status_code=400, detail="El archivo excede el tamaño máximo permitido de 50 MB.")
 
     try:
-        file_bytes = base64.b64decode(raw_b64)
-    except Exception as e:
+        file_bytes = base64.b64decode(raw_b64, validate=True)
+    except Exception:
         raise HTTPException(status_code=400, detail="El contenido del archivo no es un Base64 válido.")
 
     if len(file_bytes) < 10:
         raise HTTPException(status_code=400, detail="El archivo está vacío o dañado.")
 
     # Validar firma magic bytes PDF (%PDF-)
-    if not file_bytes.startswith(b"%PDF"):
+    if not file_bytes.startswith(b"%PDF-"):
         raise HTTPException(status_code=400, detail="El archivo suministrado no tiene formato PDF válido.")
 
     # Limitar tamaño a 50MB
@@ -2851,11 +3344,9 @@ def api_upload_escalation(
     if not title:
         title = clean_filename[:-4] if clean_filename.lower().endswith(".pdf") else clean_filename
 
-    # Guardar en disco con nombre seguro único
-    safe_base = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', clean_filename)
-    unique_prefix = uuid.uuid4().hex[:10]
-    stored_name = f"{unique_prefix}_{safe_base}"
-    file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, stored_name)
+    # Guardar en disco con nombre opaco UUIDv4 estricto y ruta canónica validada
+    stored_name = f"{uuid.uuid4().hex}.pdf"
+    file_path = _resolve_safe_escalation_path(stored_name)
 
     try:
         with open(file_path, "wb") as f:
@@ -2948,52 +3439,64 @@ def api_upload_escalation(
 
 
 @app.get("/api/escalations/{doc_id}/view")
-def api_view_escalation(doc_id: int, db: Session = Depends(get_db)):
+def api_view_escalation(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    _principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES, detail="Acceso restringido: sesión autenticada requerida para visualizar documentos.")),
+):
     """Abre el documento de escalamiento: redirige si es Google Docs o muestra PDF inline."""
     doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Documento de escalamiento no encontrado.")
 
     if doc.doc_url:
-        return RedirectResponse(url=doc.doc_url)
+        safe_redirect = _normalize_http_url(doc.doc_url)
+        return RedirectResponse(url=safe_redirect)
 
     if not doc.stored_filename:
         raise HTTPException(status_code=404, detail="El documento no posee un archivo físico asociado.")
 
-    file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, doc.stored_filename)
-    if not os.path.isfile(file_path):
+    file_path = _resolve_safe_escalation_path(doc.stored_filename)
+    if not file_path.is_file():
         raise HTTPException(status_code=404, detail="El archivo físico del documento no se encuentra en el servidor.")
 
     return FileResponse(
-        path=file_path,
+        path=str(file_path),
         media_type="application/pdf",
-        filename=doc.original_filename,
-        content_disposition_type="inline"
+        filename=_safe_download_filename(doc.original_filename),
+        content_disposition_type="inline",
+        headers={"X-Content-Type-Options": "nosniff"},
     )
 
 
 @app.get("/api/escalations/{doc_id}/download")
-def api_download_escalation(doc_id: int, db: Session = Depends(get_db)):
+def api_download_escalation(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    _principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES, detail="Acceso restringido: sesión autenticada requerida para descargar documentos.")),
+):
     """Fuerza la descarga del PDF o redirige al documento si es Google Docs."""
     doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Documento de escalamiento no encontrado.")
 
     if doc.doc_url:
-        return RedirectResponse(url=doc.doc_url)
+        safe_redirect = _normalize_http_url(doc.doc_url)
+        return RedirectResponse(url=safe_redirect)
 
     if not doc.stored_filename:
         raise HTTPException(status_code=404, detail="El documento no posee un archivo descargable.")
 
-    file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, doc.stored_filename)
-    if not os.path.isfile(file_path):
+    file_path = _resolve_safe_escalation_path(doc.stored_filename)
+    if not file_path.is_file():
         raise HTTPException(status_code=404, detail="El archivo físico del documento no se encuentra en el servidor.")
 
     return FileResponse(
-        path=file_path,
+        path=str(file_path),
         media_type="application/pdf",
-        filename=doc.original_filename,
-        content_disposition_type="attachment"
+        filename=_safe_download_filename(doc.original_filename),
+        content_disposition_type="attachment",
+        headers={"X-Content-Type-Options": "nosniff"},
     )
 
 
@@ -3002,40 +3505,31 @@ def api_delete_escalation(
     doc_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
-    role_param: str = Query(None, alias="role")
+    principal: AuthPrincipal = Depends(require_roles(OPERATIONAL_ROLES, detail="Permiso denegado: Solo el Coordinador o el autor del documento pueden eliminarlo.")),
 ):
     """Elimina un documento de escalamiento de la BD y borra su archivo de disco."""
-    role, user_name = _require_valid_caller(
-        x_user_role,
-        x_user_name,
-        allowed_roles=OPERATIONAL_ROLES,
-        require_name=False,
-        detail="Permiso denegado: Solo el Coordinador o el autor del documento pueden eliminarlo.",
-        role_param=role_param
-    )
-
     doc = db.query(EscalationDocument).filter(EscalationDocument.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Documento no encontrado.")
 
     doc_author_norm = strip_accents_str(doc.uploaded_by or "")
-    user_norm = strip_accents_str(user_name)
+    user_norm = strip_accents_str(principal.full_name)
 
-    if role not in COORDINATOR_ROLES and (not user_norm or not doc_author_norm or user_norm not in doc_author_norm):
+    if not principal.is_coordinator and (not user_norm or not doc_author_norm or user_norm not in doc_author_norm):
         raise HTTPException(
             status_code=403,
             detail="Permiso denegado: Solo el Coordinador o el autor del documento pueden eliminarlo."
         )
 
     if doc.stored_filename:
-        file_path = os.path.join(UPLOAD_ESCALATIONS_DIR, doc.stored_filename)
-        if os.path.isfile(file_path):
-            try:
+        try:
+            file_path = _resolve_safe_escalation_path(doc.stored_filename)
+            if file_path.is_file():
                 os.remove(file_path)
-            except Exception as e:
-                print(f"[Delete Escalation File Error] {e}")
+        except HTTPException:
+            pass
+        except Exception as e:
+            print(f"[Delete Escalation File Error] {e}")
 
     # Notificación a Telegram por eliminación
     try:
@@ -3043,7 +3537,7 @@ def api_delete_escalation(
         from .notifications.telegram_notifier import send_telegram_message, now_caracas_str
         now_str = now_caracas_str("%d-%m-%Y %I:%M %p")
         safe_title = html.escape(doc.title)
-        remover = html.escape(x_user_name if isinstance(x_user_name, str) and x_user_name.strip() else "Coordinador")
+        remover = html.escape(principal.full_name or "Coordinador")
 
         msg = (
             f"🗑 <b>Escalamiento Eliminado</b>\n\n"
@@ -3095,15 +3589,22 @@ def _parse_overtime_datetime(dt_str: str) -> datetime.datetime:
                 pass
         raise HTTPException(status_code=400, detail=f"Formato de fecha u hora invalido: '{dt_str}'.")
 
+def _is_overtime_owner(ot: OvertimeRecord, caller_name: str | None) -> bool:
+    caller_low = strip_accents_str(caller_name)
+    if not caller_low:
+        return False
+    return (
+        caller_low in strip_accents_str(ot.created_by)
+        or caller_low in strip_accents_str(ot.specialist_name)
+    )
+
+
 def _serialize_overtime(
     ot: OvertimeRecord,
-    req_user_name: str | None = None,
-    req_user_role: str | None = None
+    principal: AuthPrincipal | None = None,
 ) -> dict:
-    role = (req_user_role or "").strip().lower()
-    user_name = _clean_header_user(req_user_name).lower()
-    is_admin_or_coord = role in ("coordinador", "admin", "administrador")
-    is_owner = bool(user_name and (user_name in (ot.created_by or "").lower() or user_name in (ot.specialist_name or "").lower()))
+    is_admin_or_coord = bool(principal and principal.is_coordinator)
+    is_owner = bool(principal and _is_overtime_owner(ot, principal.full_name))
 
     can_edit = is_admin_or_coord or is_owner
     can_delete = is_admin_or_coord or is_owner
@@ -3135,23 +3636,6 @@ def _serialize_overtime(
     }
 
 
-def _resolve_overtime_caller(x_user_role: str | None, x_user_name: str | None) -> tuple[bool, str]:
-    role = decode_header_val(x_user_role).lower()
-    caller_name = _clean_header_user(x_user_name)
-    if not role or role not in AUTHENTICATED_ROLES:
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Debe iniciar sesión con un perfil autorizado para consultar horas extras."
-        )
-    is_coord = role in COORDINATOR_ROLES
-    if not is_coord and not caller_name:
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Identidad de usuario requerida para consultar horas extras."
-        )
-    return is_coord, caller_name
-
-
 def _scope_overtime_query(q, is_coord: bool, caller_name: str):
     if is_coord:
         return q
@@ -3178,11 +3662,11 @@ def list_overtimes(
     status: str | None = Query(None),
     search: str | None = Query(None),
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name")
+    principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES, detail="Acceso restringido: sesión autenticada requerida para consultar horas extras.")),
 ):
     """Retorna la lista de registros de horas extras con filtros opcionales."""
-    is_coord, caller_name = _resolve_overtime_caller(x_user_role, x_user_name)
+    is_coord = principal.is_coordinator
+    caller_name = principal.full_name
 
     q = _scope_overtime_query(db.query(OvertimeRecord), is_coord, caller_name)
 
@@ -3224,7 +3708,7 @@ def list_overtimes(
         )
 
     records = q.order_by(OvertimeRecord.start_time.desc(), OvertimeRecord.id.desc()).all()
-    return [_serialize_overtime(r, x_user_name, x_user_role) for r in records]
+    return [_serialize_overtime(r, principal) for r in records]
 
 
 @app.post("/api/overtimes")
@@ -3232,17 +3716,10 @@ def create_overtime(
     req: CreateOvertimeRequest,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name")
+    principal: AuthPrincipal = Depends(require_roles(OPERATIONAL_ROLES, detail="Acceso restringido: Solo Coordinadores y Especialistas pueden registrar horas extras.")),
 ):
     """Crea un nuevo registro de horas extras con cálculo de duración y control de autoría."""
-    role, caller_name = _require_valid_caller(
-        x_user_role,
-        x_user_name,
-        allowed_roles=OPERATIONAL_ROLES,
-        require_name=True,
-        detail="Acceso restringido: Solo Coordinadores y Especialistas pueden registrar horas extras."
-    )
+    caller_name = principal.full_name or principal.username
 
     # Validar fechas
     start_dt = _parse_overtime_datetime(req.start_time)
@@ -3261,7 +3738,7 @@ def create_overtime(
         raise HTTPException(status_code=400, detail="La descripción de la actividad debe contener al menos 5 caracteres.")
 
     # Resolver especialista
-    is_coord = role in COORDINATOR_ROLES
+    is_coord = principal.is_coordinator
     if is_coord and req.specialist_name and req.specialist_name.strip():
         target_specialist = req.specialist_name.strip()
     else:
@@ -3298,12 +3775,12 @@ def create_overtime(
     db.refresh(record)
 
     log_audit(db, action="CREATE_OVERTIME", entity_type="overtime", entity_id=record.id,
-              username=creator_name, user_role=creator_role,
+              username=principal.username, user_fullname=creator_name, user_role=creator_role,
               details={"especialista": record.specialist_name, "duracion_horas": record.duration_hours,
                        "categoria": record.category, "inicio": str(record.start_time), "fin": str(record.end_time)},
               request=request)
 
-    return _serialize_overtime(record, x_user_name, x_user_role)
+    return _serialize_overtime(record, principal)
 
 
 @app.get("/api/overtimes/analytics")
@@ -3312,11 +3789,11 @@ def get_overtimes_analytics(
     end_date: str | None = Query(None),
     specialist: str | None = Query(None),
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name")
+    principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES, detail="Acceso restringido: sesión autenticada requerida para consultar analíticas.")),
 ):
     """Retorna métricas consolidadas y la matriz para el mapa de calor de horas extras por especialista."""
-    is_coord, caller_name = _resolve_overtime_caller(x_user_role, x_user_name)
+    is_coord = principal.is_coordinator
+    caller_name = principal.full_name
     q = _scope_overtime_query(db.query(OvertimeRecord), is_coord, caller_name)
 
     if start_date:
@@ -3424,18 +3901,16 @@ def get_overtimes_analytics(
 def get_overtime_detail(
     record_id: int,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name")
+    principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES, detail="Acceso restringido: sesión autenticada requerida.")),
 ):
-    is_coord, caller_name = _resolve_overtime_caller(x_user_role, x_user_name)
     record = db.query(OvertimeRecord).filter(OvertimeRecord.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Registro de hora extra no encontrado.")
-    caller_low = caller_name.lower()
-    is_owner = bool(caller_low and (caller_low in (record.created_by or "").lower() or caller_low in (record.specialist_name or "").lower()))
+    is_coord = principal.is_coordinator
+    is_owner = _is_overtime_owner(record, principal.full_name)
     if not is_coord and not is_owner:
         raise HTTPException(status_code=403, detail="Permiso denegado: solo puedes ver tus propios registros de horas extras.")
-    return _serialize_overtime(record, x_user_name, x_user_role)
+    return _serialize_overtime(record, principal)
 
 
 @app.put("/api/overtimes/{record_id}")
@@ -3445,18 +3920,15 @@ def update_overtime(
     req: UpdateOvertimeRequest,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name")
+    principal: AuthPrincipal = Depends(require_roles(OPERATIONAL_ROLES, detail="Acceso restringido: Solo Coordinadores y Especialistas pueden modificar horas extras.")),
 ):
     """Actualiza un registro de horas extras recalculando la duración si las fechas cambian."""
     record = db.query(OvertimeRecord).filter(OvertimeRecord.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Registro de hora extra no encontrado.")
 
-    role = (x_user_role or "").strip().lower()
-    caller_name = _clean_header_user(x_user_name).lower()
-    is_coord = role in ("coordinador", "admin", "administrador")
-    is_owner = bool(caller_name and (caller_name in (record.created_by or "").lower() or caller_name in (record.specialist_name or "").lower()))
+    is_coord = principal.is_coordinator
+    is_owner = _is_overtime_owner(record, principal.full_name)
 
     if not is_coord and not is_owner:
         raise HTTPException(
@@ -3516,7 +3988,7 @@ def update_overtime(
                        "categoria": record.category, "inicio": str(record.start_time), "fin": str(record.end_time)},
               request=request)
 
-    return _serialize_overtime(record, x_user_name, x_user_role)
+    return _serialize_overtime(record, principal)
 
 
 @app.delete("/api/overtimes/{record_id}")
@@ -3524,18 +3996,15 @@ def delete_overtime(
     record_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name")
+    principal: AuthPrincipal = Depends(require_roles(OPERATIONAL_ROLES, detail="Acceso restringido: Solo Coordinadores y Especialistas pueden eliminar horas extras.")),
 ):
     """Elimina un registro de horas extras con validación de permisos."""
     record = db.query(OvertimeRecord).filter(OvertimeRecord.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Registro de hora extra no encontrado.")
 
-    role = (x_user_role or "").strip().lower()
-    caller_name = _clean_header_user(x_user_name).lower()
-    is_coord = role in ("coordinador", "admin", "administrador")
-    is_owner = bool(caller_name and (caller_name in (record.created_by or "").lower() or caller_name in (record.specialist_name or "").lower()))
+    is_coord = principal.is_coordinator
+    is_owner = _is_overtime_owner(record, principal.full_name)
 
     if not is_coord and not is_owner:
         raise HTTPException(
@@ -3566,34 +4035,26 @@ def get_audit_logs(
     username: str | None = Query(None),
     search: str | None = Query(None),
     db: Session = Depends(get_db),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name")
+    principal: AuthPrincipal = Depends(require_roles(AUTHENTICATED_ROLES, detail="Acceso restringido: Debe iniciar sesión con un perfil autorizado para consultar auditoría.")),
 ):
     """Retorna los registros de auditoría y bitácora de actividad en PostgreSQL."""
-    role = decode_header_val(x_user_role).lower()
-    caller_name = _clean_header_user(x_user_name)
-    if not role or role not in AUTHENTICATED_ROLES:
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Debe iniciar sesión con un perfil autorizado para consultar auditoría."
-        )
-    is_coord = role in COORDINATOR_ROLES
-    if not is_coord and not caller_name:
-        raise HTTPException(
-            status_code=403,
-            detail="Acceso restringido: Identidad de usuario requerida para consultar registros propios."
-        )
+    is_coord = principal.is_coordinator
+    caller_name = principal.full_name
+    caller_username = principal.username
 
     q = db.query(AuditLog)
 
     # Si no es coordinador ni admin, restringir para ver únicamente sus propias acciones
     if not is_coord:
-        q = q.filter(
-            or_(
-                AuditLog.username.ilike(f"%{caller_name}%"),
-                AuditLog.user_fullname.ilike(f"%{caller_name}%")
-            )
-        )
+        conds = []
+        if caller_username:
+            conds.append(AuditLog.username.ilike(caller_username))
+        if caller_name:
+            conds.append(AuditLog.user_fullname.ilike(f"%{caller_name}%"))
+            conds.append(AuditLog.username.ilike(f"%{caller_name}%"))
+        if not conds:
+            raise HTTPException(status_code=403, detail="Acceso restringido: Identidad de usuario requerida.")
+        q = q.filter(or_(*conds))
     elif username and username.strip():
         q = q.filter(AuditLog.username.ilike(f"%{username.strip()}%"))
 

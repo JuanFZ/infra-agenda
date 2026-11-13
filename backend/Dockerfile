@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sqlite3 \
     postgresql-client \
     libpq-dev \
+    gcc \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

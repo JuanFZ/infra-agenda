@@ -12,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 sys.path.insert(0, os.path.dirname(__file__))
 from app.database import Base, get_db
 from app.models import User, OvertimeRecord
-from app.main import app, ensure_db_schema
+from app.main import app, ensure_db_schema, create_session_token, hash_password
 
 # Use in-memory SQLite database with StaticPool for test continuity across threads
 TEST_DB_URL = "sqlite:///:memory:"
@@ -36,13 +36,24 @@ client = TestClient(app)
 def setup_module(module):
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
+    db.query(OvertimeRecord).delete()
+    db.query(User).delete()
     # Create test users
-    u_coord = User(full_name="Adonis Lozada", username="a.lozada", email="a.lozada@sycom.com.ve", role="coordinador")
-    u_spec1 = User(full_name="Juan Fernández", username="j.fernandez", email="j.fernandez@sycom.com.ve", role="especialista")
-    u_spec2 = User(full_name="Yoxaide Jiménez", username="y.jimenez", email="y.jimenez@sycom.com.ve", role="especialista")
+    pw = hash_password("Overtime$2026!")
+    u_coord = User(full_name="Adonis Lozada", username="a.lozada", email="a.lozada@sycom.com.ve", role="coordinador", password_hash=pw, is_active=1, must_change_password=0)
+    u_spec1 = User(full_name="Juan Fernández", username="j.fernandez", email="j.fernandez@sycom.com.ve", role="especialista", password_hash=pw, is_active=1, must_change_password=0)
+    u_spec2 = User(full_name="Yoxaide Jiménez", username="y.jimenez", email="y.jimenez@sycom.com.ve", role="especialista", password_hash=pw, is_active=1, must_change_password=0)
     db.add_all([u_coord, u_spec1, u_spec2])
     db.commit()
     db.close()
+
+def _auth_headers(username: str) -> dict[str, str]:
+    db = TestingSessionLocal()
+    try:
+        u = db.query(User).filter(User.username == username).first()
+        return {"Authorization": f"Bearer {create_session_token(u)}"}
+    finally:
+        db.close()
 
 def test_01_create_overtime_and_duration_calculation():
     payload = {
@@ -52,10 +63,7 @@ def test_01_create_overtime_and_duration_calculation():
         "category": "PostgreSQL",
         "project_name": "SIMF"
     }
-    headers = {
-        "X-User-Role": "Especialista",
-        "X-User-Name": urllib.parse.quote("Juan Fernández")
-    }
+    headers = _auth_headers("j.fernandez")
     res = client.post("/api/overtimes", json=payload, headers=headers)
     assert res.status_code == 200, res.text
     data = res.json()
@@ -75,7 +83,7 @@ def test_02_create_overtime_invalid_range():
         "description": "Rango inválido",
         "category": "Infraestructura"
     }
-    headers = {"X-User-Role": "Especialista", "X-User-Name": urllib.parse.quote("Juan Fernández")}
+    headers = _auth_headers("j.fernandez")
     res = client.post("/api/overtimes", json=payload, headers=headers)
     assert res.status_code == 400
     assert "posterior al inicio" in res.json()["detail"]
@@ -88,7 +96,7 @@ def test_03_specialist_cannot_create_for_another():
         "description": "Guardia de soporte técnico nocturno",
         "category": "Servidores"
     }
-    headers = {"X-User-Role": "Especialista", "X-User-Name": urllib.parse.quote("Juan Fernández")}
+    headers = _auth_headers("j.fernandez")
     res = client.post("/api/overtimes", json=payload, headers=headers)
     assert res.status_code == 200
     data = res.json()
@@ -103,7 +111,7 @@ def test_04_coordinator_can_create_for_anyone():
         "description": "Mantenimiento preventivo servidores",
         "category": "Infraestructura"
     }
-    headers = {"X-User-Role": "Coordinador", "X-User-Name": urllib.parse.quote("Adonis Lozada")}
+    headers = _auth_headers("a.lozada")
     res = client.post("/api/overtimes", json=payload, headers=headers)
     assert res.status_code == 200
     data = res.json()
@@ -119,21 +127,21 @@ def test_05_permissions_on_delete():
         "description": "Prueba de permisos para borrado",
         "category": "Infraestructura"
     }
-    res = client.post("/api/overtimes", json=payload, headers={"X-User-Role": "Especialista", "X-User-Name": urllib.parse.quote("Juan Fernández")})
+    res = client.post("/api/overtimes", json=payload, headers=_auth_headers("j.fernandez"))
     rec_id = res.json()["id"]
 
     # Yoxaide Jiménez tries to delete Juan's record -> 403 Forbidden
-    res_del_forbidden = client.delete(f"/api/overtimes/{rec_id}", headers={"X-User-Role": "Especialista", "X-User-Name": urllib.parse.quote("Yoxaide Jiménez")})
+    res_del_forbidden = client.delete(f"/api/overtimes/{rec_id}", headers=_auth_headers("y.jimenez"))
     assert res_del_forbidden.status_code == 403
 
     # Coordinator can delete it -> 200 OK
-    res_del_ok = client.delete(f"/api/overtimes/{rec_id}", headers={"X-User-Role": "Coordinador", "X-User-Name": urllib.parse.quote("Adonis Lozada")})
+    res_del_ok = client.delete(f"/api/overtimes/{rec_id}", headers=_auth_headers("a.lozada"))
     assert res_del_ok.status_code == 200
 
 def test_06_analytics_and_heatmap_matrix():
     res = client.get(
         "/api/overtimes/analytics",
-        headers={"X-User-Role": "Coordinador", "X-User-Name": "Adonis Lozada"}
+        headers=_auth_headers("a.lozada")
     )
     print("ANALYTICS RESULT:", res.status_code, res.text)
     assert res.status_code == 200
@@ -158,12 +166,12 @@ def test_07_zero_telegram_calls_on_overtime():
             "description": "Auditoría de seguridad y políticas de conexión",
             "category": "PostgreSQL"
         }
-        res = client.post("/api/overtimes", json=payload, headers={"X-User-Role": "Especialista", "X-User-Name": urllib.parse.quote("Juan Fernández")})
+        res = client.post("/api/overtimes", json=payload, headers=_auth_headers("j.fernandez"))
         assert res.status_code == 200
         rec_id = res.json()["id"]
 
-        client.put(f"/api/overtimes/{rec_id}", json={"description": "Actualización de auditoría"}, headers={"X-User-Role": "Especialista", "X-User-Name": urllib.parse.quote("Juan Fernández")})
-        client.delete(f"/api/overtimes/{rec_id}", headers={"X-User-Role": "Especialista", "X-User-Name": urllib.parse.quote("Juan Fernández")})
+        client.put(f"/api/overtimes/{rec_id}", json={"description": "Actualización de auditoría"}, headers=_auth_headers("j.fernandez"))
+        client.delete(f"/api/overtimes/{rec_id}", headers=_auth_headers("j.fernandez"))
 
         # ZERO Telegram calls must be made
         mock_tg.assert_not_called()

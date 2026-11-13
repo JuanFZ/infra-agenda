@@ -123,6 +123,10 @@ class User(Base):
     job_title = Column(String(100), nullable=True) # Cargo o puesto
     bio = Column(String(255), nullable=True) # Resumen o biografía corta
     is_active = Column(Integer, default=1)
+    must_change_password = Column(Integer, default=0)
+    token_version = Column(Integer, default=1)
+    failed_login_attempts = Column(Integer, default=0)
+    locked_until = Column(DateTime, nullable=True)
     last_login = Column(DateTime, nullable=True)
 
 

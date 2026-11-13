@@ -16,6 +16,8 @@ from app import config
 from app.database import Base, get_db
 from app.main import (
     app,
+    create_kiosk_token,
+    create_session_token,
     hash_password,
     init_users,
     is_item_visible_to_user,
@@ -224,6 +226,16 @@ class TestPhase1SecurityHardening(unittest.TestCase):
         finally:
             mem_db.close()
 
+    @classmethod
+    def _auth_headers_for(cls, username: str) -> dict[str, str]:
+        db = TestingSessionLocal()
+        try:
+            u = db.query(User).filter(User.username == username).first()
+            assert u is not None, f"Seeded user {username} missing"
+            return {"Authorization": f"Bearer {create_session_token(u)}"}
+        finally:
+            db.close()
+
     def test_04_unauthenticated_requests_rejected_fail_closed(self):
         protected_gets = [
             "/api/items",
@@ -246,7 +258,7 @@ class TestPhase1SecurityHardening(unittest.TestCase):
         ]
         for path in protected_gets:
             res = self.client.get(path)
-            self.assertEqual(res.status_code, 403, f"GET {path} allowed unauthenticated ({res.status_code})")
+            self.assertEqual(res.status_code, 401, f"GET {path} allowed unauthenticated ({res.status_code})")
 
         protected_writes = [
             ("POST", "/api/sync", None),
@@ -263,26 +275,25 @@ class TestPhase1SecurityHardening(unittest.TestCase):
         ]
         for method, path, body in protected_writes:
             res = self.client.request(method, path, json=body)
-            self.assertEqual(res.status_code, 403, f"{method} {path} allowed unauthenticated ({res.status_code})")
+            self.assertEqual(res.status_code, 401, f"{method} {path} allowed unauthenticated ({res.status_code})")
 
     def test_05_forged_unknown_or_publico_role_rejected(self):
-        for bad_role in ("publico", "guest", "superadmin_fake"):
+        for bad_role in ("publico", "guest", "superadmin_fake", "coordinador"):
             headers = {"X-User-Role": bad_role, "X-User-Name": "Intruder"}
-            self.assertEqual(self.client.get("/api/items", headers=headers).status_code, 403)
-            self.assertEqual(self.client.get("/api/kpis", headers=headers).status_code, 403)
-            self.assertEqual(self.client.get("/api/escalations", headers=headers).status_code, 403)
-            self.assertEqual(self.client.get("/api/users/me", headers=headers).status_code, 403)
+            self.assertEqual(self.client.get("/api/items", headers=headers).status_code, 401)
+            self.assertEqual(self.client.get("/api/kpis", headers=headers).status_code, 401)
+            self.assertEqual(self.client.get("/api/escalations", headers=headers).status_code, 401)
+            self.assertEqual(self.client.get("/api/users/me", headers=headers).status_code, 401)
 
     def test_06_tv_guest_role_is_strictly_read_only(self):
-        tv_headers = {"X-User-Role": "tv", "X-User-Name": "Pantalla Modo TV"}
+        tv_headers = {"Authorization": f"Bearer {create_kiosk_token()}"}
 
         # Allowed TV display read endpoints
         for read_path in (
             "/api/items?tv_mode=true",
             "/api/kpis",
-            "/api/reports/data?role=tv",
+            "/api/reports/data",
             "/api/ibps",
-            "/api/escalations",
             "/api/team",
         ):
             res = self.client.get(read_path, headers=tv_headers)
@@ -291,6 +302,7 @@ class TestPhase1SecurityHardening(unittest.TestCase):
         # Denied privileged / operational / write endpoints
         denied = [
             ("POST", "/api/sync", None),
+            ("GET", "/api/escalations", None),
             ("GET", "/api/users", None),
             ("GET", "/api/auth/users", None),
             ("GET", "/api/users/me", None),
@@ -306,11 +318,7 @@ class TestPhase1SecurityHardening(unittest.TestCase):
             self.assertEqual(res.status_code, 403, f"TV role should be denied {method} {path}, got {res.status_code}")
 
     def test_07_specialist_idor_and_privilege_boundaries(self):
-        spec_headers = {
-            "X-User-Role": "especialista",
-            "X-User-Name": "Juan Fernandez",
-            "X-User-Username": "j.fernandez",
-        }
+        spec_headers = self._auth_headers_for("j.fernandez")
 
         # Coordinator-only endpoints denied
         self.assertEqual(self.client.get("/api/auth/users", headers=spec_headers).status_code, 403)
@@ -330,17 +338,17 @@ class TestPhase1SecurityHardening(unittest.TestCase):
         for rec in ot_list.json():
             self.assertIn("juan", rec["specialist_name"].lower())
 
-        # Audit logs scoped to self only (and empty caller rejected)
+        # Audit logs scoped to self only (and forged header without token rejected)
         logs_res = self.client.get("/api/audit-logs", headers=spec_headers)
         self.assertEqual(logs_res.status_code, 200)
         for entry in logs_res.json():
             self.assertNotEqual(entry["username"], "a.lozada")
 
-        no_name_logs = self.client.get("/api/audit-logs", headers={"X-User-Role": "especialista"})
-        self.assertEqual(no_name_logs.status_code, 403)
+        no_auth_logs = self.client.get("/api/audit-logs", headers={"X-User-Role": "especialista"})
+        self.assertEqual(no_auth_logs.status_code, 401)
 
     def test_08_coordinator_checks_and_url_scheme_validation(self):
-        coord_headers = {"X-User-Role": "coordinador", "X-User-Name": "Adonis Lozada Figueroa"}
+        coord_headers = self._auth_headers_for("a.lozada")
 
         # Telegram status is coordinator-only and never leaks token/chat_id substrings
         orig_tok, orig_cid = config.TELEGRAM_BOT_TOKEN, config.TELEGRAM_CHAT_ID
@@ -385,11 +393,12 @@ class TestPhase1SecurityHardening(unittest.TestCase):
         root_dir = Path(__file__).resolve().parent.parent
         html = (root_dir / "frontend" / "index.html").read_text(encoding="utf-8")
 
-        # Guest TV mode downgraded from 'coordinador' to read-only 'tv'
-        guest_start = html.index("async function enterGuestTvMode()")
-        guest_block = html[guest_start:guest_start + 500]
-        self.assertIn("role: 'tv'", guest_block)
-        self.assertNotIn("role: 'coordinador'", guest_block)
+        # Kiosk TV mode uses read-only 'tv' role and requires /api/auth/kiosk
+        kiosk_start = html.index("async function activateKioskSession(")
+        kiosk_block = html[kiosk_start:kiosk_start + 600]
+        self.assertIn("role: 'tv'", kiosk_block)
+        self.assertNotIn("role: 'coordinador'", kiosk_block)
+        self.assertIn("/auth/kiosk", html)
 
         # TV sync button has explicit ID and forceSync sends auth headers + status check
         self.assertIn('id="tvBtnSync"', html)
@@ -398,9 +407,9 @@ class TestPhase1SecurityHardening(unittest.TestCase):
         self.assertIn("headers: getAuthHeaders()", force_block)
         self.assertIn("!syncRes.ok", force_block)
 
-        # TV init skips fetchCurrentUserProfile and exit clears guest session
-        auth_start = html.index("function checkAuthAndInit()")
-        auth_block = html[auth_start:auth_start + 800]
+        # TV init skips fetchCurrentUserProfile and verifies server session
+        auth_start = html.index("async function checkAuthAndInit()")
+        auth_block = html[auth_start:auth_start + 3200]
         self.assertIn("roleLower === 'tv'", auth_block)
         self.assertIn("fetchCurrentUserProfile();", auth_block)
 
